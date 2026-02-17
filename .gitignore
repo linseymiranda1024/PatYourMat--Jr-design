@@ -63,3 +63,8 @@ ios/Flutter/flutter_export_environment.sh
 # macOS
 macos/Flutter/ephemeral/
 macos/Flutter/Flutter-Generated.xcconfig
+
+
+# Firebase config
+android/app/google-services.json
+ios/Runner/GoogleService-Info.plist
