@@ -164,7 +164,8 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
               _providerAuth.authState == AuthState.AUTHENTICATED &&
               _providerUserProfile.dataLoaded &&
               _providerUserProfile.accountCreationStep == AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
-          return ScrollableBackground(child: _getWidgetToShow(), padding: isLoggedIn ? 0 : 20);
+          final bool isAuthScreen = _providerAuth.authState == AuthState.UN_AUTHENTICATED || _providerAuth.isShowingSplash;
+          return ScrollableBackground(child: _getWidgetToShow(), padding: (isLoggedIn || isAuthScreen) ? 0 : 20);
         },
       ),
     );
