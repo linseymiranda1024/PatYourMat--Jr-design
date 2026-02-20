@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: main.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/18/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file is the main entry point for the app and
 //              initializes the app and the router.
 
@@ -110,7 +110,7 @@ class _MyAppState extends State<MyApp> {
   Widget build(BuildContext context) {
     return MaterialApp.router(
       routerConfig: _router,
-      title: 'CSC 322 Starter Project',
+      title: 'Pat Your Mat!',
       theme: lightTheme,
       darkTheme: darkTheme,
       themeMode: ThemeMode.light,

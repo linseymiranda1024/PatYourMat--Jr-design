@@ -2,7 +2,7 @@
 // Filename: widget_app_drawer.dart
 // Original Author: Wyatt Bodle
 // Creation Date: 6/10/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the primary scaffold for the app.
 
 //////////////////////////////////////////////////////////////////////////
@@ -11,7 +11,7 @@
 // Flutter external package imports
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
-import 'package:csc322_starter_app/widgets/navigation/widget_primary_app_bar.dart';
+import 'package:pat_your_mat/widgets/navigation/widget_primary_app_bar.dart';
 
 // App relative file imports
 import '../../widgets/general/widget_scrollable_background.dart';

@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: app_logger.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/18/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains a simple logger class that wraps
 //              the Flutter print method. This allows for easy logging
 //              to the console.

@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: widget_annotated_loading.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/27/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains a widget for displaying a loading
 //              animation with a timeout feature.
 

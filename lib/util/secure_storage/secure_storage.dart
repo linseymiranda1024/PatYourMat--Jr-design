@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: secure_storage.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 6/12/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the utility helper for storing data
 //              on the device (via secure storage).
 

@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: popup_dialogue.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/21/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains a wrapper around the Flutter alert
 //              dialogue library to display messages to the user.
 
@@ -118,14 +118,18 @@ class PopupDialogue {
             children: [
               Row(
                 children: [
-                  Image.asset(
-                    "images/logo.png",
-                    height: 35,
+                  const Icon(
+                    Icons.fitness_center,
+                    color: Color(0xFF8A2BFF),
+                    size: 30,
                   ),
                   Flexible(
                     child: Padding(
-                      padding: const EdgeInsets.only(left: 8.0, top: 5),
-                      child: Text(title),
+                      padding: const EdgeInsets.only(left: 12.0),
+                      child: Text(
+                        title,
+                        style: const TextStyle(fontWeight: FontWeight.bold),
+                      ),
                     ),
                   ),
                 ],

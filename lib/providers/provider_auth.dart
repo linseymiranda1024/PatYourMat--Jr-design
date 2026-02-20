@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: provider_auth.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/21/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file checks contains the provider class which manages
 //              the authentication state of the user.
 
@@ -22,6 +22,7 @@ import '../util/message_display/popup_dialogue.dart';
 import '../util/message_display/snackbar.dart';
 import '../util/logging/app_logger.dart';
 import 'provider_user_profile.dart';
+import '../models/user_profile.dart';
 
 // Constants
 const bool ENFORCE_EMAIL_VERIFICATION = true;
@@ -147,7 +148,7 @@ class ProviderAuth extends ChangeNotifier {
     // }
   }
 
-  Future<String> signinWithPassword(String email, String password) async {
+  Future<String> signinWithPassword(String email, String password, UserRole selectedRole) async {
     // Set message
     String errorMessage = "";
 
@@ -162,6 +163,23 @@ class ProviderAuth extends ChangeNotifier {
               throw FirebaseAuthException(code: "timeout");
             },
           );
+      
+      // If sign in was successful, check if the role matches
+      if (authResult.user != null) {
+        // Fetch the user's profile from Firestore to check the role
+        // We use the db instance directly here to avoid potential timing issues with providers
+        final doc = await FirebaseFirestore.instance.collection('user_profiles').doc(authResult.user!.uid).get();
+        if (doc.exists) {
+          final data = doc.data();
+          final storedRole = data?['role'] ?? 'Member';
+          final selectedRoleString = selectedRole == UserRole.STAFF ? 'Staff' : 'Member';
+
+          if (storedRole != selectedRoleString) {
+            errorMessage = "Unauthorized role. Please login as a $storedRole.";
+            await FirebaseAuth.instance.signOut();
+          }
+        }
+      }
     } catch (e) {
       if (e is FirebaseAuthException) {
         AppLogger.error("FirebaseAuthException: ${e.code}");

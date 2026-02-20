@@ -2,7 +2,7 @@
 // Filename: screen_settings.dart
 // Original Author: Wyatt Bodle
 // Creation Date: 6/06/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the screen for optional settings.
 
 //////////////////////////////////////////////////////////////////////////
@@ -13,7 +13,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/widgets.dart';
-import 'package:csc322_starter_app/widgets/navigation/widget_primary_app_bar.dart';
+import 'package:pat_your_mat/widgets/navigation/widget_primary_app_bar.dart';
 
 // App relative file imports
 import '../../providers/provider_user_profile.dart';

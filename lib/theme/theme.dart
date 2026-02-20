@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: theme.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/21/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the themes for the app.
 
 //////////////////////////////////////////////////////////////////////////
@@ -11,7 +11,7 @@
 
 // Flutter external package imports
 import 'package:flutter/material.dart';
-import 'package:csc322_starter_app/theme/colors.dart';
+import 'package:pat_your_mat/theme/colors.dart';
 
 //////////////////////////////////////////////////////////////////////////
 // LIGHT-MODE THEME

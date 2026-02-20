@@ -1,60 +1,68 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../../providers/provider_user_profile.dart';
+import '../../models/user_profile.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/calendar_screen.dart';
 import '../../screens/friends_screen.dart';
 import '../../screens/notifications_screen.dart';
 import '../../screens/profile_screen.dart';
+import '../../screens/staff/screen_staff_portal.dart';
+import '../../main.dart';
 
-class WidgetAppOutline extends StatefulWidget {
+class WidgetAppOutline extends ConsumerStatefulWidget {
   static const routeName = '/home_outline';
 
   const WidgetAppOutline({super.key});
 
   @override
-  State<WidgetAppOutline> createState() => _WidgetAppOutlineState();
+  ConsumerState<WidgetAppOutline> createState() => _WidgetAppOutlineState();
 }
 
-class _WidgetAppOutlineState extends State<WidgetAppOutline> {
+class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
   int _index = 0;
-
-  final _pages = const [
-    HomeScreen(),
-    CalendarScreen(),
-    FriendsScreen(),
-    NotificationsScreen(),
-    ProfileScreen(),
-  ];
 
   @override
   Widget build(BuildContext context) {
+    final userProfile = ref.watch(providerUserProfile);
+    final isStaff = userProfile.role == UserRole.STAFF;
+
+    final pages = [
+      isStaff ? const ScreenStaffPortal() : const HomeScreen(),
+      const CalendarScreen(),
+      const FriendsScreen(),
+      const NotificationsScreen(),
+      const ProfileScreen(),
+    ];
+
     return Scaffold(
-      body: _pages[_index],
+      body: pages[_index],
       bottomNavigationBar: NavigationBar(
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         height: 70,
-        destinations: const [
+        destinations: [
           NavigationDestination(
-            icon: Icon(Icons.home_outlined),
-            selectedIcon: Icon(Icons.home),
-            label: 'Home',
+            icon: Icon(isStaff ? Icons.admin_panel_settings_outlined : Icons.home_outlined),
+            selectedIcon: Icon(isStaff ? Icons.admin_panel_settings : Icons.home),
+            label: isStaff ? 'Staff Portal' : 'Home',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.calendar_month_outlined),
             selectedIcon: Icon(Icons.calendar_month),
             label: 'Calendar',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.group_outlined),
             selectedIcon: Icon(Icons.group),
             label: 'Friends',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.notifications_none),
             selectedIcon: Icon(Icons.notifications),
             label: 'Alerts',
           ),
-          NavigationDestination(
+          const NavigationDestination(
             icon: Icon(Icons.person_outline),
             selectedIcon: Icon(Icons.person),
             label: 'Profile',

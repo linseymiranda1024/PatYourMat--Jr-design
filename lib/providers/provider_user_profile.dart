@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: provider_user_profile.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/22/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file checks contains the provider class which manages
 //              the user profile state of the user.
 

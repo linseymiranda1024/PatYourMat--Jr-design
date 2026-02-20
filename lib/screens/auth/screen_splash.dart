@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: screen_splash.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/21/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file checks contains the splash screen which is shown
 //              when the app is first opened.
 
@@ -12,8 +12,6 @@
 // Flutter external package imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:flutter/material.dart';
-import 'package:lottie/lottie.dart';
-import 'package:csc322_starter_app/widgets/general/widget_annotated_loading.dart';
 
 // App relative file imports
 import '../../providers/provider_auth.dart';
@@ -113,7 +111,7 @@ class _ScreenSplashState extends ConsumerState<ScreenSplash> with TickerProvider
             ),
             const SizedBox(height: 8),
             const Text(
-              'Your Personal Yoga Companion',
+              'Consistency starts here.',
               style: TextStyle(
                 fontSize: 18,
                 color: Colors.white70,

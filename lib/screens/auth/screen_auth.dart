@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: provider_auth.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/22/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the screen for authenticating users
 //              (login, account creation).
 
@@ -114,7 +114,7 @@ class _ScreenAuthState extends ConsumerState<ScreenAuth> {
       User? user = _auth.currentUser;
       if (isLogin) {
         // Attempt login
-        String errorMessage = (await _providerAuth.signinWithPassword(email, password)).trim();
+        String errorMessage = (await _providerAuth.signinWithPassword(email, password, _selectedRole)).trim();
 
         // If there was an error, display it...otherwise load the profile
         if (errorMessage.isNotEmpty) {

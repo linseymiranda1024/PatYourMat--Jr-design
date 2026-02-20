@@ -1,10 +1,6 @@
 # -----------------------------------------------------------------------
 # Filename: pubspec.yaml
-# Original Author: Dan Grissom
-# Creation Date: 5/18/2024
-# Copyright: (c) 2024 CSC322
-# Description: This file specifies the dependencies of Mobile Innovation
-#              Concierge.
+# Description: This file specifies the dependencies of Pat Your Mat!
 # -----------------------------------------------------------------------
 #            ____      _      _   __  __   _       _
 #           / ___|    / \    (_) |  \/  | | |     | |
@@ -12,8 +8,8 @@
 #          | |___   / ___ \  | | | |  | | | |___  | |___
 #           \____| /_/   \_\ |_| |_|  |_| |_____| |_____|
 # -----------------------------------------------------------------------
-name: csc322_starter_app
-description: "CSC 322 Starter App"
+name: pat_your_mat
+description: "Pat Your Mat! - Gym Management App"
 publish_to: "none" # Remove this line if you wish to publish to pub.dev
 version: 1.0.1+1
 

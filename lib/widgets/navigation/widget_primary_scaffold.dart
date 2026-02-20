@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: widget_primary_scaffold.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/27/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the primary scaffold for the app.
 
 //////////////////////////////////////////////////////////////////////////

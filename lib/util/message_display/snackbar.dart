@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: snackbar.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/21/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains a wrapper around the Flutter snackbar
 //              library to display messages to the user.
 

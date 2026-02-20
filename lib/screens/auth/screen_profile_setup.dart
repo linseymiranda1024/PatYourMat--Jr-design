@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: screen_provider_setup.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/27/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains the screen for setting up the user's
 //              profile.
 
@@ -119,7 +119,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       User? user = _auth.currentUser;
       if (isLogin) {
         // Attempt login
-        String errorMessage = (await _providerAuth.signinWithPassword(email, password)).trim();
+        String errorMessage = (await _providerAuth.signinWithPassword(email, password, _providerUserProfile.role)).trim();
 
         // If there was an error, display it...otherwise return true for success
         if (errorMessage.isNotEmpty) {

@@ -1,8 +1,8 @@
 // -----------------------------------------------------------------------
 // Filename: colors.dart
-// Original Author: Dan Grissom
+// Original Author: Emily Ehrenberg
 // Creation Date: 5/18/2024
-// Copyright: (c) 2024 CSC322
+// Copyright: (c) 2024 Pat Your Mat!
 // Description: This file contains all of the custom colors used in the
 //              MIC app.
 
