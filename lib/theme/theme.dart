@@ -17,34 +17,23 @@ import 'package:csc322_starter_app/theme/colors.dart';
 // LIGHT-MODE THEME
 //////////////////////////////////////////////////////////////////////////
 final ThemeData lightTheme = ThemeData(
-  colorScheme: ColorScheme(
-    // primary: Color(0xFF7FBDDC),
-    primary: Color(0xFF022A3A),
-    onPrimary: Color(0xFFFFFFFF),
-    // onPrimary: Color(0xFF022A3A),
-    secondary: Color(0xFF022A3A),
-    onSecondary: Color(0xFFFFFFFF),
-    surface: CustomColors.offWhite,
-    error: Color(0xFFCC0000),
-    onError: Color(0xFFFFFFFF),
-    onSurface: Color(0xFF022A3A),
-    brightness: Brightness.light,
-  ),
   useMaterial3: true,
   brightness: Brightness.light,
-  scaffoldBackgroundColor: CustomColors.primaryBackgroundLightMode,
-  cardColor: CustomColors.offWhite,
-
+  scaffoldBackgroundColor: const Color(0xFFF6F7FB),
+  colorScheme: ColorScheme.fromSeed(seedColor: const Color(0xFF7A2CFF)),
+  
   // Input decoration theme - Used for TextFormFields
   inputDecorationTheme: milLightInputDecorationTheme,
   textButtonTheme: milLightTextButtonTheme,
   textTheme: Typography.blackRedmond,
   bottomNavigationBarTheme: milLightBottomNavigationBarTheme,
   appBarTheme: AppBarTheme(
-    backgroundColor: CustomColors.cloudGrey,
+    backgroundColor: const Color(0xFF7A2CFF).withOpacity(0.1),
   ),
-  iconTheme: IconThemeData(color: CustomColors.statusInfo),
-  floatingActionButtonTheme: milFloatingActionButtonTheme,
+  iconTheme: IconThemeData(color: const Color(0xFF7A2CFF)),
+  floatingActionButtonTheme: milFloatingActionButtonTheme.copyWith(
+    backgroundColor: const Color(0xFF7A2CFF),
+  ),
 );
 
 //////////////////////////////////////////////////////////////////////////

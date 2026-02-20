@@ -18,7 +18,7 @@ import 'package:flutter/material.dart';
 
 // App relative file imports
 import '../../widgets/general/widget_scrollable_background.dart';
-import '../../widgets/navigation/widget_primary_scaffold.dart';
+import '../../widgets/navigation/widget_app_outline.dart';
 import '../../widgets/general/widget_annotated_loading.dart';
 import '../../providers/provider_user_profile.dart';
 import '../../providers/provider_auth.dart';
@@ -131,7 +131,7 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
           AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO) {
         return const ScreenProfileSetup(isAuth: true);
       } else {
-        return const WidgetPrimaryScaffold();
+        return const WidgetAppOutline();
       }
     } else {
       return const WidgetAnnotatedLoading(

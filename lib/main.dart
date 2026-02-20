@@ -20,8 +20,8 @@ import 'package:flutter/material.dart';
 
 // App relative file imports
 import 'screens/general/screen_alternate.dart';
-import 'screens/general/screen_home.dart';
-import 'widgets/navigation/widget_primary_scaffold.dart';
+import 'screens/home_screen.dart';
+import 'widgets/navigation/widget_app_outline.dart';
 import 'screens/auth/screen_login_validation.dart';
 import 'screens/settings/screen_profile_edit.dart';
 import 'providers/provider_user_profile.dart';
@@ -91,10 +91,10 @@ class _MyAppState extends State<MyApp> {
       GoRoute(path: ScreenSettings.routeName, builder: (context, state) => ScreenSettings()),
       GoRoute(path: ScreenProfileEdit.routeName, builder: (context, state) => const ScreenProfileEdit()),
       GoRoute(
-        path: WidgetPrimaryScaffold.routeName,
-        builder: (BuildContext context, GoRouterState state) => const WidgetPrimaryScaffold(),
+        path: WidgetAppOutline.routeName,
+        builder: (BuildContext context, GoRouterState state) => const WidgetAppOutline(),
       ),
-      GoRoute(path: ScreenHome.routeName, builder: (BuildContext context, GoRouterState state) => ScreenHome()),
+      GoRoute(path: HomeScreen.routeName, builder: (BuildContext context, GoRouterState state) => HomeScreen()),
       GoRoute(
         path: ScreenAlternate.routeName,
         builder: (BuildContext context, GoRouterState state) => ScreenAlternate(),

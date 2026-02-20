@@ -1,11 +1,11 @@
 import 'package:flutter/material.dart';
 
 class AppColors {
-  static const primaryPurple = Color(0xFF9C27B0);
-  static const darkPurple = Color(0xFF7B1FA2);
-  static const deepPurple = Color(0xFF4A148C);
-  static const gradientStart = Color(0xFFAB47BC);
-  static const gradientEnd = Color(0xFF1976D2); // blue-ish accent
+  static const primaryPurple = Color(0xFF8A2BFF);
+  static const darkPurple = Color(0xFF5E54FF); // Derived intermediate
+  static const deepPurple = Color(0xFF2F7BFF);
+  static const gradientStart = Color(0xFF8A2BFF);
+  static const gradientEnd = Color(0xFF2F7BFF);
   static const textLight = Colors.white;
   static const textLight70 = Colors.white70;
   static const textLight60 = Colors.white60;
