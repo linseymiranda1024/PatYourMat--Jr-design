@@ -45,6 +45,7 @@ class ScreenAuth extends ConsumerStatefulWidget {
 class _ScreenAuthState extends ConsumerState<ScreenAuth> {
   // The "instance variables" managed in this state
   bool _signInMode = true;
+  UserRole _selectedRole = UserRole.MEMBER;
   bool _passwordVisible = false;
   var _isInit = true;
   late ProviderUserProfile _providerUserProfile;
@@ -133,6 +134,7 @@ class _ScreenAuthState extends ConsumerState<ScreenAuth> {
             await FirebaseAuth.instance.currentUser?.sendEmailVerification();
           }
           _providerUserProfile.email = user?.email ?? email;
+          _providerUserProfile.role = _selectedRole;
           _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
           await _providerUserProfile.writeUserProfileToDb();
           _providerAuth.isSigningIn = false;
@@ -281,144 +283,210 @@ class _ScreenAuthState extends ConsumerState<ScreenAuth> {
           ),
         ),
         child: SingleChildScrollView(
-            padding: const EdgeInsets.symmetric(horizontal: 32.0),
-            child: Form(
-              key: _formKey,
-              child: Column(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  const SizedBox(height: 60),
+          padding: const EdgeInsets.symmetric(horizontal: 32.0),
+          child: Form(
+            key: _formKey,
+            child: Column(
+              mainAxisAlignment: MainAxisAlignment.center,
+              children: [
+                const SizedBox(height: 60),
 
-                  const Icon(
-                    Icons.fitness_center,
-                    size: 100,
+                const Icon(
+                  Icons.fitness_center,
+                  size: 100,
+                  color: AppColors.textLight,
+                ),
+
+                const SizedBox(height: 24),
+
+                const Text(
+                  'Pat Your Mat!',
+                  style: TextStyle(
+                    fontSize: 40,
+                    fontWeight: FontWeight.bold,
                     color: AppColors.textLight,
+                    letterSpacing: 1.2,
                   ),
+                ),
 
-                  const SizedBox(height: 24),
+                const SizedBox(height: 8),
 
-                  const Text(
-                    'Pat Your Mat!',
-                    style: TextStyle(
-                      fontSize: 40,
-                      fontWeight: FontWeight.bold,
-                      color: AppColors.textLight,
-                      letterSpacing: 1.2,
-                    ),
+                const Text(
+                  'Reserve your spot in group exercise classes',
+                  style: TextStyle(
+                    fontSize: 18,
+                    color: AppColors.textLight70,
                   ),
+                  textAlign: TextAlign.center,
+                ),
 
-                  const SizedBox(height: 8),
+                const SizedBox(height: 40),
 
-                  const Text(
-                    'Reserve your spot in group exercise classes',
-                    style: TextStyle(
-                      fontSize: 18,
-                      color: AppColors.textLight70,
-                    ),
-                    textAlign: TextAlign.center,
+                // User/Staff Toggle
+                Container(
+                  decoration: BoxDecoration(
+                    color: Colors.white.withOpacity(0.1),
+                    borderRadius: BorderRadius.circular(12),
                   ),
-
-                  const SizedBox(height: 60),
-
-                  CustomTextField(
-                    controller: _emailController,
-                    hintText: 'Email',
-                    prefixIcon: Icons.email,
-                    keyboardType: TextInputType.emailAddress,
-                    textInputAction: TextInputAction.next,
-                    validator: _validateEmail,
-                  ),
-
-                  const SizedBox(height: 20),
-
-                  CustomTextField(
-                    controller: _passwordController,
-                    hintText: 'Password',
-                    prefixIcon: Icons.lock,
-                    obscureText: !_passwordVisible,
-                    textInputAction: _signInMode ? TextInputAction.done : TextInputAction.next,
-                    validator: validatePasssword,
-                    onFieldSubmitted: (_) {
-                      if (_signInMode) _trySubmit();
-                    },
-                  ),
-                  
-                  if (!_signInMode) ...[
-                    const SizedBox(height: 20),
-                    CustomTextField(
-                      controller: _confirmPasswordController,
-                      hintText: 'Confirm Password',
-                      prefixIcon: Icons.lock,
-                      obscureText: !_passwordVisible,
-                      textInputAction: TextInputAction.done,
-                      validator: validateConfirmPassword,
-                      onFieldSubmitted: (_) => _trySubmit(),
-                    ),
-                  ],
-
-                  if (!_signInMode && _passwordController.text.isNotEmpty)
-                    Padding(
-                      padding: const EdgeInsets.only(top: 16.0),
-                      child: WidgetPasswordStrengthIndicator(
-                        passwordStrength: _passwordStrength,
-                        passwordText: _strengthText,
-                        passwordColor: _strengthColor,
-                      ),
-                    ),
-
-                  const SizedBox(height: 40),
-
-                  ElevatedButton(
-                    onPressed: _isLoading ? null : _trySubmit,
-                    child: _isLoading
-                        ? const CircularProgressIndicator(
-                            color: Colors.white,
-                          )
-                        : Text(
-                            _signInMode ? 'Sign In' : 'Create Account',
-                            style: const TextStyle(
-                              fontSize: 18,
-                              fontWeight: FontWeight.bold,
+                  padding: const EdgeInsets.all(4),
+                  child: Row(
+                    children: [
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedRole = UserRole.MEMBER),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _selectedRole == UserRole.MEMBER ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Gym Member',
+                                style: TextStyle(
+                                  color: _selectedRole == UserRole.MEMBER ? AppColors.deepPurple : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
                             ),
                           ),
-                  ),
-
-                  const SizedBox(height: 16),
-
-                  TextButton(
-                    onPressed: showPopup,
-                    child: const Text(
-                      'Forgot Password?',
-                      style: TextStyle(
-                        color: AppColors.textLight70,
-                        fontSize: 16,
+                        ),
                       ),
-                    ),
+                      Expanded(
+                        child: GestureDetector(
+                          onTap: () => setState(() => _selectedRole = UserRole.STAFF),
+                          child: Container(
+                            padding: const EdgeInsets.symmetric(vertical: 10),
+                            decoration: BoxDecoration(
+                              color: _selectedRole == UserRole.STAFF ? Colors.white : Colors.transparent,
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            child: Center(
+                              child: Text(
+                                'Staff',
+                                style: TextStyle(
+                                  color: _selectedRole == UserRole.STAFF ? AppColors.deepPurple : Colors.white,
+                                  fontWeight: FontWeight.bold,
+                                ),
+                              ),
+                            ),
+                          ),
+                        ),
+                      ),
+                    ],
                   ),
+                ),
 
-                  const SizedBox(height: 40),
+                const SizedBox(height: 30),
 
-                  GestureDetector(
-                    onTap: () {
+                CustomTextField(
+                  controller: _emailController,
+                  hintText: 'Email',
+                  prefixIcon: Icons.email,
+                  keyboardType: TextInputType.emailAddress,
+                  textInputAction: TextInputAction.next,
+                  validator: _validateEmail,
+                ),
+
+                const SizedBox(height: 20),
+
+                CustomTextField(
+                  controller: _passwordController,
+                  hintText: 'Password',
+                  prefixIcon: Icons.lock,
+                  obscureText: !_passwordVisible,
+                  textInputAction: _signInMode ? TextInputAction.done : TextInputAction.next,
+                  validator: validatePasssword,
+                  onChanged: (value) {
+                    if (!_signInMode) {
                       setState(() {
-                        _signInMode = !_signInMode;
+                        _passwordStrength = getPasswordStrength(value);
+                        _strengthText = getPasswordStrengthText(_passwordStrength);
+                        _strengthColor = getPasswordStrengthColor(_passwordStrength);
                       });
-                    },
-                    child: Text(
-                      _signInMode ? 'Create an account' : 'I already have an account',
-                      style: const TextStyle(
-                        color: AppColors.textLight,
-                        fontSize: 16,
-                        decoration: TextDecoration.underline,
-                      ),
+                    }
+                  },
+                  onFieldSubmitted: (_) {
+                    if (_signInMode) _trySubmit();
+                  },
+                ),
+
+                if (!_signInMode) ...[
+                  const SizedBox(height: 20),
+                  CustomTextField(
+                    controller: _confirmPasswordController,
+                    hintText: 'Confirm Password',
+                    prefixIcon: Icons.lock,
+                    obscureText: !_passwordVisible,
+                    textInputAction: TextInputAction.done,
+                    validator: validateConfirmPassword,
+                    onFieldSubmitted: (_) => _trySubmit(),
+                  ),
+                ],
+
+                if (!_signInMode && _passwordController.text.isNotEmpty)
+                  Padding(
+                    padding: const EdgeInsets.only(top: 16.0),
+                    child: WidgetPasswordStrengthIndicator(
+                      passwordStrength: _passwordStrength,
+                      passwordText: _strengthText,
+                      passwordColor: _strengthColor,
                     ),
                   ),
 
-                  const SizedBox(height: 40),
-                ],
-              ),
+                const SizedBox(height: 40),
+
+                ElevatedButton(
+                  onPressed: _isLoading ? null : _trySubmit,
+                  child: _isLoading
+                      ? const CircularProgressIndicator(
+                          color: Colors.white,
+                        )
+                      : Text(
+                          _signInMode ? 'Sign In' : 'Create Account',
+                          style: const TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
+                        ),
+                ),
+
+                const SizedBox(height: 16),
+
+                TextButton(
+                  onPressed: showPopup,
+                  child: const Text(
+                    'Forgot Password?',
+                    style: TextStyle(
+                      color: AppColors.textLight70,
+                      fontSize: 16,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+
+                GestureDetector(
+                  onTap: () {
+                    setState(() {
+                      _signInMode = !_signInMode;
+                    });
+                  },
+                  child: Text(
+                    _signInMode ? 'Create an account' : 'I already have an account',
+                    style: const TextStyle(
+                      color: AppColors.textLight,
+                      fontSize: 16,
+                      decoration: TextDecoration.underline,
+                    ),
+                  ),
+                ),
+
+                const SizedBox(height: 40),
+              ],
             ),
           ),
+        ),
       ),
     );
   }

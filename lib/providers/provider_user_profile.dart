@@ -42,6 +42,12 @@ class ProviderUserProfile extends ChangeNotifier {
 
   PermissionLevel get permissionLevel => _userProfile.permissionLevel;
 
+  UserRole get role => _userProfile.role;
+  set role(UserRole value) {
+    _userProfile.role = value;
+    notifyListeners();
+  }
+
   String get uid => _userProfile.uid;
   set uid(String value) {
     _userProfile.uid = value;

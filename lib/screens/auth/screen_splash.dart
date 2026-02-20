@@ -78,37 +78,55 @@ class _ScreenSplashState extends ConsumerState<ScreenSplash> with TickerProvider
   @override
   Widget build(BuildContext context) {
     // Return the widget for this control
-    return Column(
-      mainAxisAlignment: MainAxisAlignment.center,
-      children: [
-        Padding(
-          padding: const EdgeInsets.all(0),
-          child: Center(child: Image.asset("images/logo.png", width: MediaQuery.of(context).size.width * 0.8)),
+    return Scaffold(
+      backgroundColor: Colors.white,
+      body: Container(
+        width: double.infinity,
+        height: double.infinity,
+        decoration: const BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topCenter,
+            end: Alignment.bottomCenter,
+            colors: [
+              Color(0xFF8A2BFF),
+              Color(0xFF2F7BFF),
+            ],
+          ),
         ),
-        // const Padding(
-        //   padding: EdgeInsets.all(20),
-        //   child: Center(
-        //     child: CircularProgressIndicator(),
-        //   ),
-        // ),
-        // SizedBox(height: 20),
-        // Text(
-        //   "My App",
-        //   textAlign: TextAlign.center,
-        //   style: TextStyle(fontSize: 30, fontWeight: FontWeight.bold),
-        // ),
-        // SizedBox(height: 20),
-        // Center(
-        //   child: Lottie.asset(
-        //     MediaQuery.of(context).platformBrightness == Brightness.light
-        //         // ? 'animations/loading_light_mode.json'
-        //         ? 'animations/loading_dots.json'
-        //         : 'animations/loading_dots.json',
-        //     animate: true,
-        //     width: MediaQuery.of(context).size.width * 0.5,
-        //   ),
-        // ),
-      ],
+        child: Column(
+          mainAxisAlignment: MainAxisAlignment.center,
+          children: [
+            const Icon(
+              Icons.fitness_center,
+              size: 120,
+              color: Colors.white,
+            ),
+            const SizedBox(height: 24),
+            const Text(
+              'Pat Your Mat!',
+              style: TextStyle(
+                fontSize: 48,
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+                letterSpacing: 1.5,
+              ),
+            ),
+            const SizedBox(height: 8),
+            const Text(
+              'Your Personal Yoga Companion',
+              style: TextStyle(
+                fontSize: 18,
+                color: Colors.white70,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+            const SizedBox(height: 60),
+            const CircularProgressIndicator(
+              valueColor: AlwaysStoppedAnimation<Color>(Colors.white),
+            ),
+          ],
+        ),
+      ),
     );
   }
 }

@@ -211,17 +211,16 @@ class _WidgetAnnotatedLoading extends ConsumerState<WidgetAnnotatedLoading> {
     return Column(
       mainAxisAlignment: MainAxisAlignment.center,
       children: [
-        Center(
-          child: Lottie.asset(
-            MediaQuery.of(context).platformBrightness == Brightness.light
-                // ? 'animations/loading_light_mode.json'
-                ? 'animations/loading_dots.json'
-                : 'animations/loading_dots.json',
-            animate: true,
-            height: widget.height,
+        const Center(
+          child: SizedBox(
+            height: 60,
+            width: 60,
+            child: CircularProgressIndicator(
+              strokeWidth: 5,
+            ),
           ),
         ),
-        SizedBox(height: widget.loadingText.isEmpty ? 0 : 10),
+        const SizedBox(height: 30),
         if (widget.loadingText.isNotEmpty || widget.loadingTexts != null)
           Center(
             child: Text(

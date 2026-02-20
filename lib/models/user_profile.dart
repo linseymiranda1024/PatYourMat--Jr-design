@@ -14,6 +14,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 // Enum definition for account creation status
 enum AccountCreationStep { ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO, ACC_STEP_ONBOARDING_COMPLETE }
 
+// Enum definition for user role
+enum UserRole { MEMBER, STAFF }
+
 // Enum definition for permission level
 // NOTE: Do NOT change the order of these enums. They are used for permissions
 // checking (e.g., Developer has access to Beta and Production, but not vice versa by
@@ -31,6 +34,7 @@ class UserProfile {
   String _firstName = "";
   String _lastName = "";
   String _email = "";
+  UserRole _role = UserRole.MEMBER;
   PermissionLevel _permissionLevel = PermissionLevel.PRODUCTION;
   int _accountCreationTime = 0;
   DateTime _dateLastPasswordChange = DateTime.now().add(const Duration(days: -365));
@@ -45,6 +49,7 @@ class UserProfile {
     this._firstName,
     this._lastName,
     this._email,
+    this._role,
     this._permissionLevel,
     this._accountCreationTime,
     this._dateLastPasswordChange,
@@ -57,6 +62,7 @@ class UserProfile {
     _lastName = "";
     _firstName = "";
     _email = "";
+    _role = UserRole.MEMBER;
     _permissionLevel = PermissionLevel.PRODUCTION;
     _accountCreationTime = 0;
     _accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
@@ -71,6 +77,7 @@ class UserProfile {
     lastName = jsonObject["last_name"] ?? "";
     email = jsonObject["email"] ?? "";
     uid = firebaseUid;
+    role = _getRoleFromString(jsonObject["role"] ?? _getStringFromRole(UserRole.MEMBER));
     permissionLevel = _getPermissionLevelFromString(
       jsonObject["permission_level"] ?? _getStringFromPermissionLevel(PermissionLevel.PRODUCTION),
     );
@@ -90,6 +97,7 @@ class UserProfile {
   set firstName(String value) => _firstName = value;
   set lastName(String value) => _lastName = value;
   set email(String value) => _email = value;
+  set role(UserRole value) => _role = value;
 
   set permissionLevel(PermissionLevel value) => _permissionLevel = value;
   set accountCreationTime(int value) => _accountCreationTime = value;
@@ -103,6 +111,7 @@ class UserProfile {
   String get firstName => _firstName;
   String get lastName => _lastName;
   String get email => _email;
+  UserRole get role => _role;
 
   PermissionLevel get permissionLevel => _permissionLevel;
   int get accountCreationTime => _accountCreationTime;
@@ -142,6 +151,25 @@ class UserProfile {
 
   ////////////////////////////////////////////////////////////////////////
   // Converts from enum status to string (for DB usage) for
+  // user role
+  ////////////////////////////////////////////////////////////////////////
+  String _getStringFromRole(UserRole role) {
+    if (role == UserRole.MEMBER) return "Member";
+    if (role == UserRole.STAFF) return "Staff";
+    return "Member";
+  }
+
+  ////////////////////////////////////////////////////////////////////////
+  // Converts from String to enum status for user role
+  ////////////////////////////////////////////////////////////////////////
+  UserRole _getRoleFromString(String roleStr) {
+    if (roleStr == "Member") return UserRole.MEMBER;
+    if (roleStr == "Staff") return UserRole.STAFF;
+    return UserRole.MEMBER;
+  }
+
+  ////////////////////////////////////////////////////////////////////////
+  // Converts from enum status to string (for DB usage) for
   // permission level
   ////////////////////////////////////////////////////////////////////////
   String _getStringFromPermissionLevel(PermissionLevel permissionLevel) {
@@ -174,6 +202,7 @@ class UserProfile {
     jsonObject["last_name"] = lastName;
     jsonObject["email"] = email;
     jsonObject["email_lowercase"] = email.toLowerCase(); // Added for bf_manage_share_request GCF
+    jsonObject["role"] = _getStringFromRole(role);
     jsonObject["permission_level"] = _getStringFromPermissionLevel(permissionLevel);
     jsonObject["account_creation_time"] = accountCreationTime;
     jsonObject["date_last_password_change"] = _dateLastPasswordChange;
