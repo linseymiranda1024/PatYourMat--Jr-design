@@ -5,8 +5,6 @@ class HomeScreen extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
-    final cs = Theme.of(context).colorScheme;
-
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 24),
