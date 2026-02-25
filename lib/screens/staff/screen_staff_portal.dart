@@ -1,6 +1,8 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../../providers/provider_user_profile.dart';
+import '../../providers/provider_gym_class.dart';
+import '../../models/gym_class.dart';
 import '../../main.dart';
 
 class ScreenStaffPortal extends ConsumerWidget {
@@ -11,6 +13,8 @@ class ScreenStaffPortal extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final userProfile = ref.watch(providerUserProfile);
+    final gymClassProvider = ref.watch(providerGymClass);
+    final classes = gymClassProvider.classes;
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -18,25 +22,44 @@ class ScreenStaffPortal extends ConsumerWidget {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              'Staff Portal',
-              style: TextStyle(
-                fontSize: 32,
-                fontWeight: FontWeight.bold,
-                color: Theme.of(context).primaryColor,
-              ),
-            ),
-            const SizedBox(height: 8),
-            Text(
-              'Welcome back, ${userProfile.firstName}!',
-              style: const TextStyle(fontSize: 18, color: Colors.black54),
+            Row(
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Staff Portal',
+                      style: TextStyle(
+                        fontSize: 32,
+                        fontWeight: FontWeight.bold,
+                        color: Theme.of(context).primaryColor,
+                      ),
+                    ),
+                    const SizedBox(height: 8),
+                    Text(
+                      'Welcome back, ${userProfile.firstName}!',
+                      style: const TextStyle(fontSize: 18, color: Colors.black54),
+                    ),
+                  ],
+                ),
+                ElevatedButton.icon(
+                  onPressed: () => _showCreateClassDialog(context, ref),
+                  icon: const Icon(Icons.add),
+                  label: const Text('Create Class'),
+                  style: ElevatedButton.styleFrom(
+                    padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+                    shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
+                  ),
+                ),
+              ],
             ),
             const SizedBox(height: 32),
             
             // Stats Row
             Row(
               children: [
-                _buildStatCard('Active Classes', '12', Icons.class_, Colors.blue),
+                _buildStatCard('Active Classes', '${classes.length}', Icons.class_, Colors.blue),
                 const SizedBox(width: 16),
                 _buildStatCard('Total Members', '245', Icons.people, Colors.green),
               ],
@@ -52,15 +75,122 @@ class ScreenStaffPortal extends ConsumerWidget {
             
             const SizedBox(height: 40),
             const Text(
-              'Class Management (Dummy Data)',
+              'Class Management',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
             
-            // Dummy Class Management List
-            _buildManagementItem('Morning Vinyasa', 'Sarah J.', '6:00 AM', '28/30'),
-            _buildManagementItem('Power HIIT', 'Mike C.', '7:30 AM', '15/20'),
-            _buildManagementItem('Beginner Pilates', 'Emma W.', '9:00 AM', '10/25'),
+            if (gymClassProvider.isLoading)
+              const Center(child: CircularProgressIndicator())
+            else if (classes.isEmpty)
+              const Center(child: Text('No classes created yet.'))
+            else
+              ...classes.map((c) => _buildManagementItem(
+                context,
+                ref,
+                c.id,
+                c.title,
+                c.instructor,
+                c.timeText,
+                '${c.filled}/${c.capacity}',
+              )).toList(),
+          ],
+        ),
+      ),
+    );
+  }
+
+  void _showCreateClassDialog(BuildContext context, WidgetRef ref) {
+    final titleController = TextEditingController();
+    final instructorController = TextEditingController();
+    final locationController = TextEditingController();
+    final capacityController = TextEditingController();
+    final durationController = TextEditingController(text: '60');
+    DateTime selectedDate = DateTime.now();
+    TimeOfDay selectedTime = TimeOfDay.now();
+
+    showDialog(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setState) => AlertDialog(
+          title: const Text('Create New Class'),
+          content: SingleChildScrollView(
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Class Title')),
+                TextField(controller: instructorController, decoration: const InputDecoration(labelText: 'Instructor')),
+                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
+                TextField(
+                  controller: capacityController, 
+                  decoration: const InputDecoration(labelText: 'Capacity'),
+                  keyboardType: TextInputType.number,
+                ),
+                TextField(
+                  controller: durationController, 
+                  decoration: const InputDecoration(labelText: 'Duration (min)'),
+                  keyboardType: TextInputType.number,
+                ),
+                const SizedBox(height: 16),
+                Row(
+                  children: [
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          final date = await showDatePicker(
+                            context: context,
+                            initialDate: selectedDate,
+                            firstDate: DateTime.now(),
+                            lastDate: DateTime.now().add(const Duration(days: 365)),
+                          );
+                          if (date != null) setState(() => selectedDate = date);
+                        },
+                        child: Text('${selectedDate.month}/${selectedDate.day}/${selectedDate.year}'),
+                      ),
+                    ),
+                    Expanded(
+                      child: TextButton(
+                        onPressed: () async {
+                          final time = await showTimePicker(
+                            context: context,
+                            initialTime: selectedTime,
+                          );
+                          if (time != null) setState(() => selectedTime = time);
+                        },
+                        child: Text(selectedTime.format(context)),
+                      ),
+                    ),
+                  ],
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+            ElevatedButton(
+              onPressed: () {
+                final newClass = GymClass(
+                  id: '', // Firestore will generate this
+                  title: titleController.text,
+                  instructor: instructorController.text,
+                  dateTime: DateTime(
+                    selectedDate.year,
+                    selectedDate.month,
+                    selectedDate.day,
+                    selectedTime.hour,
+                    selectedTime.minute,
+                  ),
+                  durationMinutes: int.tryParse(durationController.text) ?? 60,
+                  location: locationController.text,
+                  capacity: int.tryParse(capacityController.text) ?? 20,
+                  filled: 0,
+                  status: ClassStatus.open,
+                );
+                ref.read(providerGymClass).addClass(newClass);
+                Navigator.pop(context);
+              },
+              child: const Text('Create'),
+            ),
           ],
         ),
       ),
@@ -89,7 +219,7 @@ class ScreenStaffPortal extends ConsumerWidget {
     );
   }
 
-  Widget _buildManagementItem(String title, String instructor, String time, String filled) {
+  Widget _buildManagementItem(BuildContext context, WidgetRef ref, String id, String title, String instructor, String time, String filled) {
     return Container(
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
@@ -123,7 +253,28 @@ class ScreenStaffPortal extends ConsumerWidget {
             ],
           ),
           const SizedBox(width: 16),
-          const Icon(Icons.edit_outlined, color: Colors.grey),
+          IconButton(
+            icon: const Icon(Icons.delete_outline, color: Colors.redAccent),
+            onPressed: () {
+              showDialog(
+                context: context,
+                builder: (context) => AlertDialog(
+                  title: const Text('Delete Class'),
+                  content: const Text('Are you sure you want to delete this class?'),
+                  actions: [
+                    TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
+                    TextButton(
+                      onPressed: () {
+                        ref.read(providerGymClass).deleteClass(id);
+                        Navigator.pop(context);
+                      }, 
+                      child: const Text('Delete', style: TextStyle(color: Colors.red)),
+                    ),
+                  ],
+                ),
+              );
+            },
+          ),
         ],
       ),
     );

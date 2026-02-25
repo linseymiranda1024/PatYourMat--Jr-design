@@ -1,12 +1,18 @@
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import '../providers/provider_gym_class.dart';
+import '../models/gym_class.dart' as model;
 
-class HomeScreen extends StatelessWidget {
+class HomeScreen extends ConsumerWidget {
   static const routeName = "/home";
 
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context) {
+  Widget build(BuildContext context, WidgetRef ref) {
+    final gymClassProvider = ref.watch(providerGymClass);
+    final classes = gymClassProvider.classes;
+
     return SafeArea(
       child: SingleChildScrollView(
         padding: const EdgeInsets.only(bottom: 24),
@@ -89,44 +95,29 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
-              child: Column(
-                children: [
-                  ClassCard(
-                    title: 'Power Yoga',
-                    instructor: 'Sarah Johnson',
-                    dateText: 'Mon, Feb 3',
-                    timeText: '6:00 AM',
-                    durationText: '60 min',
-                    status: ClassStatus.open,
-                    filled: 12,
-                    capacity: 30,
-                  ),
-                  SizedBox(height: 16),
-                  ClassCard(
-                    title: 'HIIT Blast',
-                    instructor: 'Mike Chen',
-                    dateText: 'Mon, Feb 3',
-                    timeText: '7:30 AM',
-                    durationText: '45 min',
-                    status: ClassStatus.full,
-                    filled: 25,
-                    capacity: 25,
-                  ),
-                  SizedBox(height: 16),
-                  ClassCard(
-                    title: 'Pilates Core',
-                    instructor: 'Emma Wilson',
-                    dateText: 'Mon, Feb 3',
-                    timeText: '8:30 AM',
-                    durationText: '50 min',
-                    status: ClassStatus.standby,
-                    filled: 22,
-                    capacity: 30,
-                  ),
-                ],
-              ),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
+              child: gymClassProvider.isLoading 
+                ? const Center(child: CircularProgressIndicator())
+                : classes.isEmpty
+                  ? const Center(child: Text('No classes available yet.'))
+                  : Column(
+                      children: classes.map((c) => Column(
+                        children: [
+                          ClassCard(
+                            title: c.title,
+                            instructor: c.instructor,
+                            dateText: c.dateText,
+                            timeText: c.timeText,
+                            durationText: c.durationText,
+                            status: c.status,
+                            filled: c.filled,
+                            capacity: c.capacity,
+                          ),
+                          const SizedBox(height: 16),
+                        ],
+                      )).toList(),
+                    ),
             ),
           ],
         ),
@@ -218,15 +209,13 @@ class _FilterChip extends StatelessWidget {
   }
 }
 
-enum ClassStatus { open, full, standby }
-
 class ClassCard extends StatelessWidget {
   final String title;
   final String instructor;
   final String dateText;
   final String timeText;
   final String durationText;
-  final ClassStatus status;
+  final model.ClassStatus status;
   final int filled;
   final int capacity;
 
@@ -324,7 +313,7 @@ class ClassCard extends StatelessWidget {
                     minHeight: 10,
                     backgroundColor: const Color(0xFFE9ECF3),
                     valueColor: AlwaysStoppedAnimation<Color>(
-                      status == ClassStatus.full ? const Color(0xFFB00020) : const Color(0xFF7A2CFF),
+                      status == model.ClassStatus.full ? const Color(0xFFB00020) : const Color(0xFF7A2CFF),
                     ),
                   ),
                 ),
@@ -345,13 +334,13 @@ class ClassCard extends StatelessWidget {
     );
   }
 
-  _StatusStyle _statusUi(ClassStatus s) {
+  _StatusStyle _statusUi(model.ClassStatus s) {
     switch (s) {
-      case ClassStatus.open:
+      case model.ClassStatus.open:
         return const _StatusStyle('Open', Color(0xFFDFF8E8), Color(0xFF0A7A2A));
-      case ClassStatus.full:
+      case model.ClassStatus.full:
         return const _StatusStyle('Full', Color(0xFFFBE2E2), Color(0xFFB00020));
-      case ClassStatus.standby:
+      case model.ClassStatus.standby:
         return const _StatusStyle('Standby', Color(0xFFFFE9D6), Color(0xFFB85A00));
     }
   }

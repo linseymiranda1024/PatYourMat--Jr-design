@@ -25,6 +25,7 @@ import 'widgets/navigation/widget_app_outline.dart';
 import 'screens/auth/screen_login_validation.dart';
 import 'screens/settings/screen_profile_edit.dart';
 import 'providers/provider_user_profile.dart';
+import 'providers/provider_gym_class.dart';
 import 'screens/settings/screen_settings.dart';
 import 'providers/provider_auth.dart';
 import 'util/file/util_file.dart';
@@ -40,6 +41,7 @@ final ProviderContainer providerContainer = ProviderContainer();
 // Create providers
 final providerUserProfile = ChangeNotifierProvider<ProviderUserProfile>((ref) => ProviderUserProfile());
 final providerAuth = ChangeNotifierProvider<ProviderAuth>((ref) => ProviderAuth());
+final providerGymClass = ChangeNotifierProvider<ProviderGymClass>((ref) => ProviderGymClass());
 
 //////////////////////////////////////////////////////////////////////////
 // MAIN entry point to start app.
