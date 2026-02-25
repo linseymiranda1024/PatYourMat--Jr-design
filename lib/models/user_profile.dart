@@ -34,6 +34,12 @@ class UserProfile {
   String _firstName = "";
   String _lastName = "";
   String _email = "";
+  String _phoneNumber = "";
+  String _bio = "";
+  List<String> _specialties = [];
+  int _yearsTeaching = 0;
+  bool _isActiveInstructor = false;
+  bool _allowClassCreation = false;
   UserRole _role = UserRole.MEMBER;
   PermissionLevel _permissionLevel = PermissionLevel.PRODUCTION;
   int _accountCreationTime = 0;
@@ -49,6 +55,12 @@ class UserProfile {
     this._firstName,
     this._lastName,
     this._email,
+    this._phoneNumber,
+    this._bio,
+    this._specialties,
+    this._yearsTeaching,
+    this._isActiveInstructor,
+    this._allowClassCreation,
     this._role,
     this._permissionLevel,
     this._accountCreationTime,
@@ -62,6 +74,12 @@ class UserProfile {
     _lastName = "";
     _firstName = "";
     _email = "";
+    _phoneNumber = "";
+    _bio = "";
+    _specialties = [];
+    _yearsTeaching = 0;
+    _isActiveInstructor = false;
+    _allowClassCreation = false;
     _role = UserRole.MEMBER;
     _permissionLevel = PermissionLevel.PRODUCTION;
     _accountCreationTime = 0;
@@ -76,6 +94,12 @@ class UserProfile {
     firstName = jsonObject["first_name"] ?? "";
     lastName = jsonObject["last_name"] ?? "";
     email = jsonObject["email"] ?? "";
+    phoneNumber = jsonObject["phone_number"] ?? "";
+    bio = jsonObject["bio"] ?? "";
+    specialties = List<String>.from(jsonObject["specialties"] ?? []);
+    yearsTeaching = jsonObject["years_teaching"] ?? 0;
+    isActiveInstructor = jsonObject["is_active_instructor"] ?? false;
+    allowClassCreation = jsonObject["allow_class_creation"] ?? false;
     uid = firebaseUid;
     role = _getRoleFromString(jsonObject["role"] ?? _getStringFromRole(UserRole.MEMBER));
     permissionLevel = _getPermissionLevelFromString(
@@ -97,6 +121,12 @@ class UserProfile {
   set firstName(String value) => _firstName = value;
   set lastName(String value) => _lastName = value;
   set email(String value) => _email = value;
+  set phoneNumber(String value) => _phoneNumber = value;
+  set bio(String value) => _bio = value;
+  set specialties(List<String> value) => _specialties = value;
+  set yearsTeaching(int value) => _yearsTeaching = value;
+  set isActiveInstructor(bool value) => _isActiveInstructor = value;
+  set allowClassCreation(bool value) => _allowClassCreation = value;
   set role(UserRole value) => _role = value;
 
   set permissionLevel(PermissionLevel value) => _permissionLevel = value;
@@ -111,6 +141,12 @@ class UserProfile {
   String get firstName => _firstName;
   String get lastName => _lastName;
   String get email => _email;
+  String get phoneNumber => _phoneNumber;
+  String get bio => _bio;
+  List<String> get specialties => _specialties;
+  int get yearsTeaching => _yearsTeaching;
+  bool get isActiveInstructor => _isActiveInstructor;
+  bool get allowClassCreation => _allowClassCreation;
   UserRole get role => _role;
 
   PermissionLevel get permissionLevel => _permissionLevel;
@@ -202,6 +238,12 @@ class UserProfile {
     jsonObject["last_name"] = lastName;
     jsonObject["email"] = email;
     jsonObject["email_lowercase"] = email.toLowerCase(); // Added for bf_manage_share_request GCF
+    jsonObject["phone_number"] = phoneNumber;
+    jsonObject["bio"] = bio;
+    jsonObject["specialties"] = specialties;
+    jsonObject["years_teaching"] = yearsTeaching;
+    jsonObject["is_active_instructor"] = isActiveInstructor;
+    jsonObject["allow_class_creation"] = allowClassCreation;
     jsonObject["role"] = _getStringFromRole(role);
     jsonObject["permission_level"] = _getStringFromPermissionLevel(permissionLevel);
     jsonObject["account_creation_time"] = accountCreationTime;

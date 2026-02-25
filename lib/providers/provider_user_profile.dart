@@ -40,6 +40,8 @@ class ProviderUserProfile extends ChangeNotifier {
   ////////////////////////////////////////////////////////////////////////
   bool get dataLoaded => _dataLoaded;
 
+  UserProfile get userProfile => _userProfile;
+
   PermissionLevel get permissionLevel => _userProfile.permissionLevel;
 
   UserRole get role => _userProfile.role;
@@ -71,6 +73,42 @@ class ProviderUserProfile extends ChangeNotifier {
   String get email => _userProfile.email;
   set email(String value) {
     _userProfile.email = value;
+    notifyListeners();
+  }
+
+  String get phoneNumber => _userProfile.phoneNumber;
+  set phoneNumber(String value) {
+    _userProfile.phoneNumber = value;
+    notifyListeners();
+  }
+
+  String get bio => _userProfile.bio;
+  set bio(String value) {
+    _userProfile.bio = value;
+    notifyListeners();
+  }
+
+  List<String> get specialties => _userProfile.specialties;
+  set specialties(List<String> value) {
+    _userProfile.specialties = value;
+    notifyListeners();
+  }
+
+  int get yearsTeaching => _userProfile.yearsTeaching;
+  set yearsTeaching(int value) {
+    _userProfile.yearsTeaching = value;
+    notifyListeners();
+  }
+
+  bool get isActiveInstructor => _userProfile.isActiveInstructor;
+  set isActiveInstructor(bool value) {
+    _userProfile.isActiveInstructor = value;
+    notifyListeners();
+  }
+
+  bool get allowClassCreation => _userProfile.allowClassCreation;
+  set allowClassCreation(bool value) {
+    _userProfile.allowClassCreation = value;
     notifyListeners();
   }
 

@@ -8,6 +8,7 @@ import '../../screens/friends_screen.dart';
 import '../../screens/notifications_screen.dart';
 import '../../screens/profile_screen.dart';
 import '../../screens/staff/screen_staff_portal.dart';
+import '../../screens/staff/screen_staff_profile.dart';
 import '../../main.dart';
 
 class WidgetAppOutline extends ConsumerStatefulWidget {
@@ -32,7 +33,7 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
       const CalendarScreen(),
       const FriendsScreen(),
       const NotificationsScreen(),
-      const ProfileScreen(),
+      isStaff ? const ScreenStaffProfile() : const ProfileScreen(),
     ];
 
     return Scaffold(

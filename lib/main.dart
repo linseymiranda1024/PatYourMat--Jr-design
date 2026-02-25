@@ -27,6 +27,7 @@ import 'screens/settings/screen_profile_edit.dart';
 import 'providers/provider_user_profile.dart';
 import 'providers/provider_gym_class.dart';
 import 'screens/settings/screen_settings.dart';
+import 'screens/staff/screen_staff_profile.dart';
 import 'providers/provider_auth.dart';
 import 'util/file/util_file.dart';
 import 'firebase_options.dart';
@@ -97,6 +98,7 @@ class _MyAppState extends State<MyApp> {
         builder: (BuildContext context, GoRouterState state) => const WidgetAppOutline(),
       ),
       GoRoute(path: HomeScreen.routeName, builder: (BuildContext context, GoRouterState state) => HomeScreen()),
+      GoRoute(path: ScreenStaffProfile.routeName, builder: (BuildContext context, GoRouterState state) => const ScreenStaffProfile()),
       GoRoute(
         path: ScreenAlternate.routeName,
         builder: (BuildContext context, GoRouterState state) => ScreenAlternate(),
