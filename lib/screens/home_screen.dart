@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../providers/provider_gym_class.dart';
 import '../models/gym_class.dart' as model;
+import '../main.dart';
 
 class HomeScreen extends ConsumerWidget {
   static const routeName = "/home";
