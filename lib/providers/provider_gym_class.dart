@@ -15,8 +15,14 @@ class ProviderGymClass extends ChangeNotifier {
 
   void _init() {
     _isLoading = true;
+    print('DEBUG: Initializing GymClass Stream...');
     DBGymClass.getClassesStream().listen((updatedClasses) {
+      print('DEBUG: Received ${updatedClasses.length} classes from Firestore');
       _classes = updatedClasses;
+      _isLoading = false;
+      notifyListeners();
+    }, onError: (error) {
+      print('DEBUG: Firestore Stream Error: $error');
       _isLoading = false;
       notifyListeners();
     });

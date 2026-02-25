@@ -26,18 +26,36 @@ class GymClass {
   });
 
   factory GymClass.fromFirestore(DocumentSnapshot doc) {
-    Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
-    return GymClass(
-      id: doc.id,
-      title: data['title'] ?? '',
-      instructor: data['instructor'] ?? '',
-      dateTime: (data['dateTime'] as Timestamp).toDate(),
-      durationMinutes: data['durationMinutes'] ?? 0,
-      location: data['location'] ?? '',
-      capacity: data['capacity'] ?? 0,
-      filled: data['filled'] ?? 0,
-      status: _parseStatus(data['status']),
-    );
+    try {
+      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      return GymClass(
+        id: doc.id,
+        title: data['title'] ?? 'Untitled Class',
+        instructor: data['instructor'] ?? 'Unknown Instructor',
+        dateTime: data['dateTime'] is Timestamp 
+            ? (data['dateTime'] as Timestamp).toDate() 
+            : DateTime.now(),
+        durationMinutes: (data['durationMinutes'] ?? 0).toInt(),
+        location: data['location'] ?? 'No Location',
+        capacity: (data['capacity'] ?? 0).toInt(),
+        filled: (data['filled'] ?? 0).toInt(),
+        status: _parseStatus(data['status']),
+      );
+    } catch (e) {
+      print('ERROR parsing GymClass from Firestore: $e');
+      // Return a fallback object so the stream doesn't crash
+      return GymClass(
+        id: doc.id,
+        title: 'Error Loading Class',
+        instructor: '',
+        dateTime: DateTime.now(),
+        durationMinutes: 0,
+        location: '',
+        capacity: 0,
+        filled: 0,
+        status: ClassStatus.open,
+      );
+    }
   }
 
   Map<String, dynamic> toFirestore() {
