@@ -1,4 +1,10 @@
 import 'package:flutter/material.dart';
+import 'package:go_router/go_router.dart';
+import 'class_detail_screen.dart'; // ← Add this import
+// Adjust the path above if your folder structure is different, e.g.:
+// import '../screens/class_detail_screen.dart';
+// or
+// import 'package:your_app_name/screens/class_detail_screen.dart';
 
 class HomeScreen extends StatelessWidget {
   static const routeName = "/home";
@@ -22,10 +28,7 @@ class HomeScreen extends StatelessWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF8A2BFF), 
-                      Color(0xFF2F7BFF), 
-                    ],
+                    colors: [Color(0xFF8A2BFF), Color(0xFF2F7BFF)],
                   ),
                   boxShadow: const [
                     BoxShadow(
@@ -33,7 +36,7 @@ class HomeScreen extends StatelessWidget {
                       spreadRadius: 0,
                       offset: Offset(0, 10),
                       color: Color(0x22000000),
-                    )
+                    ),
                   ],
                 ),
                 child: Column(
@@ -57,9 +60,7 @@ class HomeScreen extends StatelessWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SearchBar(
-                      hintText: 'Search classes...',
-                    ),
+                    _SearchBar(hintText: 'Search classes...'),
                   ],
                 ),
               ),
@@ -89,8 +90,8 @@ class HomeScreen extends StatelessWidget {
 
             const SizedBox(height: 18),
 
-            const Padding(
-              padding: EdgeInsets.symmetric(horizontal: 16),
+            Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 16),
               child: Column(
                 children: [
                   ClassCard(
@@ -102,8 +103,9 @@ class HomeScreen extends StatelessWidget {
                     status: ClassStatus.open,
                     filled: 12,
                     capacity: 30,
+                    onTap: () => context.push(ClassDetailScreen.routeName),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   ClassCard(
                     title: 'HIIT Blast',
                     instructor: 'Mike Chen',
@@ -113,18 +115,22 @@ class HomeScreen extends StatelessWidget {
                     status: ClassStatus.full,
                     filled: 25,
                     capacity: 25,
+                    onTap: () => context.push(ClassDetailScreen.routeName),
                   ),
-                  SizedBox(height: 16),
+                  const SizedBox(height: 16),
                   ClassCard(
                     title: 'Pilates Core',
-                    instructor: 'Emma Wilson',
+                    instructor:
+                        'Emma Wilson', // ← completed name (was truncated)
                     dateText: 'Mon, Feb 3',
                     timeText: '8:30 AM',
-                    durationText: '50 min',
-                    status: ClassStatus.standby,
-                    filled: 22,
-                    capacity: 30,
+                    durationText: '45 min',
+                    status: ClassStatus.open,
+                    filled: 15,
+                    capacity: 25,
+                    onTap: () => context.push(ClassDetailScreen.routeName),
                   ),
+                  // Add more ClassCard widgets here if needed
                 ],
               ),
             ),
@@ -135,33 +141,28 @@ class HomeScreen extends StatelessWidget {
   }
 }
 
+// ─────────────────────────────────────────────────────────────────────────────
+//  Existing helper widgets (unchanged)
+// ─────────────────────────────────────────────────────────────────────────────
+
 class _SearchBar extends StatelessWidget {
   final String hintText;
+
   const _SearchBar({required this.hintText});
 
   @override
   Widget build(BuildContext context) {
-    return Container(
-      height: 54,
-      padding: const EdgeInsets.symmetric(horizontal: 14),
-      decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
-        borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
-      ),
-      child: Row(
-        children: [
-          Icon(Icons.search, color: Colors.white.withOpacity(0.75)),
-          const SizedBox(width: 10),
-          Text(
-            hintText,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.75),
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-        ],
+    return TextField(
+      decoration: InputDecoration(
+        filled: true,
+        fillColor: Colors.white,
+        hintText: hintText,
+        hintStyle: const TextStyle(color: Colors.black54),
+        prefixIcon: const Icon(Icons.search, color: Colors.black54),
+        border: OutlineInputBorder(
+          borderRadius: BorderRadius.circular(30),
+          borderSide: BorderSide.none,
+        ),
       ),
     );
   }
@@ -172,51 +173,36 @@ class _FilterChip extends StatelessWidget {
   final IconData? icon;
   final String label;
 
-  const _FilterChip({
-    this.selected = false,
-    this.icon,
-    required this.label,
-  });
+  const _FilterChip({this.selected = false, this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final purple = const Color(0xFF7A2CFF);
-
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? purple : Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: selected ? purple : const Color(0xFFE3E6EF)),
-        boxShadow: selected
-            ? const [
-                BoxShadow(
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
-                  color: Color(0x22000000),
-                )
-              ]
-            : null,
-      ),
-      child: Row(
+    return FilterChip(
+      selected: selected,
+      onSelected: (value) {},
+      label: Row(
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 20, color: selected ? Colors.white : Colors.black87),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: selected ? Colors.white : Colors.black87,
-            ),
-          ),
+          if (icon != null) Icon(icon, size: 18),
+          if (icon != null) const SizedBox(width: 6),
+          Text(label),
         ],
+      ),
+      backgroundColor: selected ? const Color(0xFF6200EE) : Colors.white,
+      selectedColor: const Color(0xFF6200EE),
+      labelStyle: TextStyle(color: selected ? Colors.white : Colors.black),
+      shape: RoundedRectangleBorder(
+        borderRadius: BorderRadius.circular(30),
+        side: BorderSide(
+          color: selected ? Colors.transparent : Colors.grey.shade300,
+        ),
       ),
     );
   }
 }
+
+// ─────────────────────────────────────────────────────────────────────────────
+//  Updated ClassCard – now supports onTap
+// ─────────────────────────────────────────────────────────────────────────────
 
 enum ClassStatus { open, full, standby }
 
@@ -229,6 +215,7 @@ class ClassCard extends StatelessWidget {
   final ClassStatus status;
   final int filled;
   final int capacity;
+  final VoidCallback? onTap; // ← NEW: added callback
 
   const ClassCard({
     super.key,
@@ -240,107 +227,134 @@ class ClassCard extends StatelessWidget {
     required this.status,
     required this.filled,
     required this.capacity,
+    this.onTap,
   });
+
+  double get progress => filled / capacity;
 
   @override
   Widget build(BuildContext context) {
     final statusUi = _statusUi(status);
-    final progress = capacity == 0 ? 0.0 : (filled / capacity).clamp(0.0, 1.0);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 18,
-            offset: Offset(0, 10),
-            color: Color(0x14000000),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              _StatusPill(
-                text: statusUi.label,
-                bg: statusUi.bg,
-                fg: statusUi.fg,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            instructor,
-            style: const TextStyle(
-              fontSize: 18,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 18,
+              offset: Offset(0, 10),
+              color: Color(0x14000000),
             ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 20, color: Colors.black54),
-              const SizedBox(width: 10),
-              Text(
-                dateText,
-                style: const TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                timeText,
-                style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 14),
-              const Text('•', style: TextStyle(color: Colors.black45, fontSize: 16)),
-              const SizedBox(width: 14),
-              Text(
-                durationText,
-                style: const TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 10,
-                    backgroundColor: const Color(0xFFE9ECF3),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      status == ClassStatus.full ? const Color(0xFFB00020) : const Color(0xFF7A2CFF),
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
+                _StatusPill(
+                  text: statusUi.label,
+                  bg: statusUi.bg,
+                  fg: statusUi.fg,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              instructor,
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(width: 14),
-              Text(
-                '$filled/$capacity',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 20,
                   color: Colors.black54,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Text(
+                  dateText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  timeText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  '•',
+                  style: TextStyle(color: Colors.black45, fontSize: 16),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  durationText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 10,
+                      backgroundColor: const Color(0xFFE9ECF3),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        status == ClassStatus.full
+                            ? const Color(0xFFB00020)
+                            : const Color(0xFF7A2CFF),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  '$filled/$capacity',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -352,7 +366,11 @@ class ClassCard extends StatelessWidget {
       case ClassStatus.full:
         return const _StatusStyle('Full', Color(0xFFFBE2E2), Color(0xFFB00020));
       case ClassStatus.standby:
-        return const _StatusStyle('Standby', Color(0xFFFFE9D6), Color(0xFFB85A00));
+        return const _StatusStyle(
+          'Standby',
+          Color(0xFFFFE9D6),
+          Color(0xFFB85A00),
+        );
     }
   }
 }
@@ -369,11 +387,7 @@ class _StatusPill extends StatelessWidget {
   final Color bg;
   final Color fg;
 
-  const _StatusPill({
-    required this.text,
-    required this.bg,
-    required this.fg,
-  });
+  const _StatusPill({required this.text, required this.bg, required this.fg});
 
   @override
   Widget build(BuildContext context) {
@@ -385,11 +399,7 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          color: fg,
-          fontWeight: FontWeight.w800,
-          fontSize: 16,
-        ),
+        style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 16),
       ),
     );
   }

@@ -17,6 +17,9 @@ import 'package:firebase_core/firebase_core.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
+import 'package:pat_your_mat/screens/class_detail_screen.dart';
+import 'package:pat_your_mat/screens/mat_selection_screen.dart';
+import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
 
 // App relative file imports
 import 'screens/general/screen_alternate.dart';
@@ -38,8 +41,12 @@ import 'theme/theme.dart';
 final ProviderContainer providerContainer = ProviderContainer();
 
 // Create providers
-final providerUserProfile = ChangeNotifierProvider<ProviderUserProfile>((ref) => ProviderUserProfile());
-final providerAuth = ChangeNotifierProvider<ProviderAuth>((ref) => ProviderAuth());
+final providerUserProfile = ChangeNotifierProvider<ProviderUserProfile>(
+  (ref) => ProviderUserProfile(),
+);
+final providerAuth = ChangeNotifierProvider<ProviderAuth>(
+  (ref) => ProviderAuth(),
+);
 
 //////////////////////////////////////////////////////////////////////////
 // MAIN entry point to start app.
@@ -55,7 +62,9 @@ Future<void> main() async {
   await UtilFile.init();
 
   // Get references to providers that will be needed in other providers
-  final ProviderUserProfile userProfileProvider = providerContainer.read(providerUserProfile);
+  final ProviderUserProfile userProfileProvider = providerContainer.read(
+    providerUserProfile,
+  );
   final ProviderAuth authProvider = providerContainer.read(providerAuth);
 
   // Initialize providers
@@ -63,7 +72,9 @@ Future<void> main() async {
   authProvider.initProviders(userProfileProvider);
 
   // Run the app
-  runApp(UncontrolledProviderScope(container: providerContainer, child: MyApp()));
+  runApp(
+    UncontrolledProviderScope(container: providerContainer, child: MyApp()),
+  );
 }
 
 //////////////////////////////////////////////////////////////////////////
@@ -87,18 +98,55 @@ class _MyAppState extends State<MyApp> {
   final GoRouter _router = GoRouter(
     initialLocation: ScreenLoginValidation.routeName,
     routes: [
-      GoRoute(path: ScreenLoginValidation.routeName, builder: (context, state) => const ScreenLoginValidation()),
-      GoRoute(path: ScreenSettings.routeName, builder: (context, state) => ScreenSettings()),
-      GoRoute(path: ScreenProfileEdit.routeName, builder: (context, state) => const ScreenProfileEdit()),
+      GoRoute(
+        path: ScreenLoginValidation.routeName,
+        builder: (context, state) => const ScreenLoginValidation(),
+      ),
+      GoRoute(
+        path: ScreenSettings.routeName,
+        builder: (context, state) => ScreenSettings(),
+      ),
+      GoRoute(
+        path: ScreenProfileEdit.routeName,
+        builder: (context, state) => const ScreenProfileEdit(),
+      ),
       GoRoute(
         path: WidgetAppOutline.routeName,
-        builder: (BuildContext context, GoRouterState state) => const WidgetAppOutline(),
+        builder: (context, state) => const WidgetAppOutline(),
       ),
-      GoRoute(path: HomeScreen.routeName, builder: (BuildContext context, GoRouterState state) => HomeScreen()),
+      GoRoute(
+        path: HomeScreen.routeName,
+        builder: (context, state) => HomeScreen(),
+      ),
       GoRoute(
         path: ScreenAlternate.routeName,
-        builder: (BuildContext context, GoRouterState state) => ScreenAlternate(),
+        builder: (context, state) => ScreenAlternate(),
       ),
+      // ──────────────────────────────────────────────────────────────
+      // You probably already have this one (from earlier steps):
+      GoRoute(
+        path: ClassDetailScreen.routeName,
+        builder: (context, state) => const ClassDetailScreen(),
+      ),
+      // ──────────────────────────────────────────────────────────────
+      // ADD THIS BLOCK RIGHT HERE:
+      GoRoute(
+        path: ReservationConfirmationScreen
+            .routeName, // must match exactly '/reservation_confirmed'
+        name: ReservationConfirmationScreen
+            .routeName, // optional but good practice
+        builder: (context, state) {
+          // Safely extract passed data (prevents crash if navigated directly)
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return ReservationConfirmationScreen(
+            className: extra['className'] as String? ?? 'Class',
+            instructor: extra['instructor'] as String? ?? 'Instructor',
+            dateTime: extra['dateTime'] as String? ?? 'Date & Time',
+            matNumber: extra['matNumber'] as String? ?? 'Mat #?',
+          );
+        },
+      ),
+      // ... other routes
     ],
   );
 
