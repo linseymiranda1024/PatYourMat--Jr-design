@@ -1,8 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../providers/provider_gym_class.dart';
-import '../models/gym_class.dart' as model;
+import 'package:go_router/go_router.dart';
+
 import '../main.dart';
+import '../models/gym_class.dart' as model;
+import '../providers/provider_gym_class.dart';
+import 'class_detail_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
   static const routeName = "/home";
@@ -29,10 +32,7 @@ class HomeScreen extends ConsumerWidget {
                   gradient: const LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [
-                      Color(0xFF8A2BFF), 
-                      Color(0xFF2F7BFF), 
-                    ],
+                    colors: [Color(0xFF8A2BFF), Color(0xFF2F7BFF)],
                   ),
                   boxShadow: const [
                     BoxShadow(
@@ -64,14 +64,11 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SearchBar(
-                      hintText: 'Search classes...',
-                    ),
+                    _SearchBar(hintText: 'Search classes...'),
                   ],
                 ),
               ),
             ),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: SingleChildScrollView(
@@ -93,32 +90,37 @@ class HomeScreen extends ConsumerWidget {
                 ),
               ),
             ),
-
             const SizedBox(height: 18),
-
             Padding(
               padding: const EdgeInsets.symmetric(horizontal: 16),
-              child: gymClassProvider.isLoading 
-                ? const Center(child: CircularProgressIndicator())
-                : classes.isEmpty
-                  ? const Center(child: Text('No classes available yet.'))
-                  : Column(
-                      children: classes.map((c) => Column(
-                        children: [
-                          ClassCard(
-                            title: c.title,
-                            instructor: c.instructor,
-                            dateText: c.dateText,
-                            timeText: c.timeText,
-                            durationText: c.durationText,
-                            status: c.status,
-                            filled: c.filled,
-                            capacity: c.capacity,
-                          ),
-                          const SizedBox(height: 16),
-                        ],
-                      )).toList(),
-                    ),
+              child: gymClassProvider.isLoading
+                  ? const Center(child: CircularProgressIndicator())
+                  : classes.isEmpty
+                      ? const Center(child: Text('No classes available yet.'))
+                      : Column(
+                          children: classes
+                              .map(
+                                (c) => Column(
+                                  children: [
+                                    ClassCard(
+                                      title: c.title,
+                                      instructor: c.instructor,
+                                      dateText: c.dateText,
+                                      timeText: c.timeText,
+                                      durationText: c.durationText,
+                                      status: c.status,
+                                      filled: c.filled,
+                                      capacity: c.capacity,
+                                      onTap: () => context.push(
+                                        ClassDetailScreen.routeName,
+                                      ),
+                                    ),
+                                    const SizedBox(height: 16),
+                                  ],
+                                ),
+                              )
+                              .toList(),
+                        ),
             ),
           ],
         ),
@@ -129,6 +131,7 @@ class HomeScreen extends ConsumerWidget {
 
 class _SearchBar extends StatelessWidget {
   final String hintText;
+
   const _SearchBar({required this.hintText});
 
   @override
@@ -219,6 +222,7 @@ class ClassCard extends StatelessWidget {
   final model.ClassStatus status;
   final int filled;
   final int capacity;
+  final VoidCallback? onTap;
 
   const ClassCard({
     super.key,
@@ -230,6 +234,7 @@ class ClassCard extends StatelessWidget {
     required this.status,
     required this.filled,
     required this.capacity,
+    this.onTap,
   });
 
   @override
@@ -237,100 +242,125 @@ class ClassCard extends StatelessWidget {
     final statusUi = _statusUi(status);
     final progress = capacity == 0 ? 0.0 : (filled / capacity).clamp(0.0, 1.0);
 
-    return Container(
-      padding: const EdgeInsets.all(18),
-      decoration: BoxDecoration(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(22),
-        boxShadow: const [
-          BoxShadow(
-            blurRadius: 18,
-            offset: Offset(0, 10),
-            color: Color(0x14000000),
-          )
-        ],
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
-            children: [
-              Expanded(
-                child: Text(
-                  title,
-                  style: const TextStyle(
-                    fontSize: 28,
-                    fontWeight: FontWeight.w800,
-                  ),
-                ),
-              ),
-              _StatusPill(
-                text: statusUi.label,
-                bg: statusUi.bg,
-                fg: statusUi.fg,
-              ),
-            ],
-          ),
-          const SizedBox(height: 8),
-          Text(
-            instructor,
-            style: const TextStyle(
-              fontSize: 18,
-              color: Colors.black54,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 14),
-          Row(
-            children: [
-              const Icon(Icons.calendar_today_outlined, size: 20, color: Colors.black54),
-              const SizedBox(width: 10),
-              Text(
-                dateText,
-                style: const TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 16),
-              Text(
-                timeText,
-                style: const TextStyle(fontSize: 16, color: Colors.black87, fontWeight: FontWeight.w600),
-              ),
-              const SizedBox(width: 14),
-              const Text('•', style: TextStyle(color: Colors.black45, fontSize: 16)),
-              const SizedBox(width: 14),
-              Text(
-                durationText,
-                style: const TextStyle(fontSize: 16, color: Colors.black54, fontWeight: FontWeight.w600),
-              ),
-            ],
-          ),
-          const SizedBox(height: 18),
-          Row(
-            children: [
-              Expanded(
-                child: ClipRRect(
-                  borderRadius: BorderRadius.circular(10),
-                  child: LinearProgressIndicator(
-                    value: progress,
-                    minHeight: 10,
-                    backgroundColor: const Color(0xFFE9ECF3),
-                    valueColor: AlwaysStoppedAnimation<Color>(
-                      status == model.ClassStatus.full ? const Color(0xFFB00020) : const Color(0xFF7A2CFF),
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(22),
+      child: Container(
+        padding: const EdgeInsets.all(18),
+        decoration: BoxDecoration(
+          color: Colors.white,
+          borderRadius: BorderRadius.circular(22),
+          boxShadow: const [
+            BoxShadow(
+              blurRadius: 18,
+              offset: Offset(0, 10),
+              color: Color(0x14000000),
+            )
+          ],
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Row(
+              children: [
+                Expanded(
+                  child: Text(
+                    title,
+                    style: const TextStyle(
+                      fontSize: 28,
+                      fontWeight: FontWeight.w800,
                     ),
                   ),
                 ),
+                _StatusPill(
+                  text: statusUi.label,
+                  bg: statusUi.bg,
+                  fg: statusUi.fg,
+                ),
+              ],
+            ),
+            const SizedBox(height: 8),
+            Text(
+              instructor,
+              style: const TextStyle(
+                fontSize: 18,
+                color: Colors.black54,
+                fontWeight: FontWeight.w500,
               ),
-              const SizedBox(width: 14),
-              Text(
-                '$filled/$capacity',
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w700,
+            ),
+            const SizedBox(height: 14),
+            Row(
+              children: [
+                const Icon(
+                  Icons.calendar_today_outlined,
+                  size: 20,
                   color: Colors.black54,
                 ),
-              ),
-            ],
-          ),
-        ],
+                const SizedBox(width: 10),
+                Text(
+                  dateText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 16),
+                Text(
+                  timeText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black87,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+                const SizedBox(width: 14),
+                const Text(
+                  '•',
+                  style: TextStyle(color: Colors.black45, fontSize: 16),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  durationText,
+                  style: const TextStyle(
+                    fontSize: 16,
+                    color: Colors.black54,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+            const SizedBox(height: 18),
+            Row(
+              children: [
+                Expanded(
+                  child: ClipRRect(
+                    borderRadius: BorderRadius.circular(10),
+                    child: LinearProgressIndicator(
+                      value: progress,
+                      minHeight: 10,
+                      backgroundColor: const Color(0xFFE9ECF3),
+                      valueColor: AlwaysStoppedAnimation<Color>(
+                        status == model.ClassStatus.full
+                            ? const Color(0xFFB00020)
+                            : const Color(0xFF7A2CFF),
+                      ),
+                    ),
+                  ),
+                ),
+                const SizedBox(width: 14),
+                Text(
+                  '$filled/$capacity',
+                  style: const TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.w700,
+                    color: Colors.black54,
+                  ),
+                ),
+              ],
+            ),
+          ],
+        ),
       ),
     );
   }
@@ -359,11 +389,7 @@ class _StatusPill extends StatelessWidget {
   final Color bg;
   final Color fg;
 
-  const _StatusPill({
-    required this.text,
-    required this.bg,
-    required this.fg,
-  });
+  const _StatusPill({required this.text, required this.bg, required this.fg});
 
   @override
   Widget build(BuildContext context) {
@@ -375,11 +401,7 @@ class _StatusPill extends StatelessWidget {
       ),
       child: Text(
         text,
-        style: TextStyle(
-          color: fg,
-          fontWeight: FontWeight.w800,
-          fontSize: 16,
-        ),
+        style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 16),
       ),
     );
   }
