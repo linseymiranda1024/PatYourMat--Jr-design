@@ -68,3 +68,7 @@ macos/Flutter/Flutter-Generated.xcconfig
 # Firebase config
 android/app/google-services.json
 ios/Runner/GoogleService-Info.plist
+# Python
+venv/
+__pycache__/
+*.pyc
