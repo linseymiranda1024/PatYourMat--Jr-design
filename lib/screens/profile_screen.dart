@@ -11,7 +11,6 @@ import '../models/reservation.dart'; // ← added (your model file)
 import '../widgets/general/widget_profile_avatar.dart';
 import 'settings/screen_profile_edit.dart';
 import 'settings/screen_settings.dart';
-import '../theme/app_colors.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -20,7 +19,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userProfile = ref.watch(providerUserProfile);
     final auth = ref.watch(providerAuth);
-    final reservations = ref.watch(reservationsProvider);
+    final reservations = ref.watch(reservationsProvider).reservations;
 
     return Scaffold(
       body: Container(
@@ -41,7 +40,7 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatsSection(context),
+                      _buildStatsSection(context, reservations),
                       const SizedBox(height: 32),
 
                       // ── Upcoming Reservations ───────────────────────────────────
@@ -89,7 +88,7 @@ class ProfileScreen extends ConsumerWidget {
                       // Your original sections
                       _buildQuickActions(context),
                       const SizedBox(height: 24),
-                      _buildRecentActivity(context),
+                      _buildRecentActivity(context, reservations),
                       const SizedBox(height: 24),
                       _buildAchievements(context),
                       const SizedBox(height: 24),
@@ -236,13 +235,25 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () {
-                    ref
-                        .read(reservationsProvider.notifier)
-                        .cancelReservation(res);
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(content: Text('Reservation cancelled')),
-                    );
+                  onPressed: () async {
+                    try {
+                      await ref
+                          .read(reservationsProvider)
+                          .cancelReservation(res);
+                      if (!context.mounted) return;
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        const SnackBar(content: Text('Reservation cancelled')),
+                      );
+                    } catch (e) {
+                      if (!context.mounted) return;
+                      String message = e.toString();
+                      if (message.startsWith('Exception: ')) {
+                        message = message.replaceFirst('Exception: ', '');
+                      }
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(content: Text('Cancel failed: $message')),
+                      );
+                    }
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
@@ -362,7 +373,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsSection(BuildContext context) {
+  Widget _buildStatsSection(BuildContext context, List<Reservation> reservations) {
+    final activeCount = reservations.length;
+    final thisMonthCount = reservations.where((r) {
+      final now = DateTime.now();
+      return r.date.month == now.month && r.date.year == now.year;
+    }).length;
+
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -379,16 +396,16 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _buildStatCard(
               "Total Classes",
-              "42",
+              activeCount.toString(), // Simplified for now since we only have upcoming
               Icons.fitness_center,
               Colors.blue,
-              progress: 0.42,
-              progressText: "42/100 to Silver",
+              progress: (activeCount / 10).clamp(0.0, 1.0),
+              progressText: "$activeCount/10 to Next Level",
             ),
             const SizedBox(width: 16),
             _buildStatCard(
               "This Month",
-              "12",
+              thisMonthCount.toString(),
               Icons.calendar_month,
               Colors.orange,
             ),
@@ -397,11 +414,11 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildStatCard("Active Res.", "3", Icons.bookmark, Colors.green),
+            _buildStatCard("Active Res.", activeCount.toString(), Icons.bookmark, Colors.green),
             const SizedBox(width: 16),
             _buildStatCard(
               "Attend Rate",
-              "98%",
+              "100%", // Simplified dummy for now
               Icons.trending_up,
               Colors.purple,
             ),
@@ -552,7 +569,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentActivity(BuildContext context) {
+  Widget _buildRecentActivity(BuildContext context, List<Reservation> reservations) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -563,34 +580,24 @@ class ProfileScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Recent Activity",
+            "Upcoming Activity",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          _buildActivityItem(
-            "Power Yoga",
-            "Today, 6:00 AM",
-            "Upcoming",
-            Colors.blue,
-          ),
-          _buildActivityItem(
-            "HIIT Blast",
-            "Yesterday, 7:30 AM",
-            "Attended",
-            Colors.green,
-          ),
-          _buildActivityItem(
-            "Pilates Core",
-            "Feb 3, 8:30 AM",
-            "Attended",
-            Colors.green,
-          ),
-          _buildActivityItem(
-            "Spin Power",
-            "Jan 30, 5:00 PM",
-            "Missed",
-            Colors.red,
-          ),
+          if (reservations.isEmpty)
+            const Text(
+              "No upcoming activity.",
+              style: TextStyle(color: Colors.black45, fontSize: 14),
+            )
+          else
+            ...reservations.take(3).map(
+                  (res) => _buildActivityItem(
+                    res.className,
+                    res.dateTime,
+                    "Upcoming",
+                    Colors.blue,
+                  ),
+                ),
         ],
       ),
     );

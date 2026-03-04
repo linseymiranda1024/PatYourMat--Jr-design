@@ -1,6 +1,7 @@
 // lib/screens/reservation_confirmation_screen.dart
 import 'package:flutter/material.dart';
 import 'package:go_router/go_router.dart';
+import '../widgets/navigation/widget_app_outline.dart';
 
 class ReservationConfirmationScreen extends StatelessWidget {
   static const String routeName = '/reservation_confirmed';
@@ -187,8 +188,8 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       ),
                       onPressed: () {
                         context.go(
-                          '/profile',
-                        ); // Adjust path if your profile route is different
+                          '${WidgetAppOutline.routeName}?tab=4',
+                        ); // Navigates to the Profile tab in the main shell
                       },
                       child: const Text(
                         "View My Reservations",
@@ -218,7 +219,7 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       ),
                       onPressed: () {
                         context.go(
-                          '/home',
+                          WidgetAppOutline.routeName,
                         ); // or HomeScreen.routeName if you prefer named route
                       },
                     ),

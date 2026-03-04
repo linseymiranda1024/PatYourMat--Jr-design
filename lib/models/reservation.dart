@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 
 class Reservation {
+  final String? id; // added id field
   final String className;
   final String instructor;
   final String dateTime; // e.g. "Mon, Feb 3 6:00 AM"
@@ -10,6 +11,7 @@ class Reservation {
   final String? checkInCode; // optional QR-like string or future real code
 
   Reservation({
+    this.id,
     required this.className,
     required this.instructor,
     required this.dateTime,

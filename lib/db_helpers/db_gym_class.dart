@@ -18,6 +18,13 @@ class DBGymClass {
             .toList());
   }
 
+  static Stream<GymClass?> getClassStream(String id) {
+    return _db.collection(_collection).doc(id).snapshots().map((doc) {
+      if (!doc.exists) return null;
+      return GymClass.fromFirestore(doc);
+    });
+  }
+
   static Future<void> updateClass(GymClass gymClass) async {
     await _db.collection(_collection).doc(gymClass.id).update(gymClass.toFirestore());
   }

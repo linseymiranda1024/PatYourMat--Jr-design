@@ -1,0 +1,66 @@
+Analyzing PatYourMat--Jr-design...                              
+
+warning • Unused import: 'package:flutter/material.dart' • lib/models/reservation.dart:1:8 • unused_import
+warning • The value of the field '_authStateSubscription' isn't used • lib/providers/provider_auth.dart:41:35 • unused_field
+warning • The value of the local variable 'dateLastPasswordChange' isn't used • lib/providers/provider_auth.dart:245:16 • unused_local_variable
+warning • Unused import: 'package:flutter_riverpod/flutter_riverpod.dart' • lib/providers/provider_reservations.dart:3:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/auth/screen_auth.dart:328:41 • deprecated_member_use
+warning • The declaration '_submitAuthForm' isn't referenced • lib/screens/auth/screen_profile_setup.dart:113:8 • unused_element
+warning • Unused import: 'package:firebase_auth/firebase_auth.dart' • lib/screens/class_detail_screen.dart:4:8 • unused_import
+warning • Unused import: '../providers/provider_gym_class.dart' • lib/screens/home_screen.dart:7:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/home_screen.dart:144:29 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/home_screen.dart:146:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/home_screen.dart:150:50 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/home_screen.dart:155:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/mat_selection_screen.dart:92:53 • deprecated_member_use
+warning • Unused import: '../theme/app_colors.dart' • lib/screens/profile_screen.dart:14:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:63:49 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:124:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:284:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:324:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:331:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:430:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:465:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:612:34 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/profile_screen.dart:639:34 • deprecated_member_use
+warning • Unused import: 'package:go_router/go_router.dart' • lib/screens/settings/screen_profile_edit.dart:12:8 • unused_import
+   info • The import of 'package:flutter/widgets.dart' is unnecessary because all of the used elements are also provided by the import of 'package:flutter/material.dart' • lib/screens/settings/screen_settings.dart:15:8 • unnecessary_import
+warning • Unused import: '../../util/logging/app_logger.dart' • lib/screens/settings/screen_settings.dart:22:8 • unused_import
+warning • Unused import: '../../providers/provider_user_profile.dart' • lib/screens/staff/screen_staff_portal.dart:3:8 • unused_import
+warning • Unused import: '../../providers/provider_gym_class.dart' • lib/screens/staff/screen_staff_portal.dart:4:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_portal.dart:205:24 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_portal.dart:207:43 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_portal.dart:215:76 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_portal.dart:231:33 • deprecated_member_use
+warning • Unused import: '../../providers/provider_gym_class.dart' • lib/screens/staff/screen_staff_profile.dart:6:8 • unused_import
+warning • Unused import: '../../models/user_profile.dart' • lib/screens/staff/screen_staff_profile.dart:7:8 • unused_import
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:84:54 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:87:39 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:114:35 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:122:46 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:124:65 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:241:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:289:29 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:293:33 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:314:40 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/screens/staff/screen_staff_profile.dart:363:48 • deprecated_member_use
+   info • 'withOpacity' is deprecated and shouldn't be used. Use .withValues() to avoid precision loss • lib/theme/theme.dart:31:46 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:150:16 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:153:22 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:154:22 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:155:12 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:168:14 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:169:16 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:172:22 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:177:14 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:178:16 • deprecated_member_use
+   info • 'MaterialStateProperty' is deprecated and shouldn't be used. Use WidgetStateProperty instead. Moved to the Widgets layer to make code available outside of Material. This feature was deprecated after v3.19.0-0.3.pre • lib/theme/theme.dart:181:22 • deprecated_member_use
+warning • This class (or a class that this class inherits from) is marked as '@immutable', but one or more of its instance fields aren't final: WidgetPasswordStrengthIndicator.passwordStrength, WidgetPasswordStrengthIndicator.passwordColor, WidgetPasswordStrengthIndicator.passwordText • lib/widgets/auth/widget_password_strength_indicator.dart:22:7 • must_be_immutable
+warning • Unused import: 'package:lottie/lottie.dart' • lib/widgets/general/widget_annotated_loading.dart:18:8 • unused_import
+warning • Unused import: '../../widgets/navigation/widget_primary_scaffold.dart' • lib/widgets/navigation/widget_app_drawer.dart:17:8 • unused_import
+warning • Unused import: '../../providers/provider_user_profile.dart' • lib/widgets/navigation/widget_app_outline.dart:3:8 • unused_import
+warning • This class (or a class that this class inherits from) is marked as '@immutable', but one or more of its instance fields aren't final: WidgetPrimaryAppBar.inCurrentMeeting • lib/widgets/navigation/widget_primary_app_bar.dart:21:7 • must_be_immutable
+warning • Unused import: '../../main.dart' • lib/widgets/navigation/widget_primary_scaffold.dart:25:8 • unused_import
+warning • The declaration '_getMenu' isn't referenced • lib/widgets/navigation/widget_primary_scaffold.dart:89:32 • unused_element
+
+62 issues found. (ran in 3.3s)

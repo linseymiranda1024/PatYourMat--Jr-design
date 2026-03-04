@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:pat_your_mat/screens/class_detail_screen.dart';
 import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
+import 'models/gym_class.dart';
 
 // App relative file imports
 import 'screens/general/screen_alternate.dart';
@@ -113,7 +114,10 @@ class _MyAppState extends State<MyApp> {
       ),
       GoRoute(
         path: WidgetAppOutline.routeName,
-        builder: (context, state) => const WidgetAppOutline(),
+        builder: (context, state) {
+          final index = int.tryParse(state.uri.queryParameters['tab'] ?? '');
+          return WidgetAppOutline(initialIndex: index);
+        },
       ),
       GoRoute(
         path: HomeScreen.routeName,
@@ -129,7 +133,10 @@ class _MyAppState extends State<MyApp> {
       ),
       GoRoute(
         path: ClassDetailScreen.routeName,
-        builder: (context, state) => const ClassDetailScreen(),
+        builder: (context, state) {
+          final gymClass = state.extra as GymClass;
+          return ClassDetailScreen(gymClass: gymClass);
+        },
       ),
       GoRoute(
         path: ReservationConfirmationScreen.routeName,

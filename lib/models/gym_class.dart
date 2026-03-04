@@ -38,7 +38,7 @@ class GymClass {
         durationMinutes: (data['durationMinutes'] ?? 0).toInt(),
         location: data['location'] ?? 'No Location',
         capacity: (data['capacity'] ?? 0).toInt(),
-        filled: (data['filled'] ?? 0).toInt(),
+        filled: (data['filled'] ?? data['registeredCount'] ?? 0).toInt(),
         status: _parseStatus(data['status']),
       );
     } catch (e) {
@@ -67,6 +67,7 @@ class GymClass {
       'location': location,
       'capacity': capacity,
       'filled': filled,
+      'registeredCount': filled,
       'status': status.name,
     };
   }

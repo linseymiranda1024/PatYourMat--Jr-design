@@ -16,12 +16,14 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // App relative file imports
 import '../util/message_display/popup_dialogue.dart';
 import '../util/message_display/snackbar.dart';
 import '../util/logging/app_logger.dart';
 import 'provider_user_profile.dart';
+import 'provider_reservations.dart';
 import '../models/user_profile.dart';
 
 // Constants
@@ -506,6 +508,9 @@ class ProviderAuth extends ChangeNotifier {
     // // Load provider data from DB if needed
     await _providerUserProfile.fetchUserProfileIfNeeded();
     await _providerUserProfile.fetchUserProfileImageIfNeeded();
+
+    // Update reservations listener
+    ProviderScope.containerOf(_context, listen: false).read(reservationsProvider).updateUser();
   }
 
   //////////////////////////////////////////////////////////////

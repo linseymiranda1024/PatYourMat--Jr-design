@@ -13,15 +13,22 @@ import '../../main.dart';
 
 class WidgetAppOutline extends ConsumerStatefulWidget {
   static const routeName = '/home_outline';
+  final int? initialIndex;
 
-  const WidgetAppOutline({super.key});
+  const WidgetAppOutline({super.key, this.initialIndex});
 
   @override
   ConsumerState<WidgetAppOutline> createState() => _WidgetAppOutlineState();
 }
 
 class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
-  int _index = 0;
+  late int _index;
+
+  @override
+  void initState() {
+    super.initState();
+    _index = widget.initialIndex ?? 0;
+  }
 
   @override
   Widget build(BuildContext context) {

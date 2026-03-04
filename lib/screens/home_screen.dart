@@ -4,7 +4,6 @@ import 'package:go_router/go_router.dart';
 
 import '../main.dart';
 import '../models/gym_class.dart' as model;
-import '../providers/provider_gym_class.dart';
 import 'class_detail_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -113,6 +112,7 @@ class HomeScreen extends ConsumerWidget {
                                       capacity: c.capacity,
                                       onTap: () => context.push(
                                         ClassDetailScreen.routeName,
+                                        extra: c,
                                       ),
                                     ),
                                     const SizedBox(height: 16),
@@ -242,43 +242,46 @@ class ClassCard extends StatelessWidget {
     final statusUi = _statusUi(status);
     final progress = capacity == 0 ? 0.0 : (filled / capacity).clamp(0.0, 1.0);
 
-    return InkWell(
-      onTap: onTap,
+    return Material(
+      color: Colors.transparent,
       borderRadius: BorderRadius.circular(22),
-      child: Container(
-        padding: const EdgeInsets.all(18),
-        decoration: BoxDecoration(
-          color: Colors.white,
-          borderRadius: BorderRadius.circular(22),
-          boxShadow: const [
-            BoxShadow(
-              blurRadius: 18,
-              offset: Offset(0, 10),
-              color: Color(0x14000000),
-            )
-          ],
-        ),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            Row(
-              children: [
-                Expanded(
-                  child: Text(
-                    title,
-                    style: const TextStyle(
-                      fontSize: 28,
-                      fontWeight: FontWeight.w800,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(22),
+        child: Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: Colors.white,
+            borderRadius: BorderRadius.circular(22),
+            boxShadow: const [
+              BoxShadow(
+                blurRadius: 18,
+                offset: Offset(0, 10),
+                color: Color(0x14000000),
+              )
+            ],
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                children: [
+                  Expanded(
+                    child: Text(
+                      title,
+                      style: const TextStyle(
+                        fontSize: 28,
+                        fontWeight: FontWeight.w800,
+                      ),
                     ),
                   ),
-                ),
-                _StatusPill(
-                  text: statusUi.label,
-                  bg: statusUi.bg,
-                  fg: statusUi.fg,
-                ),
-              ],
-            ),
+                  _StatusPill(
+                    text: statusUi.label,
+                    bg: statusUi.bg,
+                    fg: statusUi.fg,
+                  ),
+                ],
+              ),
             const SizedBox(height: 8),
             Text(
               instructor,
@@ -359,7 +362,8 @@ class ClassCard extends StatelessWidget {
                 ),
               ],
             ),
-          ],
+            ],
+          ),
         ),
       ),
     );
