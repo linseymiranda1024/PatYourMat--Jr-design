@@ -23,6 +23,7 @@ class ReservationsNotifier extends ChangeNotifier {
 
   void _init() {
     _subscription?.cancel();
+    _subscription = null;
     final user = FirebaseAuth.instance.currentUser;
     if (user != null) {
       _subscription = DBReservations.getReservationsStream(user.uid).listen(
@@ -35,7 +36,12 @@ class ReservationsNotifier extends ChangeNotifier {
           notifyListeners();
         },
       );
+      return;
     }
+
+    // No authenticated user: clear stale reservations from previous account.
+    _reservations = [];
+    notifyListeners();
   }
 
   void updateUser() {

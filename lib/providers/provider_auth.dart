@@ -50,6 +50,7 @@ class ProviderAuth extends ChangeNotifier {
   bool _isShowingSplash = false;
   int _splashStartTime = 0;
   late BuildContext _context;
+  String? _lastAuthedUid;
   // bool _mobileProfileIsDoc = true; // Assume so until proven otherwise by DB
 
   ///////////////////////////////////////////////////////////////////
@@ -75,10 +76,23 @@ class ProviderAuth extends ChangeNotifier {
     // the user is logged in or not
     _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((user) async {
       _emailVerified = FirebaseAuth.instance.currentUser?.emailVerified ?? false;
-      // If no real change in state, return
-      if (_authState == AuthState.AUTHENTICATED && user != null) {
+      final currentUid = user?.uid;
+      final authUidChanged = currentUid != _lastAuthedUid;
+
+      // Handle account switch without full app restart (A -> B).
+      if (authUidChanged && _lastAuthedUid != null) {
+        await _providerUserProfile.wipeAndCancelDbStream();
+        ProviderScope.containerOf(_context, listen: false).read(reservationsProvider).updateUser();
+      }
+
+      // If no real change in state (including same authenticated uid), return.
+      if (!authUidChanged &&
+          _authState == AuthState.AUTHENTICATED &&
+          user != null) {
         return;
-      } else if (_authState == AuthState.UN_AUTHENTICATED && user == null) {
+      } else if (!authUidChanged &&
+          _authState == AuthState.UN_AUTHENTICATED &&
+          user == null) {
         return;
       }
 
@@ -98,6 +112,7 @@ class ProviderAuth extends ChangeNotifier {
 
         _authState = AuthState.UN_AUTHENTICATED;
         _isShowingSplash = false;
+        _lastAuthedUid = null;
         // loadAuthedUserDetailsUponSignin();
         // _mobileProfileIsDoc = false;
       } else {
@@ -106,6 +121,7 @@ class ProviderAuth extends ChangeNotifier {
         _authState = AuthState.AUTHENTICATED;
         _isShowingSplash = false;
         _isSigningIn = true;
+        _lastAuthedUid = user.uid;
       }
 
       // If the state changes, notify listeners
@@ -494,6 +510,7 @@ class ProviderAuth extends ChangeNotifier {
 
     // Wipe data stored in providers
     await _providerUserProfile.wipeAndCancelDbStream();
+    ProviderScope.containerOf(_context, listen: false).read(reservationsProvider).updateUser();
 
     // Terminate the current instance of Firestore and clear any persistant state (cache) being stored locally
     await FirebaseFirestore.instance.terminate();
