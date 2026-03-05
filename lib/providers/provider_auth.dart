@@ -542,26 +542,28 @@ class ProviderAuth extends ChangeNotifier {
   // After prompt is confirmed, clears the authenticated user deatils
   // (in all the providers) and logs user out.
   ///////////////////////////////////////////////////////////////////
-  promptAndClearAuthedUserDetailsAndSignout() async {
+  promptAndClearAuthedUserDetailsAndSignout({BuildContext? context}) async {
+    final ctx = context ?? _context;
+
     // Prompt user to logout
     bool confirmed =
         await PopupDialogue.showConfirm(
           "Are you sure you want to log out?",
-          _context,
+          ctx,
         ) ??
         false;
 
     // If they confirmed, logout
-    if (confirmed) await clearAuthedUserDetailsAndSignout();
+    if (confirmed) await clearAuthedUserDetailsAndSignout(context: ctx);
   }
 
   ///////////////////////////////////////////////////////////////////
   // Clears the authenticated user deatils (in all the providers)
   // and logs user out.
   ///////////////////////////////////////////////////////////////////
-  clearAuthedUserDetailsAndSignout() async {
+  clearAuthedUserDetailsAndSignout({BuildContext? context}) async {
     // Clear all user details/data
-    await _clearAuthedUserDetails();
+    await _clearAuthedUserDetails(context: context);
 
     // Wait 1 second before calling sign out to allow for listeners to be cancelled before
     // firebase unauths
@@ -582,7 +584,9 @@ class ProviderAuth extends ChangeNotifier {
   ///////////////////////////////////////////////////////////////////
   // Clears the authenticated user deatils (in all the providers)
   ///////////////////////////////////////////////////////////////////
-  _clearAuthedUserDetails() async {
+  _clearAuthedUserDetails({BuildContext? context}) async {
+    final ctx = context ?? _context;
+
     // Set a flag to indicate that the user is logging out
     isSigningOut = true;
     // _context.router.popUntilRoot();
@@ -590,7 +594,7 @@ class ProviderAuth extends ChangeNotifier {
     // Wipe data stored in providers
     await _providerUserProfile.wipeAndCancelDbStream();
     ProviderScope.containerOf(
-      _context,
+      ctx,
       listen: false,
     ).read(reservationsProvider).clearAndCancelForSignOut();
 

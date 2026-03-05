@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../main.dart';
 import '../models/gym_class.dart';
 import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
@@ -29,6 +30,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           .registerForClass(gClass);
 
       if (matNumber != null) {
+        ref.read(providerGymClass).applyLocalRegistrationDelta(gClass.id, 1);
         if (mounted) {
           context.pushNamed(
             ReservationConfirmationScreen.routeName,
@@ -65,12 +67,14 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       initialData: widget.gymClass,
       builder: (context, snapshot) {
         final gClass = snapshot.data ?? widget.gymClass;
-        
+
         final reservations = ref.watch(reservationsProvider).reservations;
         final isRegistered = reservations.any((r) => r.id == gClass.id);
 
         final spotsLeft = gClass.capacity - gClass.filled;
-        final progress = gClass.capacity == 0 ? 0.0 : (gClass.filled / gClass.capacity).clamp(0.0, 1.0);
+        final progress = gClass.capacity == 0
+            ? 0.0
+            : (gClass.filled / gClass.capacity).clamp(0.0, 1.0);
 
         return Scaffold(
           body: Stack(
@@ -108,7 +112,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                           ),
                           Expanded(
                             child: Text(
-                              gClass.title, 
+                              gClass.title,
                               style: const TextStyle(
                                 color: Colors.white,
                                 fontSize: 24,
@@ -146,10 +150,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 12),
 
                               Row(
-                                mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                                mainAxisAlignment:
+                                    MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    isRegistered ? 'You are registered' : '$spotsLeft Spots Left',
+                                    isRegistered
+                                        ? 'You are registered'
+                                        : '$spotsLeft Spots Left',
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w600,
@@ -161,21 +168,23 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: isRegistered 
+                                      color: isRegistered
                                           ? Colors.blue.shade50
-                                          : (gClass.status == ClassStatus.open 
-                                              ? const Color(0xFFE8F5E9) 
-                                              : const Color(0xFFFBE2E2)),
+                                          : (gClass.status == ClassStatus.open
+                                                ? const Color(0xFFE8F5E9)
+                                                : const Color(0xFFFBE2E2)),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
-                                      isRegistered ? 'REGISTERED' : gClass.status.name.toUpperCase(),
+                                      isRegistered
+                                          ? 'REGISTERED'
+                                          : gClass.status.name.toUpperCase(),
                                       style: TextStyle(
                                         color: isRegistered
                                             ? Colors.blue.shade700
-                                            : (gClass.status == ClassStatus.open 
-                                                ? const Color(0xFF2E7D32) 
-                                                : const Color(0xFFB00020)),
+                                            : (gClass.status == ClassStatus.open
+                                                  ? const Color(0xFF2E7D32)
+                                                  : const Color(0xFFB00020)),
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -193,7 +202,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   minHeight: 12,
                                   backgroundColor: Colors.grey.shade200,
                                   valueColor: AlwaysStoppedAnimation(
-                                    gClass.status == ClassStatus.full ? Colors.red : Colors.green,
+                                    gClass.status == ClassStatus.full
+                                        ? Colors.red
+                                        : Colors.green,
                                   ),
                                 ),
                               ),
@@ -201,7 +212,10 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 8),
                               Text(
                                 '${gClass.filled} / ${gClass.capacity} registered',
-                                style: const TextStyle(color: Colors.grey, fontSize: 14),
+                                style: const TextStyle(
+                                  color: Colors.grey,
+                                  fontSize: 14,
+                                ),
                               ),
 
                               const SizedBox(height: 32),
@@ -273,8 +287,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 width: double.infinity,
                                 height: 56,
                                 child: ElevatedButton(
-                                  onPressed: (_isLoading || isRegistered || gClass.status != ClassStatus.open) 
-                                      ? null 
+                                  onPressed:
+                                      (_isLoading ||
+                                          isRegistered ||
+                                          gClass.status != ClassStatus.open)
+                                      ? null
                                       : () => _registerForClass(gClass),
                                   style: ElevatedButton.styleFrom(
                                     backgroundColor: const Color(0xFF6200EE),
@@ -285,9 +302,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     elevation: 2,
                                   ),
                                   child: _isLoading
-                                      ? const CircularProgressIndicator(color: Colors.white)
+                                      ? const CircularProgressIndicator(
+                                          color: Colors.white,
+                                        )
                                       : Text(
-                                          isRegistered ? 'Registered' : 'Reserve Your Spot',
+                                          isRegistered
+                                              ? 'Registered'
+                                              : 'Reserve Your Spot',
                                           style: const TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
@@ -346,4 +367,3 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     );
   }
 }
-

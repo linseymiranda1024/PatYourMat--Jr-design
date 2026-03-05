@@ -62,7 +62,11 @@ class ScreenStaffProfile extends ConsumerWidget {
                 top: 10,
                 right: 10,
                 child: IconButton(
-                  icon: const Icon(Icons.edit_outlined, color: Colors.white, size: 28),
+                  icon: const Icon(
+                    Icons.edit_outlined,
+                    color: Colors.white,
+                    size: 28,
+                  ),
                   onPressed: () => context.push(ScreenProfileEdit.routeName),
                 ),
               ),
@@ -81,13 +85,16 @@ class ScreenStaffProfile extends ConsumerWidget {
           Container(
             decoration: BoxDecoration(
               shape: BoxShape.circle,
-              border: Border.all(color: Colors.white.withOpacity(0.5), width: 4),
+              border: Border.all(
+                color: Colors.white.withOpacity(0.5),
+                width: 4,
+              ),
               boxShadow: [
                 BoxShadow(
                   color: Colors.black.withOpacity(0.2),
                   blurRadius: 20,
                   offset: const Offset(0, 10),
-                )
+                ),
               ],
             ),
             child: ProfileAvatar(
@@ -121,7 +128,9 @@ class ScreenStaffProfile extends ConsumerWidget {
             decoration: BoxDecoration(
               color: const Color(0xFF00E676).withOpacity(0.2),
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFF00E676).withOpacity(0.5)),
+              border: Border.all(
+                color: const Color(0xFF00E676).withOpacity(0.5),
+              ),
             ),
             child: const Row(
               mainAxisSize: MainAxisSize.min,
@@ -153,26 +162,45 @@ class ScreenStaffProfile extends ConsumerWidget {
         children: [
           Text(
             profile.bio.isEmpty ? "No bio provided yet." : profile.bio,
-            style: const TextStyle(fontSize: 15, color: Colors.black87, height: 1.5),
+            style: const TextStyle(
+              fontSize: 15,
+              color: Colors.black87,
+              height: 1.5,
+            ),
           ),
           const SizedBox(height: 16),
-          const Text("Specialties", style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
+          const Text(
+            "Specialties",
+            style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+          ),
           const SizedBox(height: 10),
           Wrap(
             spacing: 8,
             runSpacing: 8,
-            children: (profile.specialties.isEmpty ? ["Yoga", "HIIT", "Cardio"] : profile.specialties)
-                .map((s) => _buildPill(s))
-                .toList(),
+            children:
+                (profile.specialties.isEmpty
+                        ? ["Yoga", "HIIT", "Cardio"]
+                        : profile.specialties)
+                    .map((s) => _buildPill(s))
+                    .toList(),
           ),
           if (profile.yearsTeaching > 0) ...[
             const SizedBox(height: 16),
             Row(
               children: [
-                const Icon(Icons.timer_outlined, size: 20, color: Color(0xFF7A2CFF)),
+                const Icon(
+                  Icons.timer_outlined,
+                  size: 20,
+                  color: Color(0xFF7A2CFF),
+                ),
                 const SizedBox(width: 8),
-                Text("${profile.yearsTeaching} Years Teaching", 
-                  style: const TextStyle(fontWeight: FontWeight.w600, color: Colors.black54)),
+                Text(
+                  "${profile.yearsTeaching} Years Teaching",
+                  style: const TextStyle(
+                    fontWeight: FontWeight.w600,
+                    color: Colors.black54,
+                  ),
+                ),
               ],
             ),
           ],
@@ -181,7 +209,10 @@ class ScreenStaffProfile extends ConsumerWidget {
     );
   }
 
-  Widget _buildUpcomingClassesCard(BuildContext context, List<model.GymClass> classes) {
+  Widget _buildUpcomingClassesCard(
+    BuildContext context,
+    List<model.GymClass> classes,
+  ) {
     return _buildGlassCard(
       title: "My Upcoming Classes",
       child: Column(
@@ -189,7 +220,10 @@ class ScreenStaffProfile extends ConsumerWidget {
           if (classes.isEmpty)
             const Padding(
               padding: EdgeInsets.symmetric(vertical: 20),
-              child: Text("No classes scheduled.", style: TextStyle(color: Colors.black45)),
+              child: Text(
+                "No classes scheduled.",
+                style: TextStyle(color: Colors.black45),
+              ),
             )
           else
             ...classes.map((c) => _buildClassItem(c)),
@@ -198,8 +232,13 @@ class ScreenStaffProfile extends ConsumerWidget {
             width: double.infinity,
             child: TextButton(
               onPressed: () {},
-              child: const Text("View All Classes", 
-                style: TextStyle(color: Color(0xFF7A2CFF), fontWeight: FontWeight.bold)),
+              child: const Text(
+                "View All Classes",
+                style: TextStyle(
+                  color: Color(0xFF7A2CFF),
+                  fontWeight: FontWeight.bold,
+                ),
+              ),
             ),
           ),
         ],
@@ -234,14 +273,16 @@ class ScreenStaffProfile extends ConsumerWidget {
           width: double.infinity,
           height: 56,
           decoration: BoxDecoration(
-            gradient: const LinearGradient(colors: [Color(0xFF8A2BFF), Color(0xFF2F7BFF)]),
+            gradient: const LinearGradient(
+              colors: [Color(0xFF8A2BFF), Color(0xFF2F7BFF)],
+            ),
             borderRadius: BorderRadius.circular(16),
             boxShadow: [
               BoxShadow(
                 color: const Color(0xFF8A2BFF).withOpacity(0.3),
                 blurRadius: 12,
                 offset: const Offset(0, 6),
-              )
+              ),
             ],
           ),
           child: ElevatedButton(
@@ -249,18 +290,36 @@ class ScreenStaffProfile extends ConsumerWidget {
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
-              shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
+              shape: RoundedRectangleBorder(
+                borderRadius: BorderRadius.circular(16),
+              ),
             ),
-            child: const Text("Create New Class", 
-              style: TextStyle(color: Colors.white, fontSize: 18, fontWeight: FontWeight.bold)),
+            child: const Text(
+              "Create New Class",
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 18,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
           ),
         ),
         const SizedBox(height: 12),
         Row(
           children: [
-            Expanded(child: _buildSecondaryAction("My Attendance", Icons.fact_check_outlined)),
+            Expanded(
+              child: _buildSecondaryAction(
+                "My Attendance",
+                Icons.fact_check_outlined,
+              ),
+            ),
             const SizedBox(width: 12),
-            Expanded(child: _buildSecondaryAction("Message Group", Icons.chat_bubble_outline)),
+            Expanded(
+              child: _buildSecondaryAction(
+                "Message Group",
+                Icons.chat_bubble_outline,
+              ),
+            ),
           ],
         ),
       ],
@@ -273,9 +332,20 @@ class ScreenStaffProfile extends ConsumerWidget {
       child: Column(
         children: [
           _buildMenuRow("Edit Profile", Icons.person_outline, () {}),
-          _buildMenuRow("Notification Settings", Icons.notifications_none, () {}),
+          _buildMenuRow(
+            "Notification Settings",
+            Icons.notifications_none,
+            () {},
+          ),
           const Divider(height: 24),
-          _buildMenuRow("Log Out", Icons.logout, () => auth.promptAndClearAuthedUserDetailsAndSignout(), isDestructive: true),
+          _buildMenuRow(
+            "Log Out",
+            Icons.logout,
+            () => auth.promptAndClearAuthedUserDetailsAndSignout(
+              context: context,
+            ),
+            isDestructive: true,
+          ),
         ],
       ),
     );
@@ -299,7 +369,14 @@ class ScreenStaffProfile extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(title, style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800, color: Colors.black87)),
+          Text(
+            title,
+            style: const TextStyle(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: Colors.black87,
+            ),
+          ),
           const SizedBox(height: 16),
           child,
         ],
@@ -316,7 +393,11 @@ class ScreenStaffProfile extends ConsumerWidget {
       ),
       child: Text(
         text,
-        style: const TextStyle(color: Color(0xFF7A2CFF), fontWeight: FontWeight.bold, fontSize: 13),
+        style: const TextStyle(
+          color: Color(0xFF7A2CFF),
+          fontWeight: FontWeight.bold,
+          fontSize: 13,
+        ),
       ),
     );
   }
@@ -331,12 +412,24 @@ class ScreenStaffProfile extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(c.title, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 16)),
-              Text(c.timeText, style: const TextStyle(color: Colors.black54, fontSize: 14)),
+              Text(
+                c.title,
+                style: const TextStyle(
+                  fontWeight: FontWeight.bold,
+                  fontSize: 16,
+                ),
+              ),
+              Text(
+                c.timeText,
+                style: const TextStyle(color: Colors.black54, fontSize: 14),
+              ),
             ],
           ),
           const SizedBox(height: 4),
-          Text("${c.dateText} • ${c.location}", style: const TextStyle(color: Colors.black45, fontSize: 13)),
+          Text(
+            "${c.dateText} • ${c.location}",
+            style: const TextStyle(color: Colors.black45, fontSize: 13),
+          ),
           const SizedBox(height: 8),
           ClipRRect(
             borderRadius: BorderRadius.circular(4),
@@ -344,11 +437,16 @@ class ScreenStaffProfile extends ConsumerWidget {
               value: progress,
               minHeight: 6,
               backgroundColor: Colors.grey[200],
-              valueColor: const AlwaysStoppedAnimation<Color>(Color(0xFF2F7BFF)),
+              valueColor: const AlwaysStoppedAnimation<Color>(
+                Color(0xFF2F7BFF),
+              ),
             ),
           ),
           const SizedBox(height: 4),
-          Text("${c.filled}/${c.capacity} spots filled", style: const TextStyle(fontSize: 11, color: Colors.black45)),
+          Text(
+            "${c.filled}/${c.capacity} spots filled",
+            style: const TextStyle(fontSize: 11, color: Colors.black45),
+          ),
         ],
       ),
     );
@@ -368,8 +466,14 @@ class ScreenStaffProfile extends ConsumerWidget {
         children: [
           Icon(icon, size: 18, color: const Color(0xFF2F7BFF)),
           const SizedBox(height: 4),
-          Text(value, style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15)),
-          Text(label, style: const TextStyle(fontSize: 11, color: Colors.black45)),
+          Text(
+            value,
+            style: const TextStyle(fontWeight: FontWeight.w900, fontSize: 15),
+          ),
+          Text(
+            label,
+            style: const TextStyle(fontSize: 11, color: Colors.black45),
+          ),
         ],
       ),
     );
@@ -389,21 +493,33 @@ class ScreenStaffProfile extends ConsumerWidget {
           children: [
             Icon(icon, size: 18, color: Colors.black87),
             const SizedBox(width: 8),
-            Text(label, style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
+            Text(
+              label,
+              style: const TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+            ),
           ],
         ),
       ),
     );
   }
 
-  Widget _buildMenuRow(String label, IconData icon, VoidCallback onTap, {bool isDestructive = false}) {
+  Widget _buildMenuRow(
+    String label,
+    IconData icon,
+    VoidCallback onTap, {
+    bool isDestructive = false,
+  }) {
     return InkWell(
       onTap: onTap,
       child: Padding(
         padding: const EdgeInsets.symmetric(vertical: 8),
         child: Row(
           children: [
-            Icon(icon, size: 20, color: isDestructive ? Colors.red : Colors.black54),
+            Icon(
+              icon,
+              size: 20,
+              color: isDestructive ? Colors.red : Colors.black54,
+            ),
             const SizedBox(width: 12),
             Text(
               label,
@@ -414,7 +530,8 @@ class ScreenStaffProfile extends ConsumerWidget {
               ),
             ),
             const Spacer(),
-            if (!isDestructive) const Icon(Icons.chevron_right, size: 20, color: Colors.black26),
+            if (!isDestructive)
+              const Icon(Icons.chevron_right, size: 20, color: Colors.black26),
           ],
         ),
       ),

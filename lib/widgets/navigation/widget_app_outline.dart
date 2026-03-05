@@ -51,8 +51,14 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
         height: 70,
         destinations: [
           NavigationDestination(
-            icon: Icon(isStaff ? Icons.admin_panel_settings_outlined : Icons.home_outlined),
-            selectedIcon: Icon(isStaff ? Icons.admin_panel_settings : Icons.home),
+            icon: Icon(
+              isStaff
+                  ? Icons.admin_panel_settings_outlined
+                  : Icons.home_outlined,
+            ),
+            selectedIcon: Icon(
+              isStaff ? Icons.admin_panel_settings : Icons.home,
+            ),
             label: isStaff ? 'Staff Portal' : 'Home',
           ),
           const NavigationDestination(

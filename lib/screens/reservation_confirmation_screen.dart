@@ -194,6 +194,7 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       child: const Text(
                         "View My Reservations",
                         style: TextStyle(
+                          color: Colors.white,
                           fontSize: 18,
                           fontWeight: FontWeight.bold,
                         ),
