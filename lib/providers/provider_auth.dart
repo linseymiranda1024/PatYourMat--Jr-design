@@ -122,6 +122,7 @@ class ProviderAuth extends ChangeNotifier {
         _isShowingSplash = false;
         _isSigningIn = true;
         _lastAuthedUid = user.uid;
+        loadAuthedUserDetailsUponSignin();
       }
 
       // If the state changes, notify listeners
@@ -528,6 +529,9 @@ class ProviderAuth extends ChangeNotifier {
 
     // Update reservations listener
     ProviderScope.containerOf(_context, listen: false).read(reservationsProvider).updateUser();
+
+    // Stop loading
+    isSigningIn = false;
   }
 
   //////////////////////////////////////////////////////////////

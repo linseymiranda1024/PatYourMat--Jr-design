@@ -10,7 +10,7 @@
 // Imports
 //////////////////////////////////////////////////////////////////////////
 // Dart imports
-import 'dart:io';
+import 'dart:typed_data';
 
 // Flutter external package imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
@@ -55,7 +55,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   var _isInit = true;
   late ProviderUserProfile _providerUserProfile;
   late ProviderAuth _providerAuth;
-  File? pickedImage;
+  Uint8List? pickedImage;
   bool editingPicture = false;
 
   // Finals used in this widget
@@ -63,6 +63,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _emailController = TextEditingController();
+  final _passwordController = TextEditingController();
 
   ////////////////////////////////////////////////////////////////
   // Runs the following code once upon initialization
@@ -137,7 +139,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
         try {
           await FirebaseAuth.instance.currentUser?.sendEmailVerification();
           _providerUserProfile.email = user?.email ?? email;
-          _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
+          _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
           await _providerUserProfile.writeUserProfileToDb();
           _providerAuth.isSigningIn = false;
         } catch (e) {
@@ -184,11 +186,13 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       // Update profile information and write to database
       _providerUserProfile.firstName = _firstNameController.text.trim();
       _providerUserProfile.lastName = _lastNameController.text.trim();
-      _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
-      _providerUserProfile.writeUserProfileToDb();
 
-      //If saving a snack-bar will appear and will pop the navigator
-      if (!widget.isAuth) {
+      if (widget.isAuth) {
+        // This is a new user registration
+        _submitAuthForm(_emailController.text.trim(), _passwordController.text.trim(), false, context);
+      } else {
+        // This is a profile update for an existing user
+        _providerUserProfile.writeUserProfileToDb();
         Snackbar.show(SnackbarDisplayType.SB_SUCCESS, "Profile Updated", context);
         context.pop();
       }
@@ -200,8 +204,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   ////////////////////////////////////////////////////////////////
   Future uploadProfileImage(String? uid) async {
     if (pickedImage != null) {
-      final file = File(pickedImage!.path);
-      await _providerUserProfile.uploadAndSetNewUserProfileImage(file);
+      await _providerUserProfile.uploadAndSetNewUserProfileImage(pickedImage!);
     }
     setState(() {
       editingPicture = false;
@@ -215,16 +218,16 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   ////////////////////////////////////////////////////////////////
   Future pickImage() async {
     try {
-      final pickedImage = await ImagePicker().pickImage(
+      final XFile? image = await ImagePicker().pickImage(
         source: ImageSource.gallery,
         maxHeight: 300,
         maxWidth: 300,
         imageQuality: 100,
       );
-      if (pickedImage == null) return;
+      if (image == null) return;
 
-      final imageTemporary = File(pickedImage.path);
-      setState(() => this.pickedImage = imageTemporary);
+      final Uint8List imageBytes = await image.readAsBytes();
+      setState(() => pickedImage = imageBytes);
       uploadProfileImage(_providerUserProfile.uid);
     } on PlatformException catch (e) {
       AppLogger.error('Failed to pick image: $e');
@@ -236,10 +239,10 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   ////////////////////////////////////////////////////////////////
   Future takeImage() async {
     try {
-      final pickedImage = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 10);
-      if (pickedImage == null) return;
-      final imageTemporary = File(pickedImage.path);
-      setState(() => this.pickedImage = imageTemporary);
+      final XFile? image = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 10);
+      if (image == null) return;
+      final Uint8List imageBytes = await image.readAsBytes();
+      setState(() => pickedImage = imageBytes);
       uploadProfileImage(_providerUserProfile.uid);
     } on PlatformException catch (e) {
       AppLogger.error('Failed to pick image: $e');
@@ -333,7 +336,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                                 radius: 100,
                                 userImage: pickedImage == null
                                     ? _providerUserProfile.userImage
-                                    : Image.file(pickedImage!).image,
+                                    : MemoryImage(pickedImage!),
                                 userWholeName: _providerUserProfile.wholeName,
                               ),
                             ),
@@ -475,6 +478,43 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                       decoration: InputDecoration(labelText: 'Last Name'),
                     ),
                   ),
+                  ///////////////////////////////////////////////////////////////////////
+                  // Email Text Field (Only if creating new account)
+                  ///////////////////////////////////////////////////////////////////////
+                  if (widget.isAuth)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: TextFormField(
+                        controller: _emailController,
+                        autofillHints: const [AutofillHints.email],
+                        keyboardType: TextInputType.emailAddress,
+                        decoration: const InputDecoration(labelText: 'Email'),
+                        validator: (value) {
+                          if (value == null || value.isEmpty || !value.contains('@')) {
+                            return 'Please enter a valid email address.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
+                  ///////////////////////////////////////////////////////////////////////
+                  // Password Text Field (Only if creating new account)
+                  ///////////////////////////////////////////////////////////////////////
+                  if (widget.isAuth)
+                    Padding(
+                      padding: const EdgeInsets.symmetric(vertical: 5),
+                      child: TextFormField(
+                        controller: _passwordController,
+                        decoration: const InputDecoration(labelText: 'Password'),
+                        obscureText: true,
+                        validator: (value) {
+                          if (value == null || value.length < 6) {
+                            return 'Password must be at least 6 characters long.';
+                          }
+                          return null;
+                        },
+                      ),
+                    ),
                   ///////////////////////////////////////////////////////////////////////
                   /// Continue Button and Cancel Button
                   ///////////////////////////////////////////////////////////////////////

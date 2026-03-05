@@ -10,8 +10,7 @@
 // Imports
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Dart imports
-import 'dart:async';
-import 'dart:io';
+import 'dart:async'; // Keep this for StreamSubscription
 
 // Flutter external package imports
 import 'package:firebase_storage/firebase_storage.dart';
@@ -69,6 +68,19 @@ class DBUserProfile {
 
       // Try to get the user's data from firestore and setup for future updates
       try {
+        // Fetch initial data to ensure we have it before returning
+        var docSnapshot = await db.collection(FS_COL_IC_USER_PROFILES).doc(uid).get();
+        if (docSnapshot.exists) {
+          Map<String, dynamic>? data = docSnapshot.data();
+          if (data != null) {
+            data["email"] = user.email;
+            UserProfile userProfile = UserProfile.defFromJsonDbObject(data, user.uid);
+            userProfile.uid = uid;
+            await providerUserProfile.updateUserProfile(userProfile);
+            success = true;
+          }
+        }
+
         _profileUpdateStream = db.collection(FS_COL_IC_USER_PROFILES).doc(uid).snapshots().listen((docRef) async {
           if (docRef.exists) {
             Map<String, dynamic>? data = docRef.data()!;
@@ -191,7 +203,7 @@ class DBUserProfile {
   ////////////////////////////////////////////////////////////////////////////////////////////
   // Uplads the user profile image to Google Cloud Storage
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> uploadNewUserProfileImage(File imageFile, ProviderUserProfile providerUserProfile) async {
+  static Future<bool> uploadNewUserProfileImage(Uint8List imageBytes, ProviderUserProfile providerUserProfile) async {
     // Initialize success variable
     bool success = false;
 
@@ -203,11 +215,11 @@ class DBUserProfile {
       // Get existing metadata, upload the file, and then re-upload the metadata
       try {
         final existingMetadata = await ref.getMetadata();
-        await ref.putFile(
-            imageFile, SettableMetadata(customMetadata: existingMetadata.customMetadata ?? <String, String>{}));
+        await ref.putData(
+            imageBytes, SettableMetadata(customMetadata: existingMetadata.customMetadata ?? <String, String>{}));
       } catch (e) {
-        Map<String, String> customMetadata = {};
-        ref.putFile(imageFile, SettableMetadata(customMetadata: customMetadata));
+        // If no existing metadata, upload with default metadata
+        ref.putData(imageBytes, SettableMetadata(customMetadata: const {}));
       }
       success = true;
     } catch (e) {

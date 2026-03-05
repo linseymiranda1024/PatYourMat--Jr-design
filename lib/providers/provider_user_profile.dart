@@ -10,7 +10,9 @@
 // Imports
 //////////////////////////////////////////////////////////////////////////
 // Dart imports
-import 'dart:io';
+import 'package:universal_io/io.dart';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Flutter external package imports
 import 'package:permission_handler/permission_handler.dart';
@@ -163,14 +165,16 @@ class ProviderUserProfile extends ChangeNotifier {
     providerAuth.isSigningOut = false;
 
     // Ensure the proper permissions are granted
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      await Permission.microphone.request();
-    }
+    if (!kIsWeb) {
+      var status = await Permission.microphone.status;
+      if (!status.isGranted) {
+        await Permission.microphone.request();
+      }
 
-    status = await Permission.storage.status;
-    if (!status.isGranted) {
-      await Permission.storage.request();
+      status = await Permission.storage.status;
+      if (!status.isGranted) {
+        await Permission.storage.request();
+      }
     }
   }
 
@@ -252,13 +256,16 @@ class ProviderUserProfile extends ChangeNotifier {
   ////////////////////////////////////////////////////////////////////////////////////////////
   // Takes in a file (to an image) and uploads as new user profile image using the DB helper
   // (in GCS) and notifies listeners (notify is triggered by called method, so not done here)
+  // NOTE: This method now accepts image bytes (Uint8List) to be compatible with web.
+  // The calling widget should get bytes from the picked file (e.g., using `await xFile.readAsBytes()`)
+  // and the DB helper method `DBUserProfile.uploadNewUserProfileImage` must also be updated to accept `Uint8List`.
   ////////////////////////////////////////////////////////////////////////////////////////////
-  uploadAndSetNewUserProfileImage(File imageFile) async {
+  uploadAndSetNewUserProfileImage(Uint8List imageBytes) async {
     // Convert file to image and set (which notifies listeners) to local profile picture
-    userImage = FileImage(imageFile);
+    userImage = MemoryImage(imageBytes);
 
     // Upload image to Google Cloud Storage
-    await DBUserProfile.uploadNewUserProfileImage(imageFile, this);
+    await DBUserProfile.uploadNewUserProfileImage(imageBytes, this);
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////////
