@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../providers/provider_user_profile.dart';
 import '../../providers/provider_gym_class.dart';
 import '../../models/gym_class.dart';
 import '../../main.dart';
+import 'screen_create_class.dart';
 
 class ScreenStaffPortal extends ConsumerWidget {
   static const routeName = '/staff_portal';
@@ -44,7 +46,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                   ],
                 ),
                 ElevatedButton.icon(
-                  onPressed: () => _showCreateClassDialog(context, ref),
+                  onPressed: () => context.push(ScreenCreateClass.routeName),
                   icon: const Icon(Icons.add),
                   label: const Text('Create Class'),
                   style: ElevatedButton.styleFrom(
@@ -94,103 +96,6 @@ class ScreenStaffPortal extends ConsumerWidget {
                 c.timeText,
                 '${c.filled}/${c.capacity}',
               )).toList(),
-          ],
-        ),
-      ),
-    );
-  }
-
-  void _showCreateClassDialog(BuildContext context, WidgetRef ref) {
-    final titleController = TextEditingController();
-    final instructorController = TextEditingController();
-    final locationController = TextEditingController();
-    final capacityController = TextEditingController();
-    final durationController = TextEditingController(text: '60');
-    DateTime selectedDate = DateTime.now();
-    TimeOfDay selectedTime = TimeOfDay.now();
-
-    showDialog(
-      context: context,
-      builder: (context) => StatefulBuilder(
-        builder: (context, setState) => AlertDialog(
-          title: const Text('Create New Class'),
-          content: SingleChildScrollView(
-            child: Column(
-              mainAxisSize: MainAxisSize.min,
-              children: [
-                TextField(controller: titleController, decoration: const InputDecoration(labelText: 'Class Title')),
-                TextField(controller: instructorController, decoration: const InputDecoration(labelText: 'Instructor')),
-                TextField(controller: locationController, decoration: const InputDecoration(labelText: 'Location')),
-                TextField(
-                  controller: capacityController, 
-                  decoration: const InputDecoration(labelText: 'Capacity'),
-                  keyboardType: TextInputType.number,
-                ),
-                TextField(
-                  controller: durationController, 
-                  decoration: const InputDecoration(labelText: 'Duration (min)'),
-                  keyboardType: TextInputType.number,
-                ),
-                const SizedBox(height: 16),
-                Row(
-                  children: [
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
-                          final date = await showDatePicker(
-                            context: context,
-                            initialDate: selectedDate,
-                            firstDate: DateTime.now(),
-                            lastDate: DateTime.now().add(const Duration(days: 365)),
-                          );
-                          if (date != null) setState(() => selectedDate = date);
-                        },
-                        child: Text('${selectedDate.month}/${selectedDate.day}/${selectedDate.year}'),
-                      ),
-                    ),
-                    Expanded(
-                      child: TextButton(
-                        onPressed: () async {
-                          final time = await showTimePicker(
-                            context: context,
-                            initialTime: selectedTime,
-                          );
-                          if (time != null) setState(() => selectedTime = time);
-                        },
-                        child: Text(selectedTime.format(context)),
-                      ),
-                    ),
-                  ],
-                ),
-              ],
-            ),
-          ),
-          actions: [
-            TextButton(onPressed: () => Navigator.pop(context), child: const Text('Cancel')),
-            ElevatedButton(
-              onPressed: () {
-                final newClass = GymClass(
-                  id: '', // Firestore will generate this
-                  title: titleController.text,
-                  instructor: instructorController.text,
-                  dateTime: DateTime(
-                    selectedDate.year,
-                    selectedDate.month,
-                    selectedDate.day,
-                    selectedTime.hour,
-                    selectedTime.minute,
-                  ),
-                  durationMinutes: int.tryParse(durationController.text) ?? 60,
-                  location: locationController.text,
-                  capacity: int.tryParse(capacityController.text) ?? 20,
-                  filled: 0,
-                  status: ClassStatus.open,
-                );
-                ref.read(providerGymClass).addClass(newClass);
-                Navigator.pop(context);
-              },
-              child: const Text('Create'),
-            ),
           ],
         ),
       ),
