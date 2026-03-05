@@ -35,13 +35,48 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
     final userProfile = ref.watch(providerUserProfile);
     final isStaff = userProfile.role == UserRole.STAFF;
 
-    final pages = [
+    // Dynamically build the list of pages and destinations based on user role.
+    final List<Widget> pages = [
       isStaff ? const ScreenStaffPortal() : const HomeScreen(),
       const CalendarScreen(),
-      const FriendsScreen(),
+      if (!isStaff) const FriendsScreen(), // Only show Friends for non-staff
       const NotificationsScreen(),
       isStaff ? const ScreenStaffProfile() : const ProfileScreen(),
     ];
+
+    final List<NavigationDestination> destinations = [
+      NavigationDestination(
+        icon: Icon(isStaff ? Icons.admin_panel_settings_outlined : Icons.home_outlined),
+        selectedIcon: Icon(isStaff ? Icons.admin_panel_settings : Icons.home),
+        label: isStaff ? 'Staff Portal' : 'Home',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.calendar_month_outlined),
+        selectedIcon: Icon(Icons.calendar_month),
+        label: 'Calendar',
+      ),
+      if (!isStaff) // Only show Friends for non-staff
+        const NavigationDestination(
+          icon: Icon(Icons.group_outlined),
+          selectedIcon: Icon(Icons.group),
+          label: 'Friends',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.notifications_none),
+        selectedIcon: Icon(Icons.notifications),
+        label: 'Alerts',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+
+    // Prevent index out of bounds when switching roles.
+    if (_index >= pages.length) {
+      _index = 0;
+    }
 
     return Scaffold(
       body: pages[_index],
@@ -49,33 +84,7 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         height: 70,
-        destinations: [
-          NavigationDestination(
-            icon: Icon(isStaff ? Icons.admin_panel_settings_outlined : Icons.home_outlined),
-            selectedIcon: Icon(isStaff ? Icons.admin_panel_settings : Icons.home),
-            label: isStaff ? 'Staff Portal' : 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Calendar',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group),
-            label: 'Friends',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        destinations: destinations,
       ),
     );
   }
