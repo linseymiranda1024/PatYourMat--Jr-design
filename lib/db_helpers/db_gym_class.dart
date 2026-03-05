@@ -10,12 +10,22 @@ class DBGymClass {
   }
 
   static Stream<List<GymClass>> getClassesStream() {
-    return _db.collection(_collection)
+    return _db
+        .collection(_collection)
         .orderBy('dateTime', descending: false)
         .snapshots()
-        .map((snapshot) => snapshot.docs
-            .map((doc) => GymClass.fromFirestore(doc))
-            .toList());
+        .map(
+          (snapshot) =>
+              snapshot.docs.map((doc) => GymClass.fromFirestore(doc)).toList(),
+        );
+  }
+
+  static Future<List<GymClass>> getClassesOnce() async {
+    final snapshot = await _db
+        .collection(_collection)
+        .orderBy('dateTime', descending: false)
+        .get();
+    return snapshot.docs.map((doc) => GymClass.fromFirestore(doc)).toList();
   }
 
   static Stream<GymClass?> getClassStream(String id) {
@@ -26,7 +36,10 @@ class DBGymClass {
   }
 
   static Future<void> updateClass(GymClass gymClass) async {
-    await _db.collection(_collection).doc(gymClass.id).update(gymClass.toFirestore());
+    await _db
+        .collection(_collection)
+        .doc(gymClass.id)
+        .update(gymClass.toFirestore());
   }
 
   static Future<void> deleteClass(String id) async {

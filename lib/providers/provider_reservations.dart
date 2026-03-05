@@ -6,10 +6,11 @@ import '../models/reservation.dart';
 import '../models/gym_class.dart';
 import '../db_helpers/db_reservations.dart';
 
-final reservationsProvider =
-    ChangeNotifierProvider<ReservationsNotifier>((ref) {
-      return ReservationsNotifier();
-    });
+final reservationsProvider = ChangeNotifierProvider<ReservationsNotifier>((
+  ref,
+) {
+  return ReservationsNotifier();
+});
 
 class ReservationsNotifier extends ChangeNotifier {
   List<Reservation> _reservations = [];
@@ -46,6 +47,13 @@ class ReservationsNotifier extends ChangeNotifier {
 
   void updateUser() {
     _init();
+  }
+
+  void clearAndCancelForSignOut() {
+    _subscription?.cancel();
+    _subscription = null;
+    _reservations = [];
+    notifyListeners();
   }
 
   @override
