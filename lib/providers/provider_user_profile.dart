@@ -10,7 +10,8 @@
 // Imports
 //////////////////////////////////////////////////////////////////////////
 // Dart imports
-import 'dart:io';
+import 'dart:typed_data';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Flutter external package imports
 import 'package:permission_handler/permission_handler.dart';
@@ -142,7 +143,8 @@ class ProviderUserProfile extends ChangeNotifier {
     notifyListeners();
   }
 
-  AccountCreationStep get accountCreationStep => _userProfile.accountCreationStep;
+  AccountCreationStep get accountCreationStep =>
+      _userProfile.accountCreationStep;
   set accountCreationStep(AccountCreationStep value) {
     _userProfile.accountCreationStep = value;
     notifyListeners();
@@ -163,14 +165,16 @@ class ProviderUserProfile extends ChangeNotifier {
     providerAuth.isSigningOut = false;
 
     // Ensure the proper permissions are granted
-    var status = await Permission.microphone.status;
-    if (!status.isGranted) {
-      await Permission.microphone.request();
-    }
+    if (!kIsWeb) {
+      var status = await Permission.microphone.status;
+      if (!status.isGranted) {
+        await Permission.microphone.request();
+      }
 
-    status = await Permission.storage.status;
-    if (!status.isGranted) {
-      await Permission.storage.request();
+      status = await Permission.storage.status;
+      if (!status.isGranted) {
+        await Permission.storage.request();
+      }
     }
   }
 
@@ -253,12 +257,12 @@ class ProviderUserProfile extends ChangeNotifier {
   // Takes in a file (to an image) and uploads as new user profile image using the DB helper
   // (in GCS) and notifies listeners (notify is triggered by called method, so not done here)
   ////////////////////////////////////////////////////////////////////////////////////////////
-  uploadAndSetNewUserProfileImage(File imageFile) async {
+  uploadAndSetNewUserProfileImage(Uint8List imageBytes) async {
     // Convert file to image and set (which notifies listeners) to local profile picture
-    userImage = FileImage(imageFile);
+    userImage = MemoryImage(imageBytes);
 
     // Upload image to Google Cloud Storage
-    await DBUserProfile.uploadNewUserProfileImage(imageFile, this);
+    await DBUserProfile.uploadNewUserProfileImage(imageBytes, this);
   }
 
   ////////////////////////////////////////////////////////////////////////////////////////////
@@ -295,7 +299,10 @@ class ProviderUserProfile extends ChangeNotifier {
   // Writes the user profile to the DB using the DB helper.
   ////////////////////////////////////////////////////////////////////////////////////////////
   Future<bool> writeUserProfileToDb({merge = true}) async {
-    bool success = await DBUserProfile.writeUserProfile(_userProfile, merge: merge);
+    bool success = await DBUserProfile.writeUserProfile(
+      _userProfile,
+      merge: merge,
+    );
     _dataLoaded = true;
     notifyListeners();
     return success;

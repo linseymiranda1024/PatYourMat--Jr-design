@@ -11,7 +11,7 @@
 ////////////////////////////////////////////////////////////////////////////////////////////
 // Dart imports
 import 'dart:async';
-import 'dart:io';
+import 'dart:typed_data';
 
 // Flutter external package imports
 import 'package:firebase_storage/firebase_storage.dart';
@@ -50,7 +50,9 @@ class DBUserProfile {
   //
   // Returns true if data was fetched and set in provider; false otherwise
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> fetchUserProfileAndSyncProvider(ProviderUserProfile providerUserProfile) async {
+  static Future<bool> fetchUserProfileAndSyncProvider(
+    ProviderUserProfile providerUserProfile,
+  ) async {
     // Initialize success variable
     bool success = false;
 
@@ -69,21 +71,30 @@ class DBUserProfile {
 
       // Try to get the user's data from firestore and setup for future updates
       try {
-        _profileUpdateStream = db.collection(FS_COL_IC_USER_PROFILES).doc(uid).snapshots().listen((docRef) async {
-          if (docRef.exists) {
-            Map<String, dynamic>? data = docRef.data()!;
+        _profileUpdateStream = db
+            .collection(FS_COL_IC_USER_PROFILES)
+            .doc(uid)
+            .snapshots()
+            .listen((docRef) async {
+              if (docRef.exists) {
+                Map<String, dynamic>? data = docRef.data()!;
 
-            data["email"] = user.email;
-            UserProfile userProfile = UserProfile.defFromJsonDbObject(data, user.uid);
-            userProfile.uid = uid;
+                data["email"] = user.email;
+                UserProfile userProfile = UserProfile.defFromJsonDbObject(
+                  data,
+                  user.uid,
+                );
+                userProfile.uid = uid;
 
-            // Use the provider to update the profile with new data
-            await providerUserProfile.updateUserProfile(userProfile);
-            success = true;
-          }
-        });
+                // Use the provider to update the profile with new data
+                await providerUserProfile.updateUserProfile(userProfile);
+                success = true;
+              }
+            });
       } catch (e) {
-        AppLogger.error("Encountered problem loading user profile from firestore: $e");
+        AppLogger.error(
+          "Encountered problem loading user profile from firestore: $e",
+        );
         providerUserProfile.wipeAndCancelDbStream();
       }
     }
@@ -95,7 +106,10 @@ class DBUserProfile {
   ////////////////////////////////////////////////////////////////////////////////////////////
   // Writes the provided user profile to the database
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> writeUserProfile(UserProfile userProfile, {merge = true}) async {
+  static Future<bool> writeUserProfile(
+    UserProfile userProfile, {
+    merge = true,
+  }) async {
     // Initialize success variable
     bool success = false;
 
@@ -115,10 +129,15 @@ class DBUserProfile {
       // Try to get the user's data from firestore
       try {
         // Attempt to write data
-        await db.collection(FS_COL_IC_USER_PROFILES).doc(uid).set(userProfile.toJsonForDb(), SetOptions(merge: merge));
+        await db
+            .collection(FS_COL_IC_USER_PROFILES)
+            .doc(uid)
+            .set(userProfile.toJsonForDb(), SetOptions(merge: merge));
         success = true;
       } catch (e) {
-        AppLogger.error("Encountered problem writing user profile to firestore.$e");
+        AppLogger.error(
+          "Encountered problem writing user profile to firestore.$e",
+        );
 
         success = false;
       }
@@ -134,13 +153,16 @@ class DBUserProfile {
   //
   // Returns true if image data was fetched and set in provider; false otherwise
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> fetchUserProfileImageAndSyncProvider(ProviderUserProfile providerUserProfile) async {
+  static Future<bool> fetchUserProfileImageAndSyncProvider(
+    ProviderUserProfile providerUserProfile,
+  ) async {
     // Initialize success variable
     bool success = false;
 
     // Get a Google Storage reference to the profile picture
-    final ref =
-        FirebaseStorage.instance.ref().child('users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg');
+    final ref = FirebaseStorage.instance.ref().child(
+      'users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg',
+    );
 
     // Try to download the image
     try {
@@ -168,10 +190,15 @@ class DBUserProfile {
   //
   // Returns an image (MIC logo if no image retreived)
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<ImageProvider?> fetchUserProfileImageFromUid(String uid, bool attemptFetch) async {
+  static Future<ImageProvider?> fetchUserProfileImageFromUid(
+    String uid,
+    bool attemptFetch,
+  ) async {
     if (attemptFetch) {
       // Get a Google Storage reference to the profile picture
-      final ref = FirebaseStorage.instance.ref().child('users/$uid/profile_picture/userProfilePicture.jpg');
+      final ref = FirebaseStorage.instance.ref().child(
+        'users/$uid/profile_picture/userProfilePicture.jpg',
+      );
 
       // Try to download the image
       try {
@@ -191,23 +218,34 @@ class DBUserProfile {
   ////////////////////////////////////////////////////////////////////////////////////////////
   // Uplads the user profile image to Google Cloud Storage
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> uploadNewUserProfileImage(File imageFile, ProviderUserProfile providerUserProfile) async {
+  static Future<bool> uploadNewUserProfileImage(
+    Uint8List imageBytes,
+    ProviderUserProfile providerUserProfile,
+  ) async {
     // Initialize success variable
     bool success = false;
 
     try {
       // Get a reference to the logged-in user's profile pic and upload the new picture
-      final gcsPath = 'users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg';
+      final gcsPath =
+          'users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg';
       final ref = FirebaseStorage.instance.ref().child(gcsPath);
 
       // Get existing metadata, upload the file, and then re-upload the metadata
       try {
         final existingMetadata = await ref.getMetadata();
-        await ref.putFile(
-            imageFile, SettableMetadata(customMetadata: existingMetadata.customMetadata ?? <String, String>{}));
+        await ref.putData(
+          imageBytes,
+          SettableMetadata(
+            customMetadata:
+                existingMetadata.customMetadata ?? <String, String>{},
+          ),
+        );
       } catch (e) {
-        Map<String, String> customMetadata = {};
-        ref.putFile(imageFile, SettableMetadata(customMetadata: customMetadata));
+        await ref.putData(
+          imageBytes,
+          SettableMetadata(customMetadata: const <String, String>{}),
+        );
       }
       success = true;
     } catch (e) {
@@ -222,13 +260,16 @@ class DBUserProfile {
   ////////////////////////////////////////////////////////////////////////////////////////////
   // Deletes the user profile image from Google Cloud Storage
   ////////////////////////////////////////////////////////////////////////////////////////////
-  static Future<bool> deleteUserProfileImage(ProviderUserProfile providerUserProfile) async {
+  static Future<bool> deleteUserProfileImage(
+    ProviderUserProfile providerUserProfile,
+  ) async {
     // Initialize success variable
     bool success = false;
 
     try {
       // Get a reference to the logged-in user's profile pic and upload the new picture
-      final gcsPath = 'users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg';
+      final gcsPath =
+          'users/${providerUserProfile.uid}/profile_picture/userProfilePicture.jpg';
       final ref = FirebaseStorage.instance.ref().child(gcsPath);
       await ref.delete();
       success = true;
@@ -239,14 +280,16 @@ class DBUserProfile {
     return success;
   }
 
-////////////////////////////////////////////////////////////////////////////////
-// Deletes the account data associated with the current user.
-//
-// Returns: A Future that completes when the account data is successfully deleted.
-////////////////////////////////////////////////////////////////////////////////
+  ////////////////////////////////////////////////////////////////////////////////
+  // Deletes the account data associated with the current user.
+  //
+  // Returns: A Future that completes when the account data is successfully deleted.
+  ////////////////////////////////////////////////////////////////////////////////
   static Future<void> deleteAccountData() async {
     try {
-      User? currentUser = FirebaseAuth.instance.currentUser; // Retrieve the currently authenticated user
+      User? currentUser = FirebaseAuth
+          .instance
+          .currentUser; // Retrieve the currently authenticated user
       if (currentUser == null) {
         return; // Exit the method if the user is null
       }

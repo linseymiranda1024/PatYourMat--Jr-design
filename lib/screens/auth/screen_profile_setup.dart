@@ -9,9 +9,6 @@
 //////////////////////////////////////////////////////////////////////////
 // Imports
 //////////////////////////////////////////////////////////////////////////
-// Dart imports
-import 'dart:io';
-
 // Flutter external package imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -55,7 +52,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   var _isInit = true;
   late ProviderUserProfile _providerUserProfile;
   late ProviderAuth _providerAuth;
-  File? pickedImage;
+  Uint8List? pickedImage;
   bool editingPicture = false;
 
   // Finals used in this widget
@@ -110,7 +107,12 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   // Attempts to either login to existing account or signup for
   // new account.
   ////////////////////////////////////////////////////////////////
-  void _submitAuthForm(String email, String password, bool isLogin, BuildContext ctx) async {
+  void _submitAuthForm(
+    String email,
+    String password,
+    bool isLogin,
+    BuildContext ctx,
+  ) async {
     try {
       // Update screen to indicate loading spinner
       setState(() {});
@@ -119,7 +121,11 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       User? user = _auth.currentUser;
       if (isLogin) {
         // Attempt login
-        String errorMessage = (await _providerAuth.signinWithPassword(email, password, _providerUserProfile.role)).trim();
+        String errorMessage = (await _providerAuth.signinWithPassword(
+          email,
+          password,
+          _providerUserProfile.role,
+        )).trim();
 
         // If there was an error, display it...otherwise return true for success
         if (errorMessage.isNotEmpty) {
@@ -131,17 +137,23 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       } else {
         // ...otherwise, attempt to create a new account
         // Attempt to create a new account
-        await _auth.createUserWithEmailAndPassword(email: email, password: password);
+        await _auth.createUserWithEmailAndPassword(
+          email: email,
+          password: password,
+        );
 
         // Send verification e-mail and create initial user profile
         try {
           await FirebaseAuth.instance.currentUser?.sendEmailVerification();
           _providerUserProfile.email = user?.email ?? email;
-          _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
+          _providerUserProfile.accountCreationStep =
+              AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
           await _providerUserProfile.writeUserProfileToDb();
           _providerAuth.isSigningIn = false;
         } catch (e) {
-          AppLogger.warning("Issue with sending email verification or writing to user profile.  email: $e");
+          AppLogger.warning(
+            "Issue with sending email verification or writing to user profile.  email: $e",
+          );
         }
 
         // ...and send verification email
@@ -150,7 +162,11 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
 
           // ...and display to user as "Snack bar" pop-up at bottom of screen
           if (mounted) {
-            Snackbar.show(SnackbarDisplayType.SB_INFO, 'Check ${user.email} for verification link.', context);
+            Snackbar.show(
+              SnackbarDisplayType.SB_INFO,
+              'Check ${user.email} for verification link.',
+              context,
+            );
           }
         }
       }
@@ -184,12 +200,17 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       // Update profile information and write to database
       _providerUserProfile.firstName = _firstNameController.text.trim();
       _providerUserProfile.lastName = _lastNameController.text.trim();
-      _providerUserProfile.accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
+      _providerUserProfile.accountCreationStep =
+          AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
       _providerUserProfile.writeUserProfileToDb();
 
       //If saving a snack-bar will appear and will pop the navigator
       if (!widget.isAuth) {
-        Snackbar.show(SnackbarDisplayType.SB_SUCCESS, "Profile Updated", context);
+        Snackbar.show(
+          SnackbarDisplayType.SB_SUCCESS,
+          "Profile Updated",
+          context,
+        );
         context.pop();
       }
     }
@@ -200,13 +221,16 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   ////////////////////////////////////////////////////////////////
   Future uploadProfileImage(String? uid) async {
     if (pickedImage != null) {
-      final file = File(pickedImage!.path);
-      await _providerUserProfile.uploadAndSetNewUserProfileImage(file);
+      await _providerUserProfile.uploadAndSetNewUserProfileImage(pickedImage!);
     }
     setState(() {
       editingPicture = false;
     });
-    Snackbar.show(SnackbarDisplayType.SB_SUCCESS, 'Profile Photo Saved Sucessfully', context);
+    Snackbar.show(
+      SnackbarDisplayType.SB_SUCCESS,
+      'Profile Photo Saved Sucessfully',
+      context,
+    );
     // Get the file that was chosen
   }
 
@@ -223,8 +247,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       );
       if (pickedImage == null) return;
 
-      final imageTemporary = File(pickedImage.path);
-      setState(() => this.pickedImage = imageTemporary);
+      final imageBytes = await pickedImage.readAsBytes();
+      setState(() => this.pickedImage = imageBytes);
       uploadProfileImage(_providerUserProfile.uid);
     } on PlatformException catch (e) {
       AppLogger.error('Failed to pick image: $e');
@@ -236,10 +260,13 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   ////////////////////////////////////////////////////////////////
   Future takeImage() async {
     try {
-      final pickedImage = await ImagePicker().pickImage(source: ImageSource.camera, imageQuality: 10);
+      final pickedImage = await ImagePicker().pickImage(
+        source: ImageSource.camera,
+        imageQuality: 10,
+      );
       if (pickedImage == null) return;
-      final imageTemporary = File(pickedImage.path);
-      setState(() => this.pickedImage = imageTemporary);
+      final imageBytes = await pickedImage.readAsBytes();
+      setState(() => this.pickedImage = imageBytes);
       uploadProfileImage(_providerUserProfile.uid);
     } on PlatformException catch (e) {
       AppLogger.error('Failed to pick image: $e');
@@ -268,10 +295,18 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
     child: buildCircle(
       color: color,
       all: 8,
-      child: Icon(editingPicture ? Icons.edit_off_rounded : Icons.edit_rounded, size: 22, color: Colors.white),
+      child: Icon(
+        editingPicture ? Icons.edit_off_rounded : Icons.edit_rounded,
+        size: 22,
+        color: Colors.white,
+      ),
     ),
   );
-  Widget buildCircle({required Widget child, required double all, required Color color}) {
+  Widget buildCircle({
+    required Widget child,
+    required double all,
+    required Color color,
+  }) {
     return Container(
       decoration: BoxDecoration(shape: BoxShape.circle, color: color),
       padding: EdgeInsets.all(all),
@@ -303,9 +338,13 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
         child: AutofillGroup(
           child: SingleChildScrollView(
             child: Container(
-              constraints: BoxConstraints(minHeight: MediaQuery.of(context).size.height),
+              constraints: BoxConstraints(
+                minHeight: MediaQuery.of(context).size.height,
+              ),
               child: Column(
-                mainAxisAlignment: widget.isAuth ? MainAxisAlignment.center : MainAxisAlignment.start,
+                mainAxisAlignment: widget.isAuth
+                    ? MainAxisAlignment.center
+                    : MainAxisAlignment.start,
                 children: [
                   ///////////////////////////////////////////////////////////////////////
                   // Logo
@@ -333,7 +372,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                                 radius: 100,
                                 userImage: pickedImage == null
                                     ? _providerUserProfile.userImage
-                                    : Image.file(pickedImage!).image,
+                                    : MemoryImage(pickedImage!),
                                 userWholeName: _providerUserProfile.wholeName,
                               ),
                             ),
@@ -341,7 +380,10 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                               bottom: 10,
                               right: 10,
                               child: getEditIcon(
-                                Theme.of(context).inputDecorationTheme.iconColor ?? CustomColors.statusInfo,
+                                Theme.of(
+                                      context,
+                                    ).inputDecorationTheme.iconColor ??
+                                    CustomColors.statusInfo,
                               ),
                             ),
                           ],
@@ -362,14 +404,20 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                           padding: const EdgeInsets.all(0.0),
                           child: ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               backgroundColor: CustomColors.statusInfo,
                               foregroundColor: Colors.white,
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
                               children: [
-                                Icon(Icons.image_outlined, color: Colors.white, size: 20),
+                                Icon(
+                                  Icons.image_outlined,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                                 SizedBox(width: 5),
                                 Text("Gallery", style: TextStyle(fontSize: 15)),
                               ],
@@ -389,7 +437,11 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                             children: [
                               Align(
                                 alignment: Alignment.center,
-                                child: Icon(CupertinoIcons.photo_camera, color: Colors.white, size: 20),
+                                child: Icon(
+                                  CupertinoIcons.photo_camera,
+                                  color: Colors.white,
+                                  size: 20,
+                                ),
                               ),
                               SizedBox(width: 5),
                               Text("Capture", style: TextStyle(fontSize: 15)),
@@ -401,7 +453,9 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                         if (_providerUserProfile.userImage != null)
                           ElevatedButton(
                             style: ElevatedButton.styleFrom(
-                              padding: const EdgeInsets.symmetric(horizontal: 12),
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
+                              ),
                               backgroundColor: CustomColors.statusInfo,
                               foregroundColor: Colors.white,
                             ),
@@ -410,7 +464,11 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                               children: [
                                 Align(
                                   alignment: Alignment.center,
-                                  child: Icon(CupertinoIcons.delete, color: Colors.white, size: 20),
+                                  child: Icon(
+                                    CupertinoIcons.delete,
+                                    color: Colors.white,
+                                    size: 20,
+                                  ),
                                 ),
                                 SizedBox(width: 5),
                                 Text("Delete", style: TextStyle(fontSize: 15)),
@@ -486,14 +544,17 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                           onPressed: () {
                             _trySubmit();
                           },
-                          child: widget.isAuth ? const Text("Submit") : const Text("Update"),
+                          child: widget.isAuth
+                              ? const Text("Submit")
+                              : const Text("Update"),
                         ),
                       ),
                       if (widget.isAuth)
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 0),
                           child: TextButton(
-                            onPressed: () => _providerAuth.clearAuthedUserDetailsAndSignout(),
+                            onPressed: () => _providerAuth
+                                .clearAuthedUserDetailsAndSignout(),
                             child: const Text("Log out"),
                           ),
                         ),

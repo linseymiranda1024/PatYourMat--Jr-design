@@ -12,7 +12,8 @@
 // Dart imports
 import 'dart:typed_data';
 import 'dart:convert';
-import 'dart:io';
+import 'package:universal_io/io.dart';
+import 'package:flutter/foundation.dart' show kIsWeb;
 
 // Flutter external package imports
 import 'package:path_provider/path_provider.dart';
@@ -34,10 +35,14 @@ class UtilFile {
   ////////////////////////////////////////////////////////////////
   static Future<String> init() async {
     // If it's not already set, set it
-    if (_appDirPath.isEmpty) {
-      Directory _appDir = await getApplicationDocumentsDirectory();
-      _appDirPath = _appDir.path;
-      AppLogger.debug("App directory path: $_appDirPath");
+    if (_appDirPath.isEmpty && !kIsWeb) {
+      try {
+        Directory _appDir = await getApplicationDocumentsDirectory();
+        _appDirPath = _appDir.path;
+        AppLogger.debug("App directory path: $_appDirPath");
+      } catch (e) {
+        AppLogger.error("Could not get application documents directory: $e");
+      }
     }
     return _appDirPath;
   }
@@ -153,6 +158,10 @@ class UtilFile {
   // external storage directory.
   ////////////////////////////////////////////////////////////////
   static Future<String> getFilePathInExternalStorage(String fileName) async {
+    if (kIsWeb) {
+      return "";
+    }
+
     // Get the external storage directory, append the file name, and return
     try {
       Directory? extStorageDirectory = await getExternalStorageDirectory();

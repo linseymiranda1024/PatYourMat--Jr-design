@@ -1,6 +1,5 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import '../../providers/provider_user_profile.dart';
 import '../../models/user_profile.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/calendar_screen.dart';
@@ -35,13 +34,48 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
     final userProfile = ref.watch(providerUserProfile);
     final isStaff = userProfile.role == UserRole.STAFF;
 
-    final pages = [
+    final pages = <Widget>[
       isStaff ? const ScreenStaffPortal() : const HomeScreen(),
       const CalendarScreen(),
-      const FriendsScreen(),
+      if (!isStaff) const FriendsScreen(),
       const NotificationsScreen(),
       isStaff ? const ScreenStaffProfile() : const ProfileScreen(),
     ];
+
+    final destinations = <NavigationDestination>[
+      NavigationDestination(
+        icon: Icon(
+          isStaff ? Icons.admin_panel_settings_outlined : Icons.home_outlined,
+        ),
+        selectedIcon: Icon(isStaff ? Icons.admin_panel_settings : Icons.home),
+        label: isStaff ? 'Staff Portal' : 'Home',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.calendar_month_outlined),
+        selectedIcon: Icon(Icons.calendar_month),
+        label: 'Calendar',
+      ),
+      if (!isStaff)
+        const NavigationDestination(
+          icon: Icon(Icons.group_outlined),
+          selectedIcon: Icon(Icons.group),
+          label: 'Friends',
+        ),
+      const NavigationDestination(
+        icon: Icon(Icons.notifications_none),
+        selectedIcon: Icon(Icons.notifications),
+        label: 'Alerts',
+      ),
+      const NavigationDestination(
+        icon: Icon(Icons.person_outline),
+        selectedIcon: Icon(Icons.person),
+        label: 'Profile',
+      ),
+    ];
+
+    if (_index >= pages.length) {
+      _index = 0;
+    }
 
     return Scaffold(
       body: pages[_index],
@@ -49,39 +83,7 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
         selectedIndex: _index,
         onDestinationSelected: (i) => setState(() => _index = i),
         height: 70,
-        destinations: [
-          NavigationDestination(
-            icon: Icon(
-              isStaff
-                  ? Icons.admin_panel_settings_outlined
-                  : Icons.home_outlined,
-            ),
-            selectedIcon: Icon(
-              isStaff ? Icons.admin_panel_settings : Icons.home,
-            ),
-            label: isStaff ? 'Staff Portal' : 'Home',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.calendar_month_outlined),
-            selectedIcon: Icon(Icons.calendar_month),
-            label: 'Calendar',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.group_outlined),
-            selectedIcon: Icon(Icons.group),
-            label: 'Friends',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.notifications_none),
-            selectedIcon: Icon(Icons.notifications),
-            label: 'Alerts',
-          ),
-          const NavigationDestination(
-            icon: Icon(Icons.person_outline),
-            selectedIcon: Icon(Icons.person),
-            label: 'Profile',
-          ),
-        ],
+        destinations: destinations,
       ),
     );
   }
