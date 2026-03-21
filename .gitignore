@@ -72,3 +72,5 @@ ios/Runner/GoogleService-Info.plist
 venv/
 __pycache__/
 *.pyc
+
+/ai/
