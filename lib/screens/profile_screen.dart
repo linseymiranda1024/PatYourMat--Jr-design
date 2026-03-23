@@ -1,16 +1,19 @@
+// lib/screens/profile_screen.dart
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pat_your_mat/main.dart';
+import 'package:pat_your_mat/screens/settings_screen.dart';
 
 import '../providers/provider_user_profile.dart';
 import '../providers/provider_auth.dart';
-import '../providers/provider_reservations.dart'; // ← added
-import '../models/reservation.dart'; // ← added (your model file)
+import '../providers/provider_reservations.dart';
+import '../models/reservation.dart';
 
 import '../widgets/general/widget_profile_avatar.dart';
 import 'settings/screen_profile_edit.dart';
 import 'settings/screen_settings.dart';
+import '../theme/app_colors.dart';
 
 class ProfileScreen extends ConsumerWidget {
   const ProfileScreen({super.key});
@@ -40,10 +43,10 @@ class ProfileScreen extends ConsumerWidget {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      _buildStatsSection(context, reservations),
+                      _buildStatsSection(context),
                       const SizedBox(height: 32),
 
-                      // ── Upcoming Reservations ───────────────────────────────────
+                      // Upcoming Reservations Section
                       const Text(
                         'Upcoming Reservations',
                         style: TextStyle(
@@ -64,8 +67,7 @@ class ProfileScreen extends ConsumerWidget {
                           ),
                           child: const Center(
                             child: Text(
-                              'No upcoming reservations yet.\n'
-                              'Reserve a class to see it here!',
+                              'No upcoming reservations yet.\nReserve a class to see it here!',
                               textAlign: TextAlign.center,
                               style: TextStyle(
                                 fontSize: 16,
@@ -85,10 +87,9 @@ class ProfileScreen extends ConsumerWidget {
 
                       const SizedBox(height: 32),
 
-                      // Your original sections
                       _buildQuickActions(context),
                       const SizedBox(height: 24),
-                      _buildRecentActivity(context, reservations),
+                      _buildRecentActivity(context),
                       const SizedBox(height: 24),
                       _buildAchievements(context),
                       const SizedBox(height: 24),
@@ -105,13 +106,13 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  // ── New: Reservation Card ────────────────────────────────────────────────
+  // Reservation Card
   Widget _buildReservationCard(
     Reservation res,
     BuildContext context,
     WidgetRef ref,
   ) {
-    final bool isConfirmed = res.status == 'CONFIRMED';
+    final isConfirmed = res.status == 'CONFIRMED';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -162,16 +163,16 @@ class ProfileScreen extends ConsumerWidget {
                 ),
                 decoration: BoxDecoration(
                   color: isConfirmed
-                      ? const Color(0xFFE8F5E9)
-                      : const Color(0xFFFFF3E0),
+                      ? Colors.green.shade100
+                      : Colors.orange.shade100,
                   borderRadius: BorderRadius.circular(20),
                 ),
                 child: Text(
                   res.status,
                   style: TextStyle(
                     color: isConfirmed
-                        ? const Color(0xFF2E7D32)
-                        : const Color(0xFFE65100),
+                        ? Colors.green.shade800
+                        : Colors.orange.shade800,
                     fontWeight: FontWeight.bold,
                     fontSize: 12,
                   ),
@@ -216,7 +217,6 @@ class ProfileScreen extends ConsumerWidget {
                         content: Text('Checked in for ${res.className}'),
                       ),
                     );
-                    // Later: real check-in logic
                   },
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.green.shade600,
@@ -235,25 +235,13 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(width: 12),
               Expanded(
                 child: OutlinedButton(
-                  onPressed: () async {
-                    try {
-                      await ref
-                          .read(reservationsProvider)
-                          .cancelReservation(res);
-                      if (!context.mounted) return;
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reservation cancelled')),
-                      );
-                    } catch (e) {
-                      if (!context.mounted) return;
-                      String message = e.toString();
-                      if (message.startsWith('Exception: ')) {
-                        message = message.replaceFirst('Exception: ', '');
-                      }
-                      ScaffoldMessenger.of(context).showSnackBar(
-                        SnackBar(content: Text('Cancel failed: $message')),
-                      );
-                    }
+                  onPressed: () {
+                    ref
+                        .read(reservationsProvider.notifier)
+                        .cancelReservation(res);
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Reservation cancelled')),
+                    );
                   },
                   style: OutlinedButton.styleFrom(
                     foregroundColor: Colors.red,
@@ -275,8 +263,6 @@ class ProfileScreen extends ConsumerWidget {
       ),
     );
   }
-
-  // ── Your original methods (unchanged) ─────────────────────────────────────
 
   Widget _buildHeader(BuildContext context, ProviderUserProfile profile) {
     return Container(
@@ -373,13 +359,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatsSection(BuildContext context, List<Reservation> reservations) {
-    final activeCount = reservations.length;
-    final thisMonthCount = reservations.where((r) {
-      final now = DateTime.now();
-      return r.date.month == now.month && r.date.year == now.year;
-    }).length;
-
+  Widget _buildStatsSection(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -396,16 +376,16 @@ class ProfileScreen extends ConsumerWidget {
           children: [
             _buildStatCard(
               "Total Classes",
-              activeCount.toString(), // Simplified for now since we only have upcoming
+              "42",
               Icons.fitness_center,
               Colors.blue,
-              progress: (activeCount / 10).clamp(0.0, 1.0),
-              progressText: "$activeCount/10 to Next Level",
+              progress: 0.42,
+              progressText: "42/100 to Silver",
             ),
             const SizedBox(width: 16),
             _buildStatCard(
               "This Month",
-              thisMonthCount.toString(),
+              "12",
               Icons.calendar_month,
               Colors.orange,
             ),
@@ -414,11 +394,11 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 16),
         Row(
           children: [
-            _buildStatCard("Active Res.", activeCount.toString(), Icons.bookmark, Colors.green),
+            _buildStatCard("Active Res.", "3", Icons.bookmark, Colors.green),
             const SizedBox(width: 16),
             _buildStatCard(
               "Attend Rate",
-              "100%", // Simplified dummy for now
+              "98%",
               Icons.trending_up,
               Colors.purple,
             ),
@@ -496,6 +476,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  // ── Quick Actions ──────────────────────────
   Widget _buildQuickActions(BuildContext context) {
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,7 +507,7 @@ class ProfileScreen extends ConsumerWidget {
           context,
           "Settings",
           Icons.settings_outlined,
-          () => context.push(ScreenSettings.routeName),
+          () => context.push(SettingsScreen.routeName),
         ),
       ],
     );
@@ -539,29 +520,53 @@ class ProfileScreen extends ConsumerWidget {
     VoidCallback onTap,
   ) {
     return Padding(
-      padding: const EdgeInsets.only(bottom: 12.0),
-      child: Material(
-        color: Colors.white,
-        borderRadius: BorderRadius.circular(16),
-        child: InkWell(
-          onTap: onTap,
+      padding: const EdgeInsets.only(bottom: 14.0),
+      child: Container(
+        decoration: BoxDecoration(
+          color: Colors.white,
           borderRadius: BorderRadius.circular(16),
-          child: Container(
-            padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 16),
-            child: Row(
-              children: [
-                Icon(icon, color: const Color(0xFF2F7BFF)),
-                const SizedBox(width: 16),
-                Text(
-                  label,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w600,
+          boxShadow: [
+            BoxShadow(
+              color: Colors.black.withOpacity(0.06),
+              blurRadius: 10,
+              offset: const Offset(0, 4),
+            ),
+          ],
+        ),
+        child: Material(
+          color: Colors.transparent,
+          child: InkWell(
+            onTap: onTap,
+            borderRadius: BorderRadius.circular(16),
+            child: Padding(
+              padding: const EdgeInsets.symmetric(horizontal: 20, vertical: 18),
+              child: Row(
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: const Color(0xFF2F7BFF).withOpacity(0.1),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(icon, color: const Color(0xFF2F7BFF), size: 22),
                   ),
-                ),
-                const Spacer(),
-                const Icon(Icons.chevron_right, color: Colors.black26),
-              ],
+                  const SizedBox(width: 16),
+                  Text(
+                    label,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black87,
+                    ),
+                  ),
+                  const Spacer(),
+                  const Icon(
+                    Icons.arrow_forward_ios,
+                    color: Colors.black12,
+                    size: 16,
+                  ),
+                ],
+              ),
             ),
           ),
         ),
@@ -569,7 +574,7 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
-  Widget _buildRecentActivity(BuildContext context, List<Reservation> reservations) {
+  Widget _buildRecentActivity(BuildContext context) {
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
@@ -580,24 +585,34 @@ class ProfileScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           const Text(
-            "Upcoming Activity",
+            "Recent Activity",
             style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
           ),
           const SizedBox(height: 20),
-          if (reservations.isEmpty)
-            const Text(
-              "No upcoming activity.",
-              style: TextStyle(color: Colors.black45, fontSize: 14),
-            )
-          else
-            ...reservations.take(3).map(
-                  (res) => _buildActivityItem(
-                    res.className,
-                    res.dateTime,
-                    "Upcoming",
-                    Colors.blue,
-                  ),
-                ),
+          _buildActivityItem(
+            "Power Yoga",
+            "Today, 6:00 AM",
+            "Upcoming",
+            Colors.blue,
+          ),
+          _buildActivityItem(
+            "HIIT Blast",
+            "Yesterday, 7:30 AM",
+            "Attended",
+            Colors.green,
+          ),
+          _buildActivityItem(
+            "Pilates Core",
+            "Feb 3, 8:30 AM",
+            "Attended",
+            Colors.green,
+          ),
+          _buildActivityItem(
+            "Spin Power",
+            "Jan 30, 5:00 PM",
+            "Missed",
+            Colors.red,
+          ),
         ],
       ),
     );

@@ -19,6 +19,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:pat_your_mat/screens/class_detail_screen.dart';
 import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
+import 'package:pat_your_mat/screens/settings_screen.dart';
 import 'models/gym_class.dart';
 
 // App relative file imports
@@ -155,6 +156,12 @@ class _MyAppState extends State<MyApp> {
             matNumber: extra['matNumber'] as String? ?? 'Mat #?',
           );
         },
+      ),
+
+      // lib/main.dart inside your GoRouter routes list
+      GoRoute(
+        path: SettingsScreen.routeName,
+        builder: (context, state) => const SettingsScreen(),
       ),
     ],
   );

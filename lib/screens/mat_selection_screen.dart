@@ -1,202 +1,217 @@
 // lib/screens/mat_selection_screen.dart
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
+import '../providers/provider_reservations.dart';
+import 'reservation_confirmation_screen.dart';
 
-class MatSelectionScreen extends StatelessWidget {
-  static const String routeName = '/mat_selection';
+class MatSelectionScreen extends ConsumerStatefulWidget {
+  static const String routeName = 'mat_selection';
 
-  const MatSelectionScreen({super.key});
+  // These come from the 'extra' map passed in ClassDetailScreen
+  final String className;
+  final String time;
+
+  const MatSelectionScreen({
+    super.key,
+    required this.className,
+    required this.time,
+  });
+
+  @override
+  ConsumerState<MatSelectionScreen> createState() => _MatSelectionScreenState();
+}
+
+class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
+  int? selectedMat;
+  bool _isSubmitting = false;
+
+  // Mocking 20 mats for the grid
+  final List<int> availableMats = List.generate(20, (index) => index + 1);
+  // Simulating some already taken mats
+  final List<int> takenMats = [3, 7, 12, 18];
+
+  Future<void> _confirmSpot() async {
+    if (selectedMat == null) return;
+
+    setState(() => _isSubmitting = true);
+
+    try {
+      // In a real app, you'd call a method to reserve this SPECIFIC mat
+      // For now, we'll simulate the successful booking
+      await Future.delayed(const Duration(milliseconds: 800));
+
+      if (mounted) {
+        context.pushNamed(
+          ReservationConfirmationScreen.routeName,
+          extra: {
+            'className': widget.className,
+            'instructor': 'TBD', // You could pass this from details too
+            'dateTime': widget.time,
+            'matNumber': selectedMat,
+          },
+        );
+      }
+    } finally {
+      if (mounted) setState(() => _isSubmitting = false);
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: const Text('Select Your Mat'),
+        title: const Text('Pick Your Spot'),
         backgroundColor: const Color(0xFF8A2BFF),
         foregroundColor: Colors.white,
-        elevation: 0,
       ),
       body: Column(
         children: [
-          // Header info
-          Container(
-            padding: const EdgeInsets.all(16),
-            color: const Color(0xFFF5F5FF),
+          Padding(
+            padding: const EdgeInsets.all(20.0),
             child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: const [
+              children: [
                 Text(
-                  'Power Yoga • 6:00 AM',
-                  style: TextStyle(
-                    fontSize: 20,
+                  widget.className,
+                  style: const TextStyle(
+                    fontSize: 22,
                     fontWeight: FontWeight.bold,
-                    color: Color(0xFF6200EE),
                   ),
                 ),
-                SizedBox(height: 12),
-                Row(
-                  children: [
-                    _LegendDot(color: Colors.green, label: 'Available'),
-                    SizedBox(width: 16),
-                    _LegendDot(color: Colors.purple, label: 'Selected'),
-                    SizedBox(width: 16),
-                    _LegendDot(color: Colors.grey, label: 'Reserved'),
-                  ],
-                ),
+                Text(widget.time, style: TextStyle(color: Colors.grey[600])),
               ],
             ),
           ),
 
-          // Instructor row
+          // Front of Class Indicator
           Container(
+            margin: const EdgeInsets.symmetric(horizontal: 40, vertical: 10),
+            padding: const EdgeInsets.symmetric(vertical: 8),
             width: double.infinity,
-            padding: const EdgeInsets.symmetric(vertical: 12),
-            color: const Color(0xFFEDE7FF),
-            child: const Center(
-              child: Row(
-                mainAxisSize: MainAxisSize.min,
-                children: [
-                  Icon(Icons.person, color: Color(0xFF6200EE)),
-                  SizedBox(width: 8),
-                  Text(
-                    'INSTRUCTOR',
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: Color(0xFF6200EE),
-                    ),
-                  ),
-                ],
+            decoration: BoxDecoration(
+              color: Colors.grey[200],
+              borderRadius: BorderRadius.circular(8),
+            ),
+            child: const Text(
+              "FRONT OF CLASS / INSTRUCTOR",
+              textAlign: TextAlign.center,
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+                color: Colors.grey,
               ),
             ),
           ),
 
-          // Mat grid (placeholder – 5×6 = 30 mats)
           Expanded(
-            child: Padding(
-              padding: const EdgeInsets.all(20),
-              child: GridView.builder(
-                gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
-                  crossAxisCount: 6,
-                  mainAxisSpacing: 12,
-                  crossAxisSpacing: 12,
-                  childAspectRatio: 1,
-                ),
-                itemCount: 30,
-                itemBuilder: (context, index) {
-                  // For now: alternating states as placeholder
-                  final isInstructor = index == 0; // top-left = instructor
-                  final isReserved = index % 7 == 3 || index % 7 == 5;
-                  final isAvailable = !isReserved && !isInstructor;
+            child: GridView.builder(
+              padding: const EdgeInsets.all(24),
+              gridDelegate: const SliverGridDelegateWithFixedCrossAxisCount(
+                crossAxisCount: 4,
+                mainAxisSpacing: 15,
+                crossAxisSpacing: 15,
+              ),
+              itemCount: availableMats.length,
+              itemBuilder: (context, index) {
+                final matNum = availableMats[index];
+                final isTaken = takenMats.contains(matNum);
+                final isSelected = selectedMat == matNum;
 
-                  Color color;
-                  if (isInstructor) {
-                    color = const Color(0xFF6200EE).withOpacity(0.3);
-                  } else if (isReserved) {
-                    color = Colors.grey.shade400;
-                  } else {
-                    color = Colors.green.shade300;
-                  }
-
-                  return GestureDetector(
-                    onTap: isAvailable
-                        ? () {
-                            ScaffoldMessenger.of(context).showSnackBar(
-                              SnackBar(
-                                content: Text('Mat ${index + 1} selected!'),
-                              ),
-                            );
-                          }
-                        : null,
-                    child: Container(
-                      decoration: BoxDecoration(
-                        color: color,
-                        borderRadius: BorderRadius.circular(12),
-                        border: Border.all(
-                          color: isInstructor
-                              ? const Color(0xFF6200EE)
-                              : Colors.transparent,
-                          width: 2,
-                        ),
+                return GestureDetector(
+                  onTap: isTaken
+                      ? null
+                      : () => setState(() => selectedMat = matNum),
+                  child: Container(
+                    decoration: BoxDecoration(
+                      color: isTaken
+                          ? Colors.grey[300]
+                          : (isSelected
+                                ? const Color(0xFF8A2BFF)
+                                : Colors.white),
+                      border: Border.all(
+                        color: isSelected
+                            ? const Color(0xFF8A2BFF)
+                            : Colors.grey[300]!,
+                        width: 2,
                       ),
-                      child: Center(
-                        child: Text(
-                          isInstructor ? 'Instructor' : '${index + 1}',
-                          style: TextStyle(
-                            color: isInstructor || isReserved
-                                ? Colors.white
-                                : Colors.black87,
-                            fontWeight: FontWeight.bold,
-                            fontSize: isInstructor ? 11 : 16,
-                          ),
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    child: Center(
+                      child: Text(
+                        "$matNum",
+                        style: TextStyle(
+                          fontWeight: FontWeight.bold,
+                          color: isSelected
+                              ? Colors.white
+                              : (isTaken ? Colors.grey : Colors.black),
                         ),
                       ),
                     ),
-                  );
-                },
-              ),
+                  ),
+                );
+              },
             ),
           ),
 
-          // Bottom button
-          SafeArea(
-            child: Padding(
-              padding: const EdgeInsets.all(16),
-              child: SizedBox(
-                width: double.infinity,
-                height: 56,
-                child: ElevatedButton(
-                  onPressed: () {
-                    // TODO: Confirm reservation, save selection, etc.
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      const SnackBar(
-                        content: Text('Reservation confirmed!'),
-                        backgroundColor: Colors.green,
+          // Legend and Confirm Button
+          Padding(
+            padding: const EdgeInsets.all(24.0),
+            child: Column(
+              children: [
+                Row(
+                  mainAxisAlignment: MainAxisAlignment.center,
+                  children: [
+                    _buildLegendItem(Colors.white, "Available"),
+                    const SizedBox(width: 15),
+                    _buildLegendItem(const Color(0xFF8A2BFF), "Selected"),
+                    const SizedBox(width: 15),
+                    _buildLegendItem(Colors.grey[300]!, "Taken"),
+                  ],
+                ),
+                const SizedBox(height: 24),
+                SizedBox(
+                  width: double.infinity,
+                  height: 56,
+                  child: ElevatedButton(
+                    onPressed: (selectedMat == null || _isSubmitting)
+                        ? null
+                        : _confirmSpot,
+                    style: ElevatedButton.styleFrom(
+                      backgroundColor: const Color(0xFF8A2BFF),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
-                    );
-                    // Go back twice or to home
-                    Navigator.pop(context);
-                    Navigator.pop(context);
-                  },
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: const Color(0xFF6200EE),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(28),
                     ),
-                  ),
-                  child: const Text(
-                    'Continue & Confirm',
-                    style: TextStyle(
-                      fontSize: 18,
-                      fontWeight: FontWeight.bold,
-                      color: Colors.white,
-                    ),
+                    child: _isSubmitting
+                        ? const CircularProgressIndicator(color: Colors.white)
+                        : const Text(
+                            "Confirm Spot",
+                            style: TextStyle(fontSize: 18, color: Colors.white),
+                          ),
                   ),
                 ),
-              ),
+              ],
             ),
           ),
         ],
       ),
     );
   }
-}
 
-class _LegendDot extends StatelessWidget {
-  final Color color;
-  final String label;
-
-  const _LegendDot({required this.color, required this.label});
-
-  @override
-  Widget build(BuildContext context) {
+  Widget _buildLegendItem(Color color, String label) {
     return Row(
       children: [
         Container(
           width: 16,
           height: 16,
-          decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+          decoration: BoxDecoration(
+            color: color,
+            borderRadius: BorderRadius.circular(4),
+            border: Border.all(color: Colors.grey[300]!),
+          ),
         ),
-        const SizedBox(width: 6),
-        Text(label, style: const TextStyle(fontSize: 14)),
+        const SizedBox(width: 4),
+        Text(label, style: const TextStyle(fontSize: 12)),
       ],
     );
   }
