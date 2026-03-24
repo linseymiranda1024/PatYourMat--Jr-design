@@ -6,15 +6,27 @@ import '../main.dart';
 import '../models/gym_class.dart' as model;
 import 'class_detail_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
+class HomeScreen extends ConsumerStatefulWidget {
   static const routeName = "/home";
 
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  String _searchQuery = '';
+
+  @override
+  Widget build(BuildContext context) {
     final gymClassProvider = ref.watch(providerGymClass);
     final classes = gymClassProvider.classes;
+    final filteredClasses = classes.where((c) {
+      final query = _searchQuery.toLowerCase();
+      return c.title.toLowerCase().contains(query) ||
+          c.instructor.toLowerCase().contains(query);
+    }).toList();
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -63,7 +75,14 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SearchBar(hintText: 'Search classes...'),
+                    _SearchBar(
+                      hintText: 'Search classes...',
+                      onChanged: (value) {
+                        setState(() {
+                          _searchQuery = value;
+                        });
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -94,10 +113,10 @@ class HomeScreen extends ConsumerWidget {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: gymClassProvider.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : classes.isEmpty
+                  : filteredClasses.isEmpty
                       ? const Center(child: Text('No classes available yet.'))
                       : Column(
-                          children: classes
+                          children: filteredClasses
                               .map(
                                 (c) => Column(
                                   children: [
@@ -131,29 +150,44 @@ class HomeScreen extends ConsumerWidget {
 
 class _SearchBar extends StatelessWidget {
   final String hintText;
+  final ValueChanged<String>? onChanged;
 
-  const _SearchBar({required this.hintText});
+  const _SearchBar({required this.hintText, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
+    const purple = Color(0xFF7A2CFF);
+
     return Container(
       height: 54,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.white.withOpacity(0.75)),
+          const Icon(Icons.search, color: purple),
           const SizedBox(width: 10),
-          Text(
-            hintText,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.75),
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
+          Expanded(
+            child: TextField(
+              onChanged: onChanged,
+              textAlignVertical: TextAlignVertical.center,
+              style: const TextStyle(color: Colors.black87, fontSize: 18),
+              cursorColor: purple,
+              decoration: InputDecoration(
+                hintText: hintText,
+                hintStyle: TextStyle(
+                  color: Colors.black.withOpacity(0.4),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: true,
+                fillColor: Colors.transparent,
+              ),
             ),
           ),
         ],
