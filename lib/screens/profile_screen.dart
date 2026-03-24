@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:intl/intl.dart';
 import 'package:pat_your_mat/main.dart';
+import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../models/reservation.dart';
 import '../providers/provider_auth.dart';
@@ -66,20 +67,38 @@ class ProfileScreen extends ConsumerWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF20406B), Color(0xFF4C8DFF)],
+          colors: [AppColors.gradientStart, AppColors.gradientEnd],
         ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
+            decoration: BoxDecoration(
+              color: Colors.white.withValues(alpha: 0.14),
+              borderRadius: BorderRadius.circular(999),
+              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
+            ),
+            child: Text(
+              'Member Profile',
+              style: TextStyle(
+                fontSize: 12,
+                fontWeight: FontWeight.w700,
+                color: Colors.white.withValues(alpha: 0.92),
+              ),
+            ),
+          ),
+          const SizedBox(height: 18),
           Row(
             crossAxisAlignment: CrossAxisAlignment.center,
             children: [
               Container(
+                padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.55),
+                    color: Colors.white.withValues(alpha: 0.50),
                     width: 3,
                   ),
                 ),
@@ -98,6 +117,8 @@ class ProfileScreen extends ConsumerWidget {
                       profile.wholeName.trim().isEmpty
                           ? 'Your Profile'
                           : profile.wholeName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -107,6 +128,8 @@ class ProfileScreen extends ConsumerWidget {
                     const SizedBox(height: 4),
                     Text(
                       memberSince ?? profile.email,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: TextStyle(
                         fontSize: 14,
                         color: Colors.white.withValues(alpha: 0.82),
@@ -118,40 +141,52 @@ class ProfileScreen extends ConsumerWidget {
             ],
           ),
           const SizedBox(height: 20),
-          Row(
-            children: [
-              Expanded(
-                child: OutlinedButton.icon(
-                  onPressed: () => context.push(ScreenProfileEdit.routeName),
-                  style: OutlinedButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    side: const BorderSide(color: Colors.white54),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+          LayoutBuilder(
+            builder: (context, constraints) {
+              final isCompact = constraints.maxWidth < 360;
+              return Flex(
+                direction: isCompact ? Axis.vertical : Axis.horizontal,
+                children: [
+                  Expanded(
+                    flex: isCompact ? 0 : 1,
+                    child: OutlinedButton.icon(
+                      onPressed: () =>
+                          context.push(ScreenProfileEdit.routeName),
+                      style: OutlinedButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        side: const BorderSide(color: Colors.white54),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit Profile'),
                     ),
                   ),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit Profile'),
-                ),
-              ),
-              const SizedBox(width: 12),
-              Expanded(
-                child: TextButton.icon(
-                  onPressed: () => context.push(ScreenSettings.routeName),
-                  style: TextButton.styleFrom(
-                    foregroundColor: Colors.white,
-                    backgroundColor: Colors.white.withValues(alpha: 0.16),
-                    padding: const EdgeInsets.symmetric(vertical: 14),
-                    shape: RoundedRectangleBorder(
-                      borderRadius: BorderRadius.circular(16),
+                  SizedBox(
+                    width: isCompact ? 0 : 12,
+                    height: isCompact ? 12 : 0,
+                  ),
+                  Expanded(
+                    flex: isCompact ? 0 : 1,
+                    child: TextButton.icon(
+                      onPressed: () => context.push(ScreenSettings.routeName),
+                      style: TextButton.styleFrom(
+                        foregroundColor: Colors.white,
+                        backgroundColor: Colors.white.withValues(alpha: 0.16),
+                        padding: const EdgeInsets.symmetric(vertical: 14),
+                        shape: RoundedRectangleBorder(
+                          borderRadius: BorderRadius.circular(16),
+                        ),
+                      ),
+                      icon: const Icon(Icons.tune),
+                      label: const Text('Settings'),
                     ),
                   ),
-                  icon: const Icon(Icons.tune),
-                  label: const Text('Settings'),
-                ),
-              ),
-            ],
+                ],
+              );
+            },
           ),
         ],
       ),
@@ -167,51 +202,70 @@ class ProfileScreen extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         const Text(
-          'Summary & History',
+          'Your Snapshot',
           style: TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
         ),
         const SizedBox(height: 12),
-        Wrap(
-          spacing: 12,
-          runSpacing: 12,
-          children: [
-            _buildStatCard(
-              label: 'Upcoming',
-              value: '${reservations.length}',
-              icon: Icons.event_available,
-              accent: const Color(0xFF2957C8),
-            ),
-            _buildStatCard(
-              label: 'This Month',
-              value: '$thisMonthCount',
-              icon: Icons.calendar_month_outlined,
-              accent: const Color(0xFF0B8F6A),
-            ),
-            _buildStatCard(
-              label: 'Next Mat',
-              value: nextReservation?.matNumber ?? 'None',
-              icon: Icons.place_outlined,
-              accent: const Color(0xFFC77718),
-            ),
-          ],
+        LayoutBuilder(
+          builder: (context, constraints) {
+            final isCompact = constraints.maxWidth < 360;
+            final cardWidth = isCompact
+                ? constraints.maxWidth
+                : (constraints.maxWidth - 12) / 2;
+            return Wrap(
+              spacing: 12,
+              runSpacing: 12,
+              children: [
+                _buildStatCard(
+                  width: cardWidth,
+                  label: 'Upcoming Classes',
+                  value: '${reservations.length}',
+                  icon: Icons.event_available,
+                  accent: AppColors.deepPurple,
+                ),
+                _buildStatCard(
+                  width: cardWidth,
+                  label: 'Classes This Month',
+                  value: '$thisMonthCount',
+                  icon: Icons.calendar_month_outlined,
+                  accent: const Color(0xFF1F8F71),
+                ),
+                _buildStatCard(
+                  width: cardWidth,
+                  label: 'Next Mat Spot',
+                  value: nextReservation?.matNumber ?? 'None',
+                  icon: Icons.place_outlined,
+                  accent: const Color(0xFFC77718),
+                ),
+              ],
+            );
+          },
         ),
       ],
     );
   }
 
   Widget _buildStatCard({
+    required double width,
     required String label,
     required String value,
     required IconData icon,
     required Color accent,
   }) {
     return Container(
-      width: 165,
-      padding: const EdgeInsets.all(16),
+      width: width,
+      padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: accent.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE7ECF3)),
+        border: Border.all(color: accent.withValues(alpha: 0.14)),
+        boxShadow: const [
+          BoxShadow(
+            color: Color(0x080E1726),
+            blurRadius: 14,
+            offset: Offset(0, 6),
+          ),
+        ],
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -227,14 +281,16 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 12),
           Text(
             value,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: const TextStyle(fontSize: 22, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             style: const TextStyle(
-              fontSize: 13,
-              color: Color(0xFF5D6470),
+              fontSize: 12,
+              color: Color(0xFF4B5563),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -258,6 +314,7 @@ class ProfileScreen extends ConsumerWidget {
               decoration: BoxDecoration(
                 color: const Color(0xFFF7F9FD),
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE4EAF4)),
               ),
               child: const Text(
                 'No upcoming reservations yet. Reserve a class to build out your history here.',
@@ -395,40 +452,75 @@ class ProfileScreen extends ConsumerWidget {
     ProviderUserProfile profile,
     ProviderAuth auth,
   ) {
+    final hasPhone = profile.phoneNumber.trim().isNotEmpty;
+
     return _buildSectionCard(
       title: 'Account & Info',
-      subtitle: 'Personal details and account actions.',
+      subtitle: 'Contact details and quick account actions.',
       child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          _buildAccountRow(
-            icon: Icons.mail_outline,
-            label: 'Email',
-            value: profile.email.isEmpty ? 'Not provided' : profile.email,
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F9FD),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE6ECF5)),
+            ),
+            child: Column(
+              children: [
+                _buildAccountRow(
+                  icon: Icons.mail_outline,
+                  label: 'Email',
+                  value: profile.email.isEmpty ? 'Not provided' : profile.email,
+                ),
+                const Padding(
+                  padding: EdgeInsets.symmetric(vertical: 14),
+                  child: Divider(height: 1, color: Color(0xFFE1E7F0)),
+                ),
+                _buildAccountRow(
+                  icon: Icons.call_outlined,
+                  label: 'Phone',
+                  value: hasPhone ? profile.phoneNumber : 'Add phone number',
+                  supportingText: hasPhone
+                      ? 'Saved on your profile.'
+                      : 'Open Edit Profile to add one.',
+                  valueColor: hasPhone
+                      ? const Color(0xFF111827)
+                      : AppColors.deepPurple,
+                ),
+              ],
+            ),
           ),
-          const SizedBox(height: 12),
-          _buildAccountRow(
-            icon: Icons.call_outlined,
-            label: 'Phone',
-            value: profile.phoneNumber.isEmpty
-                ? 'Add a phone number in Edit Profile'
-                : profile.phoneNumber,
+          const SizedBox(height: 18),
+          const Text(
+            'Quick Actions',
+            style: TextStyle(
+              fontSize: 13,
+              color: Color(0xFF5D6470),
+              fontWeight: FontWeight.w700,
+            ),
           ),
           const SizedBox(height: 18),
           _buildActionTile(
             icon: Icons.person_outline,
             label: 'Edit Profile',
+            subtitle: 'Update your photo, name, and phone number.',
             onTap: () => context.push(ScreenProfileEdit.routeName),
           ),
           const SizedBox(height: 10),
           _buildActionTile(
             icon: Icons.settings_outlined,
             label: 'Settings',
+            subtitle: 'Manage app and account preferences.',
             onTap: () => context.push(ScreenSettings.routeName),
           ),
           const SizedBox(height: 10),
           _buildActionTile(
             icon: Icons.logout,
             label: 'Log Out',
+            subtitle: 'Sign out of your Pat Your Mat account.',
             isDestructive: true,
             onTap: () => auth.promptAndClearAuthedUserDetailsAndSignout(
               context: context,
@@ -452,9 +544,9 @@ class ProfileScreen extends ConsumerWidget {
         borderRadius: BorderRadius.circular(24),
         boxShadow: const [
           BoxShadow(
-            color: Color(0x120E1726),
-            blurRadius: 20,
-            offset: Offset(0, 8),
+            color: Color(0x0F0E1726),
+            blurRadius: 16,
+            offset: Offset(0, 6),
           ),
         ],
       ),
@@ -498,6 +590,8 @@ class ProfileScreen extends ConsumerWidget {
     required IconData icon,
     required String label,
     required String value,
+    String? supportingText,
+    Color? valueColor,
   }) {
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
@@ -526,12 +620,23 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 value,
-                style: const TextStyle(
+                style: TextStyle(
                   fontSize: 15,
-                  color: Color(0xFF111827),
+                  color: valueColor ?? const Color(0xFF111827),
                   fontWeight: FontWeight.w600,
                 ),
               ),
+              if (supportingText != null) ...[
+                const SizedBox(height: 4),
+                Text(
+                  supportingText,
+                  style: const TextStyle(
+                    fontSize: 13,
+                    color: Color(0xFF5D6470),
+                    height: 1.35,
+                  ),
+                ),
+              ],
             ],
           ),
         ),
@@ -542,6 +647,7 @@ class ProfileScreen extends ConsumerWidget {
   Widget _buildActionTile({
     required IconData icon,
     required String label,
+    String? subtitle,
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
@@ -567,14 +673,32 @@ class ProfileScreen extends ConsumerWidget {
             ),
             const SizedBox(width: 12),
             Expanded(
-              child: Text(
-                label,
-                style: TextStyle(
-                  fontWeight: FontWeight.w700,
-                  color: isDestructive
-                      ? const Color(0xFFB3261E)
-                      : const Color(0xFF111827),
-                ),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    label,
+                    style: TextStyle(
+                      fontWeight: FontWeight.w700,
+                      color: isDestructive
+                          ? const Color(0xFFB3261E)
+                          : const Color(0xFF111827),
+                    ),
+                  ),
+                  if (subtitle != null) ...[
+                    const SizedBox(height: 2),
+                    Text(
+                      subtitle,
+                      style: TextStyle(
+                        fontSize: 13,
+                        height: 1.3,
+                        color: isDestructive
+                            ? const Color(0xFFB3261E).withValues(alpha: 0.76)
+                            : const Color(0xFF5D6470),
+                      ),
+                    ),
+                  ],
+                ],
               ),
             ),
             Icon(

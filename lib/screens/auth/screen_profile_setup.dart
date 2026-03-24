@@ -17,6 +17,7 @@ import 'package:go_router/go_router.dart';
 import 'package:flutter/cupertino.dart';
 import 'package:flutter/services.dart';
 import 'package:flutter/material.dart';
+import 'package:pat_your_mat/theme/app_colors.dart';
 
 // App relative file imports
 import '../../widgets/general/widget_profile_avatar.dart';
@@ -60,6 +61,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
+  final _phoneNumberController = TextEditingController();
+  final _bioController = TextEditingController();
 
   ////////////////////////////////////////////////////////////////
   // Runs the following code once upon initialization
@@ -74,6 +77,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       if (!widget.isAuth) {
         _firstNameController.text = _providerUserProfile.firstName;
         _lastNameController.text = _providerUserProfile.lastName;
+        _phoneNumberController.text = _providerUserProfile.phoneNumber;
+        _bioController.text = _providerUserProfile.bio;
       }
 
       // Now initialized; run super method
@@ -101,6 +106,15 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   @override
   void initState() {
     super.initState();
+  }
+
+  @override
+  void dispose() {
+    _firstNameController.dispose();
+    _lastNameController.dispose();
+    _phoneNumberController.dispose();
+    _bioController.dispose();
+    super.dispose();
   }
 
   ////////////////////////////////////////////////////////////////
@@ -187,7 +201,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   // Does basic validation and attempts to authenticate using the
   // method called in from the parent screen/widget.
   ////////////////////////////////////////////////////////////////
-  void _trySubmit() {
+  Future<void> _trySubmit() async {
     // Unfocus from any controls that may have focus to disengage the keyboard
     FocusScope.of(context).unfocus();
 
@@ -200,9 +214,11 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       // Update profile information and write to database
       _providerUserProfile.firstName = _firstNameController.text.trim();
       _providerUserProfile.lastName = _lastNameController.text.trim();
+      _providerUserProfile.phoneNumber = _phoneNumberController.text.trim();
+      _providerUserProfile.bio = _bioController.text.trim();
       _providerUserProfile.accountCreationStep =
           AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
-      _providerUserProfile.writeUserProfileToDb();
+      await _providerUserProfile.writeUserProfileToDb();
 
       //If saving a snack-bar will appear and will pop the navigator
       if (!widget.isAuth) {
@@ -331,20 +347,23 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   //////////////////////////////////////////////////////////////////////////
   @override
   Widget build(BuildContext context) {
-    return Scaffold(
-      resizeToAvoidBottomInset: false,
-      body: Form(
-        key: _formKey,
-        child: AutofillGroup(
+    final isStaff = _providerUserProfile.role == UserRole.STAFF;
+
+    return Form(
+      key: _formKey,
+      child: AutofillGroup(
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 2),
           child: SingleChildScrollView(
-            child: Container(
+            child: ConstrainedBox(
               constraints: BoxConstraints(
-                minHeight: MediaQuery.of(context).size.height,
+                minHeight: MediaQuery.of(context).size.height - 160,
               ),
               child: Column(
                 mainAxisAlignment: widget.isAuth
                     ? MainAxisAlignment.center
                     : MainAxisAlignment.start,
+                crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
                   ///////////////////////////////////////////////////////////////////////
                   // Logo
@@ -361,7 +380,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                   ///////////////////////////////////////////////////////////////////////
                   Center(
                     child: Padding(
-                      padding: const EdgeInsets.only(bottom: 30, top: 20),
+                      padding: const EdgeInsets.only(bottom: 24, top: 20),
                       child: GestureDetector(
                         onTap: () => setEditVisibile(),
                         child: Stack(
@@ -391,6 +410,45 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                       ),
                     ),
                   ),
+                  if (!widget.isAuth)
+                    Container(
+                      margin: const EdgeInsets.only(bottom: 18),
+                      padding: const EdgeInsets.all(18),
+                      decoration: BoxDecoration(
+                        gradient: const LinearGradient(
+                          begin: Alignment.topLeft,
+                          end: Alignment.bottomRight,
+                          colors: [
+                            AppColors.gradientStart,
+                            AppColors.gradientEnd,
+                          ],
+                        ),
+                        borderRadius: BorderRadius.circular(24),
+                      ),
+                      child: Column(
+                        crossAxisAlignment: CrossAxisAlignment.start,
+                        children: [
+                          Text(
+                            isStaff ? 'Update Staff Profile' : 'Update Profile',
+                            style: const TextStyle(
+                              fontSize: 18,
+                              fontWeight: FontWeight.w800,
+                              color: Colors.white,
+                            ),
+                          ),
+                          const SizedBox(height: 6),
+                          Text(
+                            isStaff
+                                ? 'Keep your contact info and instructor bio current.'
+                                : 'Keep your contact details current for reservations and account support.',
+                            style: const TextStyle(
+                              color: Colors.white70,
+                              height: 1.4,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
                   ///////////////////////////////////////////////////////////////////////
                   // Profile Image Edit Buttons
                   ///////////////////////////////////////////////////////////////////////
@@ -491,75 +549,114 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                       },
                       child: const Text("Upload Image"),
                     ),
-                  ///////////////////////////////////////////////////////////////////////
-                  // First Name Text Field
-                  ///////////////////////////////////////////////////////////////////////
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: TextFormField(
-                      controller: _firstNameController,
-                      autofillHints: const [AutofillHints.givenName],
-                      autocorrect: false,
-                      textCapitalization: TextCapitalization.sentences,
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return 'Please enter a first name.';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {},
-                      keyboardType: TextInputType.name,
-                      decoration: InputDecoration(labelText: 'First Name'),
-                    ),
-                  ),
-                  ///////////////////////////////////////////////////////////////////////
-                  // Last Name Text Field
-                  ///////////////////////////////////////////////////////////////////////
-                  Padding(
-                    padding: const EdgeInsets.symmetric(vertical: 5),
-                    child: TextFormField(
-                      controller: _lastNameController,
-                      autofillHints: const [AutofillHints.familyName],
-                      autocorrect: false,
-                      textCapitalization: TextCapitalization.sentences,
-                      validator: (value) {
-                        if (value!.isEmpty) {
-                          return 'Please enter a last name.';
-                        }
-                        return null;
-                      },
-                      onSaved: (value) {},
-                      keyboardType: TextInputType.name,
-                      decoration: InputDecoration(labelText: 'Last Name'),
-                    ),
-                  ),
-                  ///////////////////////////////////////////////////////////////////////
-                  /// Continue Button and Cancel Button
-                  ///////////////////////////////////////////////////////////////////////
-                  Column(
-                    children: [
-                      Padding(
-                        padding: const EdgeInsets.symmetric(vertical: 0),
-                        child: ElevatedButton(
-                          onPressed: () {
-                            _trySubmit();
-                          },
-                          child: widget.isAuth
-                              ? const Text("Submit")
-                              : const Text("Update"),
+                  Container(
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      color: Colors.white,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: const [
+                        BoxShadow(
+                          color: Color(0x0F0E1726),
+                          blurRadius: 16,
+                          offset: Offset(0, 6),
                         ),
-                      ),
-                      if (widget.isAuth)
+                      ],
+                    ),
+                    child: Column(
+                      children: [
                         Padding(
-                          padding: const EdgeInsets.symmetric(vertical: 0),
-                          child: TextButton(
-                            onPressed: () => _providerAuth
-                                .clearAuthedUserDetailsAndSignout(),
-                            child: const Text("Log out"),
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: TextFormField(
+                            controller: _firstNameController,
+                            autofillHints: const [AutofillHints.givenName],
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.sentences,
+                            validator: (value) {
+                              if (value!.isEmpty) {
+                                return 'Please enter a first name.';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) {},
+                            keyboardType: TextInputType.name,
+                            decoration: const InputDecoration(
+                              labelText: 'First Name',
+                            ),
                           ),
                         ),
-                    ],
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: TextFormField(
+                            controller: _lastNameController,
+                            autofillHints: const [AutofillHints.familyName],
+                            autocorrect: false,
+                            textCapitalization: TextCapitalization.sentences,
+                            validator: (value) {
+                              if (value!.isEmpty) {
+                                return 'Please enter a last name.';
+                              }
+                              return null;
+                            },
+                            onSaved: (value) {},
+                            keyboardType: TextInputType.name,
+                            decoration: const InputDecoration(
+                              labelText: 'Last Name',
+                            ),
+                          ),
+                        ),
+                        Padding(
+                          padding: const EdgeInsets.symmetric(vertical: 5),
+                          child: TextFormField(
+                            controller: _phoneNumberController,
+                            autofillHints: const [
+                              AutofillHints.telephoneNumber,
+                            ],
+                            keyboardType: TextInputType.phone,
+                            decoration: const InputDecoration(
+                              labelText: 'Phone Number',
+                            ),
+                          ),
+                        ),
+                        if (_providerUserProfile.role == UserRole.STAFF)
+                          Padding(
+                            padding: const EdgeInsets.symmetric(vertical: 5),
+                            child: TextFormField(
+                              controller: _bioController,
+                              textCapitalization: TextCapitalization.sentences,
+                              keyboardType: TextInputType.multiline,
+                              minLines: 4,
+                              maxLines: 6,
+                              decoration: const InputDecoration(
+                                labelText: 'Bio',
+                                alignLabelWithHint: true,
+                                helperText:
+                                    'Shown on the staff profile for members.',
+                              ),
+                            ),
+                          ),
+                        const SizedBox(height: 12),
+                        SizedBox(
+                          width: double.infinity,
+                          child: ElevatedButton(
+                            onPressed: () => _trySubmit(),
+                            child: widget.isAuth
+                                ? const Text("Submit")
+                                : const Text("Update"),
+                          ),
+                        ),
+                        if (widget.isAuth)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 10),
+                            child: TextButton(
+                              onPressed: () => _providerAuth
+                                  .clearAuthedUserDetailsAndSignout(),
+                              child: const Text("Log out"),
+                            ),
+                          ),
+                      ],
+                    ),
                   ),
+                  const SizedBox(height: 12),
                 ],
               ),
             ),

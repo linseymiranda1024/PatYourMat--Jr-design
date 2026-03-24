@@ -1,6 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../../main.dart';
 import '../../models/gym_class.dart';
@@ -35,7 +36,7 @@ class ScreenStaffProfile extends ConsumerWidget {
     );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF2F4F7),
+      backgroundColor: const Color(0xFFF5F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -47,8 +48,10 @@ class ScreenStaffProfile extends ConsumerWidget {
               _buildStatsSection(
                 managedClasses: managedClasses,
                 upcomingCount: upcomingClasses.length,
-                totalCapacity: totalCapacity,
                 totalFilled: totalFilled,
+                occupancy: totalCapacity == 0
+                    ? '0%'
+                    : '${((totalFilled / totalCapacity) * 100).round()}%',
               ),
               const SizedBox(height: 20),
               _buildManagementTools(context, auth, profile),
@@ -70,7 +73,7 @@ class ScreenStaffProfile extends ConsumerWidget {
         gradient: const LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF141E30), Color(0xFF243B55)],
+          colors: [AppColors.gradientStart, AppColors.gradientEnd],
         ),
       ),
       child: Column(
@@ -99,6 +102,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                       profile.wholeName.trim().isEmpty
                           ? 'Staff Profile'
                           : profile.wholeName,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
@@ -106,7 +111,9 @@ class ScreenStaffProfile extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 6),
-                    Row(
+                    Wrap(
+                      spacing: 8,
+                      runSpacing: 8,
                       children: [
                         _buildHeaderBadge(
                           label: profile.isActiveInstructor
@@ -115,7 +122,6 @@ class ScreenStaffProfile extends ConsumerWidget {
                           background: const Color(0x1AFFFFFF),
                           foreground: Colors.white,
                         ),
-                        const SizedBox(width: 8),
                         _buildHeaderBadge(
                           label: profile.allowClassCreation
                               ? 'CAN CREATE CLASSES'
@@ -135,6 +141,8 @@ class ScreenStaffProfile extends ConsumerWidget {
             profile.bio.isEmpty
                 ? 'Manage classes, keep your schedule in view, and maintain your staff profile.'
                 : profile.bio,
+            maxLines: profile.bio.isEmpty ? 3 : 4,
+            overflow: TextOverflow.ellipsis,
             style: TextStyle(
               height: 1.45,
               fontSize: 14,
@@ -152,10 +160,11 @@ class ScreenStaffProfile extends ConsumerWidget {
     required Color foreground,
   }) {
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: background,
+        color: background.withValues(alpha: 0.90),
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: foreground.withValues(alpha: 0.18)),
       ),
       child: Text(
         label,
@@ -163,7 +172,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           color: foreground,
           fontSize: 11,
           fontWeight: FontWeight.w800,
-          letterSpacing: 0.3,
+          letterSpacing: 0.2,
         ),
       ),
     );
@@ -172,49 +181,50 @@ class ScreenStaffProfile extends ConsumerWidget {
   Widget _buildStatsSection({
     required List<GymClass> managedClasses,
     required int upcomingCount,
-    required int totalCapacity,
     required int totalFilled,
+    required String occupancy,
   }) {
-    final occupancy = totalCapacity == 0
-        ? '0%'
-        : '${((totalFilled / totalCapacity) * 100).round()}%';
-
     return _buildPanel(
-      title: 'Staff Stats',
-      subtitle: 'Quick view of the classes currently tied to your profile.',
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.45,
-        children: [
-          _buildStatTile(
-            label: 'Managed Classes',
-            value: '${managedClasses.length}',
-            icon: Icons.class_outlined,
-            accent: const Color(0xFF2957C8),
-          ),
-          _buildStatTile(
-            label: 'Upcoming',
-            value: '$upcomingCount',
-            icon: Icons.schedule_outlined,
-            accent: const Color(0xFF0B8F6A),
-          ),
-          _buildStatTile(
-            label: 'Seats Filled',
-            value: '$totalFilled',
-            icon: Icons.people_outline,
-            accent: const Color(0xFFC77718),
-          ),
-          _buildStatTile(
-            label: 'Occupancy',
-            value: occupancy,
-            icon: Icons.analytics_outlined,
-            accent: const Color(0xFF7C3AED),
-          ),
-        ],
+      title: 'Teaching Snapshot',
+      subtitle: 'Only real class data tied to your instructor profile.',
+      child: LayoutBuilder(
+        builder: (context, constraints) {
+          final crossAxisCount = constraints.maxWidth < 360 ? 1 : 2;
+          return GridView.count(
+            shrinkWrap: true,
+            physics: const NeverScrollableScrollPhysics(),
+            crossAxisCount: crossAxisCount,
+            crossAxisSpacing: 12,
+            mainAxisSpacing: 12,
+            mainAxisExtent: 118,
+            children: [
+              _buildStatTile(
+                label: 'Classes Assigned',
+                value: '${managedClasses.length}',
+                icon: Icons.class_outlined,
+                accent: AppColors.deepPurple,
+              ),
+              _buildStatTile(
+                label: 'Upcoming Classes',
+                value: '$upcomingCount',
+                icon: Icons.schedule_outlined,
+                accent: const Color(0xFF1F8F71),
+              ),
+              _buildStatTile(
+                label: 'Total Seats Filled',
+                value: '$totalFilled',
+                icon: Icons.people_outline,
+                accent: const Color(0xFFC77718),
+              ),
+              _buildStatTile(
+                label: 'Average Occupancy',
+                value: occupancy,
+                icon: Icons.analytics_outlined,
+                accent: AppColors.primaryPurple,
+              ),
+            ],
+          );
+        },
       ),
     );
   }
@@ -226,44 +236,41 @@ class ScreenStaffProfile extends ConsumerWidget {
   ) {
     return _buildPanel(
       title: 'Management Tools',
-      subtitle:
-          'Primary staff actions, surfaced as a focused operations dashboard.',
-      child: GridView.count(
-        shrinkWrap: true,
-        physics: const NeverScrollableScrollPhysics(),
-        crossAxisCount: 2,
-        crossAxisSpacing: 12,
-        mainAxisSpacing: 12,
-        childAspectRatio: 1.05,
+      subtitle: 'Compact shortcuts for the staff tasks that matter here.',
+      child: Column(
         children: [
-          _buildToolCard(
+          _buildToolRow(
             icon: Icons.add_box_outlined,
             label: 'Create Class',
             description: 'Add a new class to the schedule.',
-            accent: const Color(0xFF2957C8),
+            accent: AppColors.deepPurple,
             onTap: () => context.push(ScreenCreateClass.routeName),
           ),
-          _buildToolCard(
+          const SizedBox(height: 10),
+          _buildToolRow(
             icon: Icons.person_outline,
             label: 'Edit Profile',
             description: 'Update contact details and profile image.',
-            accent: const Color(0xFF0B8F6A),
+            accent: const Color(0xFF1F8F71),
             onTap: () => context.push(ScreenProfileEdit.routeName),
           ),
-          _buildToolCard(
+          const SizedBox(height: 10),
+          _buildToolRow(
             icon: Icons.edit_note,
             label: 'Edit Bio',
             description: profile.bio.isEmpty
                 ? 'Add staff bio details.'
-                : 'Refresh the instructor bio shown to members.',
+                : 'Refresh the bio shown to members.',
             accent: const Color(0xFFC77718),
             onTap: () => context.push(ScreenProfileEdit.routeName),
           ),
-          _buildToolCard(
+          const SizedBox(height: 10),
+          _buildToolRow(
             icon: Icons.logout,
             label: 'Log Out',
             description: 'Sign out of the staff account.',
             accent: const Color(0xFFB3261E),
+            isDestructive: true,
             onTap: () => auth.promptAndClearAuthedUserDetailsAndSignout(
               context: context,
             ),
@@ -285,14 +292,15 @@ class ScreenStaffProfile extends ConsumerWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFF101828),
+                color: const Color(0xFFF7F9FD),
                 borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: const Color(0xFFE4EAF4)),
               ),
               child: Text(
                 profile.wholeName.trim().isEmpty
                     ? 'No upcoming classes are linked to this staff account yet.'
                     : 'No upcoming classes currently list ${profile.wholeName} as instructor.',
-                style: const TextStyle(color: Colors.white70, height: 1.4),
+                style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
               ),
             )
           : Column(
@@ -338,6 +346,8 @@ class ScreenStaffProfile extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             subtitle,
+            maxLines: 3,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
           ),
           const SizedBox(height: 18),
@@ -356,9 +366,9 @@ class ScreenStaffProfile extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: const Color(0xFFF7F9FC),
+        color: accent.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE6ECF5)),
+        border: Border.all(color: accent.withValues(alpha: 0.14)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -368,14 +378,18 @@ class ScreenStaffProfile extends ConsumerWidget {
           const SizedBox(height: 10),
           Text(
             value,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
           const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
-              color: Color(0xFF5D6470),
+              color: Color(0xFF4B5563),
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -384,47 +398,82 @@ class ScreenStaffProfile extends ConsumerWidget {
     );
   }
 
-  Widget _buildToolCard({
+  Widget _buildToolRow({
     required IconData icon,
     required String label,
     required String description,
     required Color accent,
     required VoidCallback onTap,
+    bool isDestructive = false,
   }) {
     return InkWell(
       onTap: onTap,
-      borderRadius: BorderRadius.circular(22),
-      child: Ink(
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.08),
-          borderRadius: BorderRadius.circular(22),
-          border: Border.all(color: accent.withValues(alpha: 0.16)),
+          color: isDestructive
+              ? const Color(0xFFFFF3F1)
+              : accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(
+            color: isDestructive
+                ? const Color(0xFFF2C7C2)
+                : accent.withValues(alpha: 0.14),
+          ),
         ),
         child: Padding(
-          padding: const EdgeInsets.all(16),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
             children: [
               Container(
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
-                  color: accent.withValues(alpha: 0.12),
+                  color: isDestructive
+                      ? const Color(0xFFB3261E).withValues(alpha: 0.12)
+                      : accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
-                child: Icon(icon, color: accent, size: 22),
-              ),
-              const Spacer(),
-              Text(
-                label,
-                style: const TextStyle(
-                  fontSize: 16,
-                  fontWeight: FontWeight.w800,
+                child: Icon(
+                  icon,
+                  color: isDestructive ? const Color(0xFFB3261E) : accent,
+                  size: 22,
                 ),
               ),
-              const SizedBox(height: 6),
-              Text(
-                description,
-                style: const TextStyle(color: Color(0xFF4B5563), height: 1.35),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      maxLines: 1,
+                      overflow: TextOverflow.ellipsis,
+                      style: TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: isDestructive
+                            ? const Color(0xFFB3261E)
+                            : const Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5563),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              Icon(
+                Icons.chevron_right,
+                color: isDestructive
+                    ? const Color(0xFFB3261E)
+                    : const Color(0xFF8A94A6),
               ),
             ],
           ),
@@ -441,8 +490,9 @@ class ScreenStaffProfile extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: const Color(0xFF0F172A),
+        color: Colors.white,
         borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: const Color(0xFFE4EAF4)),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -453,18 +503,26 @@ class ScreenStaffProfile extends ConsumerWidget {
               Expanded(
                 child: Text(
                   gymClass.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
                   style: const TextStyle(
-                    color: Colors.white,
+                    color: Color(0xFF111827),
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
                 ),
               ),
-              Text(
-                gymClass.timeText,
-                style: const TextStyle(
-                  color: Colors.white70,
-                  fontWeight: FontWeight.w600,
+              const SizedBox(width: 12),
+              Flexible(
+                child: Text(
+                  gymClass.timeText,
+                  textAlign: TextAlign.end,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: const TextStyle(
+                    color: Color(0xFF5D6470),
+                    fontWeight: FontWeight.w600,
+                  ),
                 ),
               ),
             ],
@@ -472,7 +530,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             '${gymClass.dateText} • ${gymClass.location}',
-            style: const TextStyle(color: Colors.white70),
+            style: const TextStyle(color: Color(0xFF5D6470)),
           ),
           const SizedBox(height: 14),
           ClipRRect(
@@ -480,7 +538,7 @@ class ScreenStaffProfile extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: occupancy,
               minHeight: 8,
-              backgroundColor: Colors.white12,
+              backgroundColor: const Color(0xFFE8EDF5),
               valueColor: const AlwaysStoppedAnimation<Color>(
                 Color(0xFFFFC857),
               ),
@@ -490,7 +548,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           Text(
             '${gymClass.filled}/${gymClass.capacity} seats filled',
             style: const TextStyle(
-              color: Colors.white70,
+              color: Color(0xFF5D6470),
               fontWeight: FontWeight.w500,
             ),
           ),
