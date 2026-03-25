@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../main.dart';
 import '../models/gym_class.dart' as model;
+import '../theme/app_colors.dart';
 import 'class_detail_screen.dart';
 
 class HomeScreen extends ConsumerWidget {
@@ -15,6 +16,11 @@ class HomeScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gymClassProvider = ref.watch(providerGymClass);
     final classes = gymClassProvider.classes;
+    final theme = Theme.of(context);
+    final textTheme = theme.textTheme;
+    final headerGradient = theme.brightness == Brightness.dark
+        ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+        : const [AppColors.gradientStart, AppColors.gradientEnd];
 
     return SafeArea(
       child: SingleChildScrollView(
@@ -28,37 +34,37 @@ class HomeScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFF8A2BFF), Color(0xFF2F7BFF)],
+                    colors: headerGradient,
                   ),
-                  boxShadow: const [
+                  boxShadow: [
                     BoxShadow(
                       blurRadius: 20,
                       spreadRadius: 0,
-                      offset: Offset(0, 10),
-                      color: Color(0x22000000),
-                    )
+                      offset: const Offset(0, 10),
+                      color: Colors.black.withValues(alpha: 0.14),
+                    ),
                   ],
                 ),
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
-                    const Text(
+                    Text(
                       'Pat Your Mat!',
-                      style: TextStyle(
+                      style: textTheme.headlineMedium?.copyWith(
                         fontSize: 34,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: AppColors.headerOnBrand,
                       ),
                     ),
                     const SizedBox(height: 6),
-                    const Text(
+                    Text(
                       'Find your perfect class',
-                      style: TextStyle(
+                      style: textTheme.titleMedium?.copyWith(
                         fontSize: 16,
-                        color: Color(0xE6FFFFFF),
+                        color: AppColors.headerOnBrandMuted,
                         fontWeight: FontWeight.w500,
                       ),
                     ),
@@ -95,32 +101,32 @@ class HomeScreen extends ConsumerWidget {
               child: gymClassProvider.isLoading
                   ? const Center(child: CircularProgressIndicator())
                   : classes.isEmpty
-                      ? const Center(child: Text('No classes available yet.'))
-                      : Column(
-                          children: classes
-                              .map(
-                                (c) => Column(
-                                  children: [
-                                    ClassCard(
-                                      title: c.title,
-                                      instructor: c.instructor,
-                                      dateText: c.dateText,
-                                      timeText: c.timeText,
-                                      durationText: c.durationText,
-                                      status: c.status,
-                                      filled: c.filled,
-                                      capacity: c.capacity,
-                                      onTap: () => context.push(
-                                        ClassDetailScreen.routeName,
-                                        extra: c,
-                                      ),
-                                    ),
-                                    const SizedBox(height: 16),
-                                  ],
+                  ? const Center(child: Text('No classes available yet.'))
+                  : Column(
+                      children: classes
+                          .map(
+                            (c) => Column(
+                              children: [
+                                ClassCard(
+                                  title: c.title,
+                                  instructor: c.instructor,
+                                  dateText: c.dateText,
+                                  timeText: c.timeText,
+                                  durationText: c.durationText,
+                                  status: c.status,
+                                  filled: c.filled,
+                                  capacity: c.capacity,
+                                  onTap: () => context.push(
+                                    ClassDetailScreen.routeName,
+                                    extra: c,
+                                  ),
                                 ),
-                              )
-                              .toList(),
-                        ),
+                                const SizedBox(height: 16),
+                              ],
+                            ),
+                          )
+                          .toList(),
+                    ),
             ),
           ],
         ),
@@ -136,22 +142,28 @@ class _SearchBar extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       height: 54,
       padding: const EdgeInsets.symmetric(horizontal: 14),
       decoration: BoxDecoration(
-        color: Colors.white.withOpacity(0.18),
+        color: AppColors.headerOnBrand.withValues(alpha: 0.16),
         borderRadius: BorderRadius.circular(18),
-        border: Border.all(color: Colors.white.withOpacity(0.15)),
+        border: Border.all(
+          color: AppColors.headerOnBrand.withValues(alpha: 0.18),
+        ),
       ),
       child: Row(
         children: [
-          Icon(Icons.search, color: Colors.white.withOpacity(0.75)),
+          Icon(
+            Icons.search,
+            color: AppColors.headerOnBrand.withValues(alpha: 0.76),
+          ),
           const SizedBox(width: 10),
           Text(
             hintText,
-            style: TextStyle(
-              color: Colors.white.withOpacity(0.75),
+            style: textTheme.titleMedium?.copyWith(
+              color: AppColors.headerOnBrand.withValues(alpha: 0.76),
               fontSize: 18,
               fontWeight: FontWeight.w500,
             ),
@@ -167,44 +179,50 @@ class _FilterChip extends StatelessWidget {
   final IconData? icon;
   final String label;
 
-  const _FilterChip({
-    this.selected = false,
-    this.icon,
-    required this.label,
-  });
+  const _FilterChip({this.selected = false, this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
-    final purple = const Color(0xFF7A2CFF);
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final fillColor = selected
+        ? colorScheme.primary
+        : colorScheme.surfaceContainer;
+    final outlineColor = selected
+        ? colorScheme.primary
+        : colorScheme.outlineVariant;
+    final foregroundColor = selected
+        ? colorScheme.onPrimary
+        : colorScheme.onSurface;
 
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
       decoration: BoxDecoration(
-        color: selected ? purple : Colors.white,
+        color: fillColor,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: selected ? purple : const Color(0xFFE3E6EF)),
+        border: Border.all(color: outlineColor),
         boxShadow: selected
-            ? const [
+            ? [
                 BoxShadow(
                   blurRadius: 12,
-                  offset: Offset(0, 6),
-                  color: Color(0x22000000),
-                )
+                  offset: const Offset(0, 6),
+                  color: Colors.black.withValues(alpha: 0.12),
+                ),
               ]
             : null,
       ),
       child: Row(
         children: [
           if (icon != null) ...[
-            Icon(icon, size: 20, color: selected ? Colors.white : Colors.black87),
+            Icon(icon, size: 20, color: foregroundColor),
             const SizedBox(width: 8),
           ],
           Text(
             label,
-            style: TextStyle(
+            style: textTheme.titleMedium?.copyWith(
               fontWeight: FontWeight.w700,
               fontSize: 16,
-              color: selected ? Colors.white : Colors.black87,
+              color: foregroundColor,
             ),
           ),
         ],
@@ -239,6 +257,9 @@ class ClassCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
     final statusUi = _statusUi(status);
     final progress = capacity == 0 ? 0.0 : (filled / capacity).clamp(0.0, 1.0);
 
@@ -251,14 +272,14 @@ class ClassCard extends StatelessWidget {
         child: Container(
           padding: const EdgeInsets.all(18),
           decoration: BoxDecoration(
-            color: Colors.white,
+            color: colorScheme.surfaceContainer,
             borderRadius: BorderRadius.circular(22),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
                 blurRadius: 18,
-                offset: Offset(0, 10),
-                color: Color(0x14000000),
-              )
+                offset: const Offset(0, 10),
+                color: Colors.black.withValues(alpha: 0.08),
+              ),
             ],
           ),
           child: Column(
@@ -269,99 +290,98 @@ class ClassCard extends StatelessWidget {
                   Expanded(
                     child: Text(
                       title,
-                      style: const TextStyle(
+                      style: textTheme.headlineSmall?.copyWith(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                       ),
                     ),
                   ),
-                  _StatusPill(
-                    text: statusUi.label,
-                    bg: statusUi.bg,
-                    fg: statusUi.fg,
+                  _StatusPill(text: statusUi.label, accent: statusUi.accent),
+                ],
+              ),
+              const SizedBox(height: 8),
+              Text(
+                instructor,
+                style: textTheme.titleMedium?.copyWith(
+                  fontSize: 18,
+                  color: colorScheme.onSurfaceVariant,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  Icon(
+                    Icons.calendar_today_outlined,
+                    size: 20,
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                  const SizedBox(width: 10),
+                  Text(
+                    dateText,
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 16),
+                  Text(
+                    timeText,
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      color: colorScheme.onSurface,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    '•',
+                    style: TextStyle(
+                      color: colorScheme.onSurfaceVariant,
+                      fontSize: 16,
+                    ),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    durationText,
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
                 ],
               ),
-            const SizedBox(height: 8),
-            Text(
-              instructor,
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.black54,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 20,
-                  color: Colors.black54,
-                ),
-                const SizedBox(width: 10),
-                Text(
-                  dateText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  timeText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-                const SizedBox(width: 14),
-                const Text(
-                  '•',
-                  style: TextStyle(color: Colors.black45, fontSize: 16),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  durationText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
-                  ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 10,
-                      backgroundColor: const Color(0xFFE9ECF3),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        status == model.ClassStatus.full
-                            ? const Color(0xFFB00020)
-                            : const Color(0xFF7A2CFF),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 10,
+                        backgroundColor: colorScheme.outlineVariant,
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          status == model.ClassStatus.full
+                              ? colorScheme.error
+                              : colorScheme.primary,
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  '$filled/$capacity',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
+                  const SizedBox(width: 14),
+                  Text(
+                    '$filled/$capacity',
+                    style: textTheme.bodyLarge?.copyWith(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ],
           ),
         ),
@@ -370,42 +390,48 @@ class ClassCard extends StatelessWidget {
   }
 
   _StatusStyle _statusUi(model.ClassStatus s) {
+    const open = AppColors.success;
+    const full = AppColors.error;
+    const standby = AppColors.warning;
     switch (s) {
       case model.ClassStatus.open:
-        return const _StatusStyle('Open', Color(0xFFDFF8E8), Color(0xFF0A7A2A));
+        return const _StatusStyle('Open', open);
       case model.ClassStatus.full:
-        return const _StatusStyle('Full', Color(0xFFFBE2E2), Color(0xFFB00020));
+        return const _StatusStyle('Full', full);
       case model.ClassStatus.standby:
-        return const _StatusStyle('Standby', Color(0xFFFFE9D6), Color(0xFFB85A00));
+        return const _StatusStyle('Standby', standby);
     }
   }
 }
 
 class _StatusStyle {
   final String label;
-  final Color bg;
-  final Color fg;
-  const _StatusStyle(this.label, this.bg, this.fg);
+  final Color accent;
+  const _StatusStyle(this.label, this.accent);
 }
 
 class _StatusPill extends StatelessWidget {
   final String text;
-  final Color bg;
-  final Color fg;
+  final Color accent;
 
-  const _StatusPill({required this.text, required this.bg, required this.fg});
+  const _StatusPill({required this.text, required this.accent});
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 8),
       decoration: BoxDecoration(
-        color: bg,
+        color: accent.withValues(alpha: isDark ? 0.24 : 0.14),
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         text,
-        style: TextStyle(color: fg, fontWeight: FontWeight.w800, fontSize: 16),
+        style: TextStyle(
+          color: accent,
+          fontWeight: FontWeight.w800,
+          fontSize: 16,
+        ),
       ),
     );
   }

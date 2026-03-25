@@ -19,6 +19,9 @@ import '../../theme/colors.dart';
 // Enumeration type for coloring the snackbar
 enum SnackbarDisplayType { SB_ERROR, SB_INFO, SB_SUCCESS, SB_WARNING }
 
+final GlobalKey<ScaffoldMessengerState> appScaffoldMessengerKey =
+    GlobalKey<ScaffoldMessengerState>();
+
 //////////////////////////////////////////////////////////////////
 // Class definition for SnackbarWrapper. This is essentially a
 // wrapper around the Snackbar library and the required scaffolding
@@ -31,7 +34,11 @@ class Snackbar {
   // displays a snackbar with the appropriate message, color and
   // source icon.
   //////////////////////////////////////////////////////////////////
-  static show(SnackbarDisplayType msgType, String message, BuildContext context) {
+  static show(
+    SnackbarDisplayType msgType,
+    String message,
+    BuildContext context,
+  ) {
     // Get proper color
     Color snackBarColor = CustomColors.statusSuccess;
     IconData snackBarIcon = CupertinoIcons.check_mark_circled;
@@ -46,25 +53,34 @@ class Snackbar {
       snackBarIcon = CupertinoIcons.exclamationmark_triangle;
     }
 
-    // Show message
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(
-        content: Row(
-          mainAxisAlignment: MainAxisAlignment.start,
-          crossAxisAlignment: CrossAxisAlignment.center,
-          children: [
-            Icon(snackBarIcon, color: Colors.white),
-            const SizedBox(width: 10),
-            Flexible(
-              child: Text(
-                message,
-                style: const TextStyle(color: Colors.white),
-              ),
-            ),
-          ],
-        ),
-        backgroundColor: snackBarColor,
+    final messengerState =
+        appScaffoldMessengerKey.currentState ??
+        ScaffoldMessenger.maybeOf(context);
+    if (messengerState == null) {
+      return;
+    }
+
+    final snackBar = SnackBar(
+      content: Row(
+        mainAxisAlignment: MainAxisAlignment.start,
+        crossAxisAlignment: CrossAxisAlignment.center,
+        children: [
+          Icon(snackBarIcon, color: Colors.white),
+          const SizedBox(width: 10),
+          Flexible(
+            child: Text(message, style: const TextStyle(color: Colors.white)),
+          ),
+        ],
       ),
+      backgroundColor: snackBarColor,
     );
+
+    WidgetsBinding.instance.addPostFrameCallback((_) {
+      final currentMessenger =
+          appScaffoldMessengerKey.currentState ?? messengerState;
+      currentMessenger
+        ..hideCurrentSnackBar()
+        ..showSnackBar(snackBar);
+    });
   }
 }

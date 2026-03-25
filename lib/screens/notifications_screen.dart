@@ -4,6 +4,7 @@ import 'package:intl/intl.dart';
 
 import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
+import '../theme/app_colors.dart';
 
 class NotificationsScreen extends ConsumerWidget {
   const NotificationsScreen({super.key});
@@ -12,16 +13,14 @@ class NotificationsScreen extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final reservations = ref.watch(reservationsProvider).reservations;
     final notifications = _buildNotifications(reservations);
+    final colorScheme = Theme.of(context).colorScheme;
+    final heroGradient = Theme.of(context).brightness == Brightness.dark
+        ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+        : const [Color(0xFFF97316), Color(0xFFFB7185)];
 
     return SafeArea(
       child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFFFF7ED), Color(0xFFFFFFFF)],
-          ),
-        ),
+        color: colorScheme.surface,
         child: Column(
           children: [
             Padding(
@@ -31,10 +30,10 @@ class NotificationsScreen extends ConsumerWidget {
                 padding: const EdgeInsets.all(20),
                 decoration: BoxDecoration(
                   borderRadius: BorderRadius.circular(28),
-                  gradient: const LinearGradient(
+                  gradient: LinearGradient(
                     begin: Alignment.topLeft,
                     end: Alignment.bottomRight,
-                    colors: [Color(0xFFF97316), Color(0xFFFB7185)],
+                    colors: heroGradient,
                   ),
                 ),
                 child: Column(
@@ -43,7 +42,7 @@ class NotificationsScreen extends ConsumerWidget {
                     const Text(
                       'Notifications',
                       style: TextStyle(
-                        color: Colors.white,
+                        color: AppColors.headerOnBrand,
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
                       ),
@@ -54,7 +53,7 @@ class NotificationsScreen extends ConsumerWidget {
                           ? 'You are all caught up.'
                           : '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your schedule.',
                       style: const TextStyle(
-                        color: Color(0xF2FFFFFF),
+                        color: AppColors.headerOnBrandMuted,
                         fontSize: 15,
                         fontWeight: FontWeight.w500,
                       ),
@@ -95,16 +94,18 @@ class _NotificationCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 14,
-            offset: Offset(0, 8),
-            color: Color(0x14000000),
+            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.08),
           ),
         ],
       ),
@@ -130,19 +131,19 @@ class _NotificationCard extends StatelessWidget {
                     Expanded(
                       child: Text(
                         notification.title,
-                        style: const TextStyle(
+                        style: textTheme.titleMedium?.copyWith(
                           fontSize: 17,
                           fontWeight: FontWeight.w800,
-                          color: Color(0xFF0F172A),
+                          color: colorScheme.onSurface,
                         ),
                       ),
                     ),
                     Text(
                       notification.timeLabel,
-                      style: const TextStyle(
+                      style: textTheme.labelSmall?.copyWith(
                         fontSize: 12,
                         fontWeight: FontWeight.w700,
-                        color: Color(0xFF64748B),
+                        color: colorScheme.onSurfaceVariant,
                       ),
                     ),
                   ],
@@ -150,10 +151,10 @@ class _NotificationCard extends StatelessWidget {
                 const SizedBox(height: 6),
                 Text(
                   notification.message,
-                  style: const TextStyle(
+                  style: textTheme.bodyMedium?.copyWith(
                     fontSize: 14,
                     height: 1.35,
-                    color: Color(0xFF475569),
+                    color: colorScheme.onSurfaceVariant,
                   ),
                 ),
               ],
@@ -170,31 +171,39 @@ class _NotificationEmptyState extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFFFE7D6)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         mainAxisSize: MainAxisSize.min,
-        children: const [
+        children: [
           Icon(
             Icons.notifications_off_outlined,
             size: 40,
-            color: Color(0xFF9A3412),
+            color: colorScheme.onSurfaceVariant,
           ),
-          SizedBox(height: 12),
+          const SizedBox(height: 12),
           Text(
             'No notifications yet',
-            style: TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: textTheme.titleMedium?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
-          SizedBox(height: 6),
+          const SizedBox(height: 6),
           Text(
             'Reserve a class and upcoming reminders will show up here.',
             textAlign: TextAlign.center,
-            style: TextStyle(color: Color(0xFF64748B)),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

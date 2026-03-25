@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pat_your_mat/theme/app_colors.dart';
-import 'package:pat_your_mat/theme/colors.dart';
 
 import '../../models/gym_class.dart';
 import '../../widgets/navigation/widget_app_outline.dart';
@@ -36,9 +35,9 @@ class ScreenStaffPortal extends ConsumerWidget {
       0,
       (total, gymClass) => total + (gymClass.capacity - gymClass.filled),
     );
+    final colorScheme = Theme.of(context).colorScheme;
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -53,6 +52,7 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
+                context: context,
                 title: 'Today At A Glance',
                 subtitle: 'A compact view of what needs attention right now.',
                 child: LayoutBuilder(
@@ -68,6 +68,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                           width: cardWidth,
                           height: cardHeight,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Classes Today',
                             value: '${todayClasses.length}',
                             icon: Icons.today_outlined,
@@ -78,6 +79,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                           width: cardWidth,
                           height: cardHeight,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Next Start',
                             value: nextClass?.timeText ?? 'None',
                             icon: Icons.schedule_outlined,
@@ -88,16 +90,18 @@ class ScreenStaffPortal extends ConsumerWidget {
                           width: cardWidth,
                           height: cardHeight,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Open Spots Today',
                             value: '$totalOpenSpotsToday',
                             icon: Icons.event_seat_outlined,
-                            color: CustomColors.statusInfo,
+                            color: colorScheme.secondary,
                           ),
                         ),
                         SizedBox(
                           width: cardWidth,
                           height: cardHeight,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Upcoming Classes',
                             value: '${upcomingClasses.length}',
                             icon: Icons.class_,
@@ -111,12 +115,14 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
+                context: context,
                 title: 'Quick Actions',
                 subtitle:
                     'Keep the class schedule moving without extra clutter.',
                 child: Column(
                   children: [
                     _buildActionRow(
+                      context: context,
                       icon: Icons.add_box_outlined,
                       label: 'Create Class',
                       description: 'Add a new class to the schedule.',
@@ -125,6 +131,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                     ),
                     const SizedBox(height: 10),
                     _buildActionRow(
+                      context: context,
                       icon: Icons.person_outline,
                       label: 'View Staff Profile',
                       description:
@@ -138,6 +145,7 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
+                context: context,
                 title: 'Active Classes',
                 subtitle: 'Preview the live schedule, then open the full list.',
                 child: gymClassProvider.isLoading
@@ -147,16 +155,21 @@ class ScreenStaffPortal extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF7F9FD),
+                          color: Theme.of(context).colorScheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFE4EAF4)),
-                        ),
-                        child: const Text(
-                          'No active classes are scheduled yet.',
-                          style: TextStyle(
-                            color: Color(0xFF5D6470),
-                            height: 1.4,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
                           ),
+                        ),
+                        child: Text(
+                          'No active classes are scheduled yet.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
                         ),
                       )
                     : Column(
@@ -181,6 +194,7 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
+                context: context,
                 title: 'Recent Classes',
                 subtitle:
                     'A short look at recently completed classes and history.',
@@ -191,16 +205,21 @@ class ScreenStaffPortal extends ConsumerWidget {
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
                         decoration: BoxDecoration(
-                          color: const Color(0xFFF7F9FD),
+                          color: Theme.of(context).colorScheme.surfaceContainer,
                           borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: const Color(0xFFE4EAF4)),
-                        ),
-                        child: const Text(
-                          'No recent classes yet.',
-                          style: TextStyle(
-                            color: Color(0xFF5D6470),
-                            height: 1.4,
+                          border: Border.all(
+                            color: Theme.of(context).colorScheme.outlineVariant,
                           ),
+                        ),
+                        child: Text(
+                          'No recent classes yet.',
+                          style: Theme.of(context).textTheme.bodyMedium
+                              ?.copyWith(
+                                color: Theme.of(
+                                  context,
+                                ).colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
                         ),
                       )
                     : Column(
@@ -225,6 +244,7 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
+                context: context,
                 title: 'Schedule Coverage',
                 subtitle: 'High-level support for planning the full roster.',
                 child: LayoutBuilder(
@@ -238,6 +258,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                           width: cardWidth,
                           height: 120,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Total Scheduled',
                             value: '${classes.length}',
                             icon: Icons.calendar_month_outlined,
@@ -248,6 +269,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                           width: cardWidth,
                           height: 120,
                           child: _buildStatCard(
+                            context: context,
                             label: 'Listed Instructors',
                             value:
                                 '${classes.map((c) => c.instructor).toSet().length}',
@@ -273,15 +295,18 @@ class ScreenStaffPortal extends ConsumerWidget {
     required int todayCount,
     required GymClass? nextClass,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+          colors: isDark
+              ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+              : const [AppColors.gradientStart, AppColors.gradientEnd],
         ),
       ),
       child: LayoutBuilder(
@@ -294,7 +319,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 28,
                   fontWeight: FontWeight.w800,
-                  color: Colors.white,
+                  color: AppColors.headerOnBrand,
                 ),
               ),
               const SizedBox(height: 8),
@@ -305,7 +330,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.4,
-                  color: Colors.white.withValues(alpha: 0.82),
+                  color: AppColors.headerOnBrand.withValues(alpha: 0.82),
                 ),
               ),
               const SizedBox(height: 16),
@@ -314,10 +339,12 @@ class ScreenStaffPortal extends ConsumerWidget {
                 runSpacing: 10,
                 children: [
                   _buildHeaderBadge(
+                    context: context,
                     icon: Icons.today_outlined,
                     label: '$todayCount today',
                   ),
                   _buildHeaderBadge(
+                    context: context,
                     icon: Icons.schedule_outlined,
                     label: nextClass == null
                         ? 'No next class'
@@ -331,12 +358,14 @@ class ScreenStaffPortal extends ConsumerWidget {
                 runSpacing: 10,
                 children: [
                   _buildHeaderAction(
+                    context: context,
                     label: 'Create Class',
                     icon: Icons.add,
                     filled: true,
                     onTap: () => context.push(ScreenCreateClass.routeName),
                   ),
                   _buildHeaderAction(
+                    context: context,
                     label: 'Staff Profile',
                     icon: Icons.person_outline,
                     filled: false,
@@ -352,23 +381,32 @@ class ScreenStaffPortal extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderBadge({required IconData icon, required String label}) {
+  Widget _buildHeaderBadge({
+    required BuildContext context,
+    required IconData icon,
+    required String label,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.12),
+        color: AppColors.headerOnBrand.withValues(alpha: isDark ? 0.08 : 0.12),
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+        border: Border.all(
+          color: AppColors.headerOnBrand.withValues(
+            alpha: isDark ? 0.12 : 0.14,
+          ),
+        ),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 16, color: Colors.white),
+          Icon(icon, size: 16, color: AppColors.headerOnBrand),
           const SizedBox(width: 8),
           Text(
             label,
             style: const TextStyle(
-              color: Colors.white,
+              color: AppColors.headerOnBrand,
               fontSize: 12,
               fontWeight: FontWeight.w700,
             ),
@@ -379,11 +417,13 @@ class ScreenStaffPortal extends ConsumerWidget {
   }
 
   Widget _buildHeaderAction({
+    required BuildContext context,
     required String label,
     required IconData icon,
     required bool filled,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     final child = Row(
       mainAxisSize: MainAxisSize.min,
       children: [
@@ -397,8 +437,12 @@ class ScreenStaffPortal extends ConsumerWidget {
       return ElevatedButton(
         onPressed: onTap,
         style: ElevatedButton.styleFrom(
-          backgroundColor: Colors.white,
-          foregroundColor: AppColors.deepPurple,
+          backgroundColor: isDark
+              ? AppColors.headerOnBrand.withValues(alpha: 0.10)
+              : AppColors.headerOnBrand,
+          foregroundColor: isDark
+              ? AppColors.headerOnBrand
+              : AppColors.deepPurple,
           padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
           textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
           shape: RoundedRectangleBorder(
@@ -412,8 +456,15 @@ class ScreenStaffPortal extends ConsumerWidget {
     return OutlinedButton(
       onPressed: onTap,
       style: OutlinedButton.styleFrom(
-        foregroundColor: Colors.white,
-        side: const BorderSide(color: Colors.white54),
+        foregroundColor: AppColors.headerOnBrand,
+        side: BorderSide(
+          color: AppColors.headerOnBrand.withValues(
+            alpha: isDark ? 0.18 : 0.54,
+          ),
+        ),
+        backgroundColor: isDark
+            ? AppColors.headerOnBrand.withValues(alpha: 0.04)
+            : Colors.transparent,
         padding: const EdgeInsets.symmetric(horizontal: 14, vertical: 12),
         textStyle: const TextStyle(fontSize: 14, fontWeight: FontWeight.w700),
         shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(16)),
@@ -423,21 +474,24 @@ class ScreenStaffPortal extends ConsumerWidget {
   }
 
   Widget _buildPanel({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required Widget child,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0F0E1726),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 14,
-            offset: Offset(0, 5),
+            offset: const Offset(0, 5),
           ),
         ],
       ),
@@ -446,12 +500,19 @@ class ScreenStaffPortal extends ConsumerWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 19, fontWeight: FontWeight.w800),
+            style: textTheme.titleLarge?.copyWith(
+              fontSize: 19,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
-            style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 14),
           child,
@@ -461,17 +522,23 @@ class ScreenStaffPortal extends ConsumerWidget {
   }
 
   Widget _buildStatCard({
+    required BuildContext context,
     required String label,
     required String value,
     required IconData icon,
     required Color color,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: color.withValues(alpha: 0.08),
+        color: color.withValues(alpha: isDark ? 0.18 : 0.08),
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: color.withValues(alpha: 0.14)),
+        border: Border.all(
+          color: color.withValues(alpha: isDark ? 0.28 : 0.14),
+        ),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -489,17 +556,21 @@ class ScreenStaffPortal extends ConsumerWidget {
             value,
             maxLines: 1,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            style: textTheme.headlineSmall?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             label,
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
+            style: textTheme.bodySmall?.copyWith(
               fontSize: 12,
               height: 1.25,
-              color: Color(0xFF4B5563),
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w600,
             ),
           ),
@@ -509,20 +580,26 @@ class ScreenStaffPortal extends ConsumerWidget {
   }
 
   Widget _buildActionRow({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String description,
     required Color accent,
     required VoidCallback onTap,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
-          color: accent.withValues(alpha: 0.08),
+          color: accent.withValues(alpha: isDark ? 0.18 : 0.08),
           borderRadius: BorderRadius.circular(20),
-          border: Border.all(color: accent.withValues(alpha: 0.14)),
+          border: Border.all(
+            color: accent.withValues(alpha: isDark ? 0.28 : 0.14),
+          ),
         ),
         child: Padding(
           padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
@@ -543,10 +620,10 @@ class ScreenStaffPortal extends ConsumerWidget {
                   children: [
                     Text(
                       label,
-                      style: const TextStyle(
+                      style: textTheme.titleMedium?.copyWith(
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
-                        color: Color(0xFF111827),
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -554,15 +631,15 @@ class ScreenStaffPortal extends ConsumerWidget {
                       description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF4B5563),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                         height: 1.35,
                       ),
                     ),
                   ],
                 ),
               ),
-              const Icon(Icons.chevron_right, color: Color(0xFF8A94A6)),
+              Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
             ],
           ),
         ),
@@ -594,6 +671,8 @@ class ScreenStaffPortal extends ConsumerWidget {
     WidgetRef ref,
     GymClass gymClass,
   ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final occupancy = gymClass.capacity == 0
         ? 0.0
         : gymClass.filled / gymClass.capacity;
@@ -602,9 +681,9 @@ class ScreenStaffPortal extends ConsumerWidget {
       margin: const EdgeInsets.only(bottom: 12),
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE4EAF4)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -617,8 +696,8 @@ class ScreenStaffPortal extends ConsumerWidget {
                   gymClass.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
@@ -631,8 +710,8 @@ class ScreenStaffPortal extends ConsumerWidget {
                   textAlign: TextAlign.end,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF5D6470),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -644,7 +723,10 @@ class ScreenStaffPortal extends ConsumerWidget {
             '${gymClass.instructor} • ${gymClass.dateText} • ${gymClass.location}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF5D6470), height: 1.35),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -652,9 +734,9 @@ class ScreenStaffPortal extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: occupancy,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE8EDF5),
+              backgroundColor: colorScheme.outlineVariant,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFFFC857),
+                AppColors.warning,
               ),
             ),
           ),
@@ -663,8 +745,8 @@ class ScreenStaffPortal extends ConsumerWidget {
             children: [
               Text(
                 '${gymClass.filled}/${gymClass.capacity} seats filled',
-                style: const TextStyle(
-                  color: Color(0xFF5D6470),
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
                   fontSize: 13,
                   fontWeight: FontWeight.w500,
                 ),
@@ -697,9 +779,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                 },
                 icon: const Icon(Icons.delete_outline),
                 label: const Text('Delete'),
-                style: TextButton.styleFrom(
-                  foregroundColor: const Color(0xFFFFC857),
-                ),
+                style: TextButton.styleFrom(foregroundColor: AppColors.warning),
               ),
             ],
           ),

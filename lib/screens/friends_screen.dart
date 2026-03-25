@@ -3,7 +3,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../main.dart';
-import '../theme/app_colors.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -30,6 +29,8 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     final currentName = userProfile.wholeName.trim().isEmpty
         ? 'Someone'
         : userProfile.wholeName.trim();
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
 
     if (currentUid.isEmpty) {
       return const SafeArea(child: _CenteredMessage('Log in to view friends.'));
@@ -37,27 +38,21 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
     return SafeArea(
       child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF8FBFF), Color(0xFFFFFFFF)],
-          ),
-        ),
+        color: colorScheme.surface,
         child: Column(
           children: [
             Padding(
               padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
               child: Row(
                 children: [
-                  const Icon(Icons.group, color: AppColors.deepPurple),
+                  Icon(Icons.group, color: colorScheme.primary),
                   const SizedBox(width: 8),
-                  const Text(
+                  Text(
                     'Friends',
-                    style: TextStyle(
+                    style: textTheme.headlineSmall?.copyWith(
                       fontSize: 24,
                       fontWeight: FontWeight.w800,
-                      color: Color(0xFF1F2A44),
+                      color: colorScheme.onSurface,
                     ),
                   ),
                   const Spacer(),
@@ -81,15 +76,11 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                           },
                           icon: const Icon(Icons.close),
                         ),
-                  filled: true,
-                  fillColor: Colors.white,
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE3EAF7)),
                   ),
                   enabledBorder: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(14),
-                    borderSide: const BorderSide(color: Color(0xFFE3EAF7)),
                   ),
                 ),
                 onChanged: (value) =>
@@ -225,13 +216,14 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: _FriendCard(
                                       user: user,
-                                      onFollow: _pendingFollowUids.contains(user.uid)
+                                      onFollow:
+                                          _pendingFollowUids.contains(user.uid)
                                           ? null
                                           : () => _handleFollowTap(
-                                                currentUid: currentUid,
-                                                currentName: currentName,
-                                                targetUser: user,
-                                              ),
+                                              currentUid: currentUid,
+                                              currentName: currentName,
+                                              targetUser: user,
+                                            ),
                                       followPending: _pendingFollowUids
                                           .contains(user.uid),
                                     ),
@@ -422,20 +414,22 @@ class _FriendCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final initials = _initials(user.firstName, user.lastName);
     final fullName = '${user.firstName} ${user.lastName}'.trim();
 
     return Container(
       padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: const Color(0xFFE5ECF8)),
-        boxShadow: const [
+        border: Border.all(color: colorScheme.outlineVariant),
+        boxShadow: [
           BoxShadow(
-            color: Color(0x0F000000),
+            color: Colors.black.withValues(alpha: 0.06),
             blurRadius: 10,
-            offset: Offset(0, 4),
+            offset: const Offset(0, 4),
           ),
         ],
       ),
@@ -443,11 +437,11 @@ class _FriendCard extends StatelessWidget {
         children: [
           CircleAvatar(
             radius: 22,
-            backgroundColor: const Color(0xFF2F7BFF),
+            backgroundColor: colorScheme.primary,
             child: Text(
               initials,
-              style: const TextStyle(
-                color: Colors.white,
+              style: TextStyle(
+                color: colorScheme.onPrimary,
                 fontWeight: FontWeight.w700,
               ),
             ),
@@ -459,16 +453,17 @@ class _FriendCard extends StatelessWidget {
               children: [
                 Text(
                   fullName.isEmpty ? 'Member' : fullName,
-                  style: const TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
                     fontSize: 16,
                     fontWeight: FontWeight.w700,
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 2),
                 Text(
                   user.email.isEmpty ? 'No email provided' : user.email,
-                  style: const TextStyle(
-                    color: Colors.black54,
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
@@ -478,7 +473,9 @@ class _FriendCard extends StatelessWidget {
                     user.bio,
                     maxLines: 2,
                     overflow: TextOverflow.ellipsis,
-                    style: const TextStyle(color: Colors.black54),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                    ),
                   ),
                 ],
               ],
@@ -490,8 +487,8 @@ class _FriendCard extends StatelessWidget {
               : FilledButton(
                   onPressed: followPending ? null : onFollow,
                   style: FilledButton.styleFrom(
-                    backgroundColor: AppColors.deepPurple,
-                    foregroundColor: Colors.white,
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
                     padding: const EdgeInsets.symmetric(
                       horizontal: 12,
                       vertical: 8,
@@ -523,18 +520,19 @@ class _Pill extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 5),
       decoration: BoxDecoration(
-        color: const Color(0xFFEAF3FF),
+        color: colorScheme.primaryContainer,
         borderRadius: BorderRadius.circular(999),
       ),
       child: Text(
         label,
-        style: const TextStyle(
+        style: TextStyle(
           fontSize: 12,
           fontWeight: FontWeight.w700,
-          color: AppColors.deepPurple,
+          color: colorScheme.onPrimaryContainer,
         ),
       ),
     );
@@ -549,28 +547,30 @@ class _SectionHeader extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       children: [
         Text(
           label,
-          style: const TextStyle(
+          style: textTheme.titleSmall?.copyWith(
             fontSize: 15,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF1F2A44),
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(width: 8),
         Container(
           padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 2),
           decoration: BoxDecoration(
-            color: const Color(0xFFEAF3FF),
+            color: colorScheme.primaryContainer,
             borderRadius: BorderRadius.circular(999),
           ),
           child: Text(
             '$count',
-            style: const TextStyle(
+            style: TextStyle(
               fontSize: 12,
-              color: AppColors.deepPurple,
+              color: colorScheme.onPrimaryContainer,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -587,17 +587,19 @@ class _InlineHint extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(12),
-        border: Border.all(color: const Color(0xFFE5ECF8)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Text(
         message,
-        style: const TextStyle(
-          color: Colors.black54,
+        style: textTheme.bodyMedium?.copyWith(
+          color: colorScheme.onSurfaceVariant,
           fontWeight: FontWeight.w600,
         ),
       ),
@@ -612,16 +614,18 @@ class _CenteredMessage extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Center(
       child: Padding(
         padding: const EdgeInsets.all(24),
         child: Text(
           message,
           textAlign: TextAlign.center,
-          style: const TextStyle(
+          style: textTheme.bodyLarge?.copyWith(
             fontSize: 16,
             fontWeight: FontWeight.w600,
-            color: Colors.black54,
+            color: colorScheme.onSurfaceVariant,
           ),
         ),
       ),

@@ -3,6 +3,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 import '../../main.dart';
 import '../../models/gym_class.dart';
+import '../../theme/app_colors.dart';
 
 class ScreenStaffClassList extends ConsumerWidget {
   static const routeName = '/staff/classes';
@@ -15,6 +16,8 @@ class ScreenStaffClassList extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final gymClassProvider = ref.watch(providerGymClass);
     final now = DateTime.now();
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final classes = [...gymClassProvider.classes];
     final filteredClasses =
         classes.where((gymClass) {
@@ -28,10 +31,8 @@ class ScreenStaffClassList extends ConsumerWidget {
         );
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
       appBar: AppBar(
         title: Text(showPast ? 'Recent Classes' : 'Active Classes'),
-        backgroundColor: const Color(0xFFF5F7FB),
         elevation: 0,
       ),
       body: SafeArea(
@@ -44,7 +45,10 @@ class ScreenStaffClassList extends ConsumerWidget {
                 showPast
                     ? 'Completed classes kept here for quick reference.'
                     : 'Current and upcoming classes on the live schedule.',
-                style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
+                style: textTheme.bodyMedium?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
               ),
               const SizedBox(height: 20),
               if (gymClassProvider.isLoading)
@@ -54,16 +58,16 @@ class ScreenStaffClassList extends ConsumerWidget {
                   width: double.infinity,
                   padding: const EdgeInsets.all(20),
                   decoration: BoxDecoration(
-                    color: Colors.white,
+                    color: colorScheme.surfaceContainer,
                     borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: const Color(0xFFE4EAF4)),
+                    border: Border.all(color: colorScheme.outlineVariant),
                   ),
                   child: Text(
                     showPast
                         ? 'No recent classes yet.'
                         : 'No active classes are scheduled yet.',
-                    style: const TextStyle(
-                      color: Color(0xFF5D6470),
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
                       height: 1.4,
                     ),
                   ),
@@ -74,7 +78,7 @@ class ScreenStaffClassList extends ConsumerWidget {
                       .map(
                         (gymClass) => Padding(
                           padding: const EdgeInsets.only(bottom: 12),
-                          child: _buildClassCard(gymClass),
+                          child: _buildClassCard(context, gymClass),
                         ),
                       )
                       .toList(),
@@ -86,7 +90,9 @@ class ScreenStaffClassList extends ConsumerWidget {
     );
   }
 
-  Widget _buildClassCard(GymClass gymClass) {
+  Widget _buildClassCard(BuildContext context, GymClass gymClass) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final occupancy = gymClass.capacity == 0
         ? 0.0
         : gymClass.filled / gymClass.capacity;
@@ -94,9 +100,9 @@ class ScreenStaffClassList extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE4EAF4)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -109,8 +115,8 @@ class ScreenStaffClassList extends ConsumerWidget {
                   gymClass.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
                     fontSize: 16,
                     fontWeight: FontWeight.w800,
                   ),
@@ -123,8 +129,8 @@ class ScreenStaffClassList extends ConsumerWidget {
                   textAlign: TextAlign.end,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF5D6470),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -136,7 +142,10 @@ class ScreenStaffClassList extends ConsumerWidget {
             '${gymClass.instructor} • ${gymClass.dateText} • ${gymClass.location}',
             maxLines: 2,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF5D6470), height: 1.35),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
           ),
           const SizedBox(height: 12),
           ClipRRect(
@@ -144,17 +153,17 @@ class ScreenStaffClassList extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: occupancy,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE8EDF5),
+              backgroundColor: colorScheme.outlineVariant,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFFFC857),
+                AppColors.warning,
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '${gymClass.filled}/${gymClass.capacity} seats filled',
-            style: const TextStyle(
-              color: Color(0xFF5D6470),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
               fontSize: 13,
               fontWeight: FontWeight.w500,
             ),

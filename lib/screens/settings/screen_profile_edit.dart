@@ -40,7 +40,6 @@ class _ScreenProfileEditState extends State<ScreenProfileEdit> {
   Widget build(BuildContext context) {
     // Return the widget to show
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
       appBar: WidgetPrimaryAppBar(title: const Text('Edit Profile')),
       body: SafeArea(
         child: Padding(

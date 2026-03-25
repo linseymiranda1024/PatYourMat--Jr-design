@@ -113,6 +113,24 @@ class ProviderUserProfile extends ChangeNotifier {
     notifyListeners();
   }
 
+  bool get pushNotificationsEnabled => _userProfile.pushNotificationsEnabled;
+  set pushNotificationsEnabled(bool value) {
+    _userProfile.pushNotificationsEnabled = value;
+    notifyListeners();
+  }
+
+  bool get standbyAlertsEnabled => _userProfile.standbyAlertsEnabled;
+  set standbyAlertsEnabled(bool value) {
+    _userProfile.standbyAlertsEnabled = value;
+    notifyListeners();
+  }
+
+  bool get darkModeEnabled => _userProfile.darkModeEnabled;
+  set darkModeEnabled(bool value) {
+    _userProfile.darkModeEnabled = value;
+    notifyListeners();
+  }
+
   int get accountCreationTime => _userProfile.accountCreationTime;
   set accountCreation(int value) {
     _userProfile.accountCreationTime = value;

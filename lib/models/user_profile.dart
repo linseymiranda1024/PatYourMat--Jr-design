@@ -12,7 +12,10 @@
 import 'package:cloud_firestore/cloud_firestore.dart';
 
 // Enum definition for account creation status
-enum AccountCreationStep { ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO, ACC_STEP_ONBOARDING_COMPLETE }
+enum AccountCreationStep {
+  ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO,
+  ACC_STEP_ONBOARDING_COMPLETE,
+}
 
 // Enum definition for user role
 enum UserRole { MEMBER, STAFF }
@@ -40,11 +43,17 @@ class UserProfile {
   int _yearsTeaching = 0;
   bool _isActiveInstructor = false;
   bool _allowClassCreation = false;
+  bool _pushNotificationsEnabled = true;
+  bool _standbyAlertsEnabled = true;
+  bool _darkModeEnabled = false;
   UserRole _role = UserRole.MEMBER;
   PermissionLevel _permissionLevel = PermissionLevel.PRODUCTION;
   int _accountCreationTime = 0;
-  DateTime _dateLastPasswordChange = DateTime.now().add(const Duration(days: -365));
-  AccountCreationStep _accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
+  DateTime _dateLastPasswordChange = DateTime.now().add(
+    const Duration(days: -365),
+  );
+  AccountCreationStep _accountCreationStep =
+      AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
 
   ////////////////////////////////////////////////////////////////////////
   // CONSTRUCTORS
@@ -61,6 +70,9 @@ class UserProfile {
     this._yearsTeaching,
     this._isActiveInstructor,
     this._allowClassCreation,
+    this._pushNotificationsEnabled,
+    this._standbyAlertsEnabled,
+    this._darkModeEnabled,
     this._role,
     this._permissionLevel,
     this._accountCreationTime,
@@ -80,17 +92,24 @@ class UserProfile {
     _yearsTeaching = 0;
     _isActiveInstructor = false;
     _allowClassCreation = false;
+    _pushNotificationsEnabled = true;
+    _standbyAlertsEnabled = true;
+    _darkModeEnabled = false;
     _role = UserRole.MEMBER;
     _permissionLevel = PermissionLevel.PRODUCTION;
     _accountCreationTime = 0;
-    _accountCreationStep = AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
+    _accountCreationStep =
+        AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
   }
 
   ////////////////////////////////////////////////////////////////////////
   // Creates a new User profile and populates using the JSON object passed
   // in as parameter
   ////////////////////////////////////////////////////////////////////////
-  UserProfile.defFromJsonDbObject(Map<String, dynamic> jsonObject, String firebaseUid) {
+  UserProfile.defFromJsonDbObject(
+    Map<String, dynamic> jsonObject,
+    String firebaseUid,
+  ) {
     firstName = jsonObject["first_name"] ?? "";
     lastName = jsonObject["last_name"] ?? "";
     email = jsonObject["email"] ?? "";
@@ -100,17 +119,25 @@ class UserProfile {
     yearsTeaching = jsonObject["years_teaching"] ?? 0;
     isActiveInstructor = jsonObject["is_active_instructor"] ?? false;
     allowClassCreation = jsonObject["allow_class_creation"] ?? false;
+    pushNotificationsEnabled = jsonObject["push_notifications_enabled"] ?? true;
+    standbyAlertsEnabled = jsonObject["standby_alerts_enabled"] ?? true;
+    darkModeEnabled = jsonObject["dark_mode_enabled"] ?? false;
     uid = firebaseUid;
-    role = _getRoleFromString(jsonObject["role"] ?? _getStringFromRole(UserRole.MEMBER));
+    role = _getRoleFromString(
+      jsonObject["role"] ?? _getStringFromRole(UserRole.MEMBER),
+    );
     permissionLevel = _getPermissionLevelFromString(
-      jsonObject["permission_level"] ?? _getStringFromPermissionLevel(PermissionLevel.PRODUCTION),
+      jsonObject["permission_level"] ??
+          _getStringFromPermissionLevel(PermissionLevel.PRODUCTION),
     );
     _dateLastPasswordChange =
         (jsonObject["date_last_password_change"] as Timestamp?)?.toDate() ??
         DateTime.now().add(const Duration(days: -365));
     accountCreationStep = getStepFromString(
       jsonObject["account_creation_step"] ??
-          getStringFromStep(AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO),
+          getStringFromStep(
+            AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO,
+          ),
     );
   }
 
@@ -127,12 +154,16 @@ class UserProfile {
   set yearsTeaching(int value) => _yearsTeaching = value;
   set isActiveInstructor(bool value) => _isActiveInstructor = value;
   set allowClassCreation(bool value) => _allowClassCreation = value;
+  set pushNotificationsEnabled(bool value) => _pushNotificationsEnabled = value;
+  set standbyAlertsEnabled(bool value) => _standbyAlertsEnabled = value;
+  set darkModeEnabled(bool value) => _darkModeEnabled = value;
   set role(UserRole value) => _role = value;
 
   set permissionLevel(PermissionLevel value) => _permissionLevel = value;
   set accountCreationTime(int value) => _accountCreationTime = value;
   set dateLastPasswordChange(DateTime value) => _dateLastPasswordChange = value;
-  set accountCreationStep(AccountCreationStep value) => _accountCreationStep = value;
+  set accountCreationStep(AccountCreationStep value) =>
+      _accountCreationStep = value;
 
   ////////////////////////////////////////////////////////////////////////
   // GETTERS
@@ -147,6 +178,9 @@ class UserProfile {
   int get yearsTeaching => _yearsTeaching;
   bool get isActiveInstructor => _isActiveInstructor;
   bool get allowClassCreation => _allowClassCreation;
+  bool get pushNotificationsEnabled => _pushNotificationsEnabled;
+  bool get standbyAlertsEnabled => _standbyAlertsEnabled;
+  bool get darkModeEnabled => _darkModeEnabled;
   UserRole get role => _role;
 
   PermissionLevel get permissionLevel => _permissionLevel;
@@ -164,15 +198,20 @@ class UserProfile {
   // by checking if key data items exist
   ////////////////////////////////////////////////////////////////////////
   bool isMissingKeyData() {
-    return (uid.isEmpty || firstName.isEmpty || lastName.isEmpty || email.isEmpty);
+    return (uid.isEmpty ||
+        firstName.isEmpty ||
+        lastName.isEmpty ||
+        email.isEmpty);
   }
 
   ////////////////////////////////////////////////////////////////
   // Converts from enum status to string (for DB usage)
   ////////////////////////////////////////////////////////////////
   String getStringFromStep(AccountCreationStep step) {
-    if (step == AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO) return "Contact";
-    if (step == AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE) return "Complete";
+    if (step == AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO)
+      return "Contact";
+    if (step == AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE)
+      return "Complete";
     return "Contact";
   }
 
@@ -180,8 +219,10 @@ class UserProfile {
   // Converts from String to enum status (for DB usage)
   ////////////////////////////////////////////////////////////////
   AccountCreationStep getStepFromString(String stepStr) {
-    if (stepStr == "Contact") return AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
-    if (stepStr == "Complete") return AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
+    if (stepStr == "Contact")
+      return AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
+    if (stepStr == "Complete")
+      return AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
     return AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
   }
 
@@ -237,18 +278,26 @@ class UserProfile {
     jsonObject["first_name"] = firstName;
     jsonObject["last_name"] = lastName;
     jsonObject["email"] = email;
-    jsonObject["email_lowercase"] = email.toLowerCase(); // Added for bf_manage_share_request GCF
+    jsonObject["email_lowercase"] = email
+        .toLowerCase(); // Added for bf_manage_share_request GCF
     jsonObject["phone_number"] = phoneNumber;
     jsonObject["bio"] = bio;
     jsonObject["specialties"] = specialties;
     jsonObject["years_teaching"] = yearsTeaching;
     jsonObject["is_active_instructor"] = isActiveInstructor;
     jsonObject["allow_class_creation"] = allowClassCreation;
+    jsonObject["push_notifications_enabled"] = pushNotificationsEnabled;
+    jsonObject["standby_alerts_enabled"] = standbyAlertsEnabled;
+    jsonObject["dark_mode_enabled"] = darkModeEnabled;
     jsonObject["role"] = _getStringFromRole(role);
-    jsonObject["permission_level"] = _getStringFromPermissionLevel(permissionLevel);
+    jsonObject["permission_level"] = _getStringFromPermissionLevel(
+      permissionLevel,
+    );
     jsonObject["account_creation_time"] = accountCreationTime;
     jsonObject["date_last_password_change"] = _dateLastPasswordChange;
-    jsonObject["account_creation_step"] = getStringFromStep(accountCreationStep);
+    jsonObject["account_creation_step"] = getStringFromStep(
+      accountCreationStep,
+    );
 
     // Return the JSON object
     return jsonObject;

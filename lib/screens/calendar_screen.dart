@@ -7,6 +7,7 @@ import '../models/gym_class.dart';
 import '../models/reservation.dart';
 import '../models/user_profile.dart';
 import '../providers/provider_reservations.dart';
+import '../theme/app_colors.dart';
 import 'class_detail_screen.dart';
 
 class CalendarScreen extends ConsumerStatefulWidget {
@@ -31,6 +32,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   Widget build(BuildContext context) {
     final userProfile = ref.watch(providerUserProfile);
     final isStaff = userProfile.role == UserRole.STAFF;
+    final colorScheme = Theme.of(context).colorScheme;
     final reservations = ref.watch(reservationsProvider).reservations;
     final classes = ref.watch(providerGymClass).classes;
     final reservedClassIds = reservations
@@ -67,13 +69,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
       return SafeArea(
         child: Container(
-          decoration: const BoxDecoration(
-            gradient: LinearGradient(
-              begin: Alignment.topCenter,
-              end: Alignment.bottomCenter,
-              colors: [Color(0xFFF3F7FF), Color(0xFFFFFFFF)],
-            ),
-          ),
+          color: colorScheme.surface,
           child: ListView(
             padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
             children: [
@@ -136,13 +132,7 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
 
     return SafeArea(
       child: Container(
-        decoration: const BoxDecoration(
-          gradient: LinearGradient(
-            begin: Alignment.topCenter,
-            end: Alignment.bottomCenter,
-            colors: [Color(0xFFF3F7FF), Color(0xFFFFFFFF)],
-          ),
-        ),
+        color: colorScheme.surface,
         child: ListView(
           padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
           children: [
@@ -253,21 +243,24 @@ class _CalendarHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF1D4ED8), Color(0xFF06B6D4)],
+          colors: isDark
+              ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+              : const [Color(0xFF1D4ED8), Color(0xFF06B6D4)],
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 18,
-            offset: Offset(0, 12),
-            color: Color(0x220B3A75),
+            offset: const Offset(0, 12),
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.13),
           ),
         ],
       ),
@@ -314,6 +307,7 @@ class _DayChip extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     return Material(
       color: Colors.transparent,
       child: InkWell(
@@ -323,12 +317,14 @@ class _DayChip extends StatelessWidget {
           width: 72,
           padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 8),
           decoration: BoxDecoration(
-            color: isSelected ? const Color(0xFF0F172A) : Colors.white,
+            color: isSelected
+                ? colorScheme.primary
+                : colorScheme.surfaceContainer,
             borderRadius: BorderRadius.circular(22),
             border: Border.all(
               color: isSelected
-                  ? const Color(0xFF0F172A)
-                  : const Color(0xFFDCE4F2),
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
             ),
           ),
           child: Column(
@@ -339,7 +335,9 @@ class _DayChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 11,
                   fontWeight: FontWeight.w700,
-                  color: isSelected ? Colors.white70 : const Color(0xFF64748B),
+                  color: isSelected
+                      ? colorScheme.onPrimary.withValues(alpha: 0.8)
+                      : colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 4),
@@ -348,7 +346,9 @@ class _DayChip extends StatelessWidget {
                 style: TextStyle(
                   fontSize: 22,
                   fontWeight: FontWeight.w800,
-                  color: isSelected ? Colors.white : const Color(0xFF0F172A),
+                  color: isSelected
+                      ? colorScheme.onPrimary
+                      : colorScheme.onSurface,
                 ),
               ),
               const SizedBox(height: 4),
@@ -358,7 +358,7 @@ class _DayChip extends StatelessWidget {
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
                   color: hasReservation
-                      ? (isSelected ? Colors.white : const Color(0xFF22C55E))
+                      ? (isSelected ? colorScheme.onPrimary : AppColors.success)
                       : Colors.transparent,
                 ),
               ),
@@ -378,16 +378,18 @@ class _ReservationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPast = reservation.date.isBefore(DateTime.now());
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 14,
-            offset: Offset(0, 8),
-            color: Color(0x12000000),
+            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.08),
           ),
         ],
       ),
@@ -397,12 +399,18 @@ class _ReservationTile extends StatelessWidget {
             width: 52,
             height: 52,
             decoration: BoxDecoration(
-              color: isPast ? const Color(0xFFE2E8F0) : const Color(0xFFDCFCE7),
+              color: isPast
+                  ? colorScheme.surface
+                  : AppColors.success.withValues(
+                      alpha: Theme.of(context).brightness == Brightness.dark
+                          ? 0.24
+                          : 0.14,
+                    ),
               borderRadius: BorderRadius.circular(16),
             ),
             child: Icon(
               isPast ? Icons.history : Icons.check_circle,
-              color: isPast ? const Color(0xFF64748B) : const Color(0xFF15803D),
+              color: isPast ? colorScheme.onSurfaceVariant : AppColors.success,
             ),
           ),
           const SizedBox(width: 14),
@@ -412,24 +420,26 @@ class _ReservationTile extends StatelessWidget {
               children: [
                 Text(
                   reservation.className,
-                  style: const TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: colorScheme.onSurface,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   '${DateFormat.jm().format(reservation.date)} • ${reservation.matNumber}',
-                  style: const TextStyle(
-                    color: Color(0xFF475569),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   reservation.instructor,
-                  style: const TextStyle(color: Color(0xFF64748B)),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
                 ),
               ],
             ),
@@ -437,11 +447,11 @@ class _ReservationTile extends StatelessWidget {
           _StatusBadge(
             label: isPast ? 'Past' : reservation.status,
             background: isPast
-                ? const Color(0xFFF1F5F9)
-                : const Color(0xFFEEF2FF),
+                ? colorScheme.surface
+                : colorScheme.primaryContainer,
             foreground: isPast
-                ? const Color(0xFF475569)
-                : const Color(0xFF4338CA),
+                ? colorScheme.onSurfaceVariant
+                : colorScheme.onPrimaryContainer,
           ),
         ],
       ),
@@ -462,8 +472,10 @@ class _ClassTile extends ConsumerWidget {
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Material(
-      color: Colors.white,
+      color: colorScheme.surfaceContainer,
       borderRadius: BorderRadius.circular(24),
       child: InkWell(
         onTap: () => Navigator.of(context).push(
@@ -476,11 +488,11 @@ class _ClassTile extends ConsumerWidget {
           padding: const EdgeInsets.all(16),
           decoration: BoxDecoration(
             borderRadius: BorderRadius.circular(24),
-            boxShadow: const [
+            boxShadow: [
               BoxShadow(
                 blurRadius: 14,
-                offset: Offset(0, 8),
-                color: Color(0x12000000),
+                offset: const Offset(0, 8),
+                color: Colors.black.withValues(alpha: 0.08),
               ),
             ],
           ),
@@ -490,12 +502,12 @@ class _ClassTile extends ConsumerWidget {
                 width: 54,
                 height: 54,
                 decoration: BoxDecoration(
-                  color: const Color(0xFFE0F2FE),
+                  color: colorScheme.primaryContainer,
                   borderRadius: BorderRadius.circular(18),
                 ),
-                child: const Icon(
+                child: Icon(
                   Icons.self_improvement,
-                  color: Color(0xFF0369A1),
+                  color: colorScheme.onPrimaryContainer,
                 ),
               ),
               const SizedBox(width: 14),
@@ -505,23 +517,26 @@ class _ClassTile extends ConsumerWidget {
                   children: [
                     Text(
                       gymClass.title,
-                      style: const TextStyle(
+                      style: textTheme.titleMedium?.copyWith(
                         fontSize: 17,
                         fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${gymClass.timeText} • ${gymClass.location}',
-                      style: const TextStyle(
-                        color: Color(0xFF475569),
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                         fontWeight: FontWeight.w600,
                       ),
                     ),
                     const SizedBox(height: 4),
                     Text(
                       '${gymClass.filled}/${gymClass.capacity} registered',
-                      style: const TextStyle(color: Color(0xFF64748B)),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
                     ),
                   ],
                 ),
@@ -531,15 +546,19 @@ class _ClassTile extends ConsumerWidget {
                     ? 'Booked'
                     : gymClass.status.name.toUpperCase(),
                 background: isReserved
-                    ? const Color(0xFFDCFCE7)
-                    : const Color(0xFFF8FAFC),
+                    ? AppColors.success.withValues(
+                        alpha: Theme.of(context).brightness == Brightness.dark
+                            ? 0.24
+                            : 0.14,
+                      )
+                    : colorScheme.surface,
                 foreground: isReserved
-                    ? const Color(0xFF166534)
-                    : const Color(0xFF334155),
+                    ? AppColors.success
+                    : colorScheme.onSurfaceVariant,
               ),
               if (showTapHint) ...[
                 const SizedBox(width: 8),
-                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+                Icon(Icons.chevron_right, color: colorScheme.onSurfaceVariant),
               ],
             ],
           ),
@@ -560,21 +579,24 @@ class _StaffCalendarHero extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [Color(0xFF0F766E), Color(0xFF2563EB)],
+          colors: isDark
+              ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+              : const [Color(0xFF0F766E), Color(0xFF2563EB)],
         ),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 18,
-            offset: Offset(0, 12),
-            color: Color(0x22133466),
+            offset: const Offset(0, 12),
+            color: Colors.black.withValues(alpha: isDark ? 0.16 : 0.13),
           ),
         ],
       ),
@@ -625,6 +647,8 @@ class _StaffMonthCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final firstDayOfMonth = DateTime(visibleMonth.year, visibleMonth.month, 1);
     final startOffset = firstDayOfMonth.weekday % 7;
     final gridStart = firstDayOfMonth.subtract(Duration(days: startOffset));
@@ -633,13 +657,13 @@ class _StaffMonthCard extends StatelessWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
             blurRadius: 14,
-            offset: Offset(0, 8),
-            color: Color(0x12000000),
+            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.08),
           ),
         ],
       ),
@@ -655,10 +679,10 @@ class _StaffMonthCard extends StatelessWidget {
                 child: Text(
                   DateFormat('MMMM yyyy').format(visibleMonth),
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
                     fontSize: 18,
                     fontWeight: FontWeight.w800,
-                    color: Color(0xFF0F172A),
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ),
@@ -669,13 +693,13 @@ class _StaffMonthCard extends StatelessWidget {
             ],
           ),
           const SizedBox(height: 8),
-          const Align(
+          Align(
             alignment: Alignment.centerLeft,
             child: Text(
               'Tap any day to load that class list below.',
-              style: TextStyle(
+              style: textTheme.bodySmall?.copyWith(
                 fontSize: 13,
-                color: Color(0xFF64748B),
+                color: colorScheme.onSurfaceVariant,
                 fontWeight: FontWeight.w500,
               ),
             ),
@@ -690,10 +714,10 @@ class _StaffMonthCard extends StatelessWidget {
                 child: Center(
                   child: Text(
                     weekday.substring(0, 1),
-                    style: const TextStyle(
+                    style: textTheme.labelSmall?.copyWith(
                       fontSize: 12,
                       fontWeight: FontWeight.w700,
-                      color: Color(0xFF64748B),
+                      color: colorScheme.onSurfaceVariant,
                     ),
                   ),
                 ),
@@ -754,11 +778,12 @@ class _StaffDayCell extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
     final foreground = !isCurrentMonth
-        ? const Color(0xFF94A3B8)
+        ? colorScheme.onSurfaceVariant.withValues(alpha: 0.72)
         : isSelected
-        ? Colors.white
-        : const Color(0xFF0F172A);
+        ? colorScheme.onPrimary
+        : colorScheme.onSurface;
 
     return Material(
       color: Colors.transparent,
@@ -768,16 +793,14 @@ class _StaffDayCell extends StatelessWidget {
         child: Container(
           height: 52,
           decoration: BoxDecoration(
-            color: isSelected
-                ? const Color(0xFF0F172A)
-                : const Color(0xFFF8FAFC),
+            color: isSelected ? colorScheme.primary : colorScheme.surface,
             borderRadius: BorderRadius.circular(16),
             border: Border.all(
               color: isToday
-                  ? const Color(0xFF2563EB)
+                  ? colorScheme.primary
                   : isSelected
-                  ? const Color(0xFF0F172A)
-                  : const Color(0xFFE2E8F0),
+                  ? colorScheme.primary
+                  : colorScheme.outlineVariant,
             ),
           ),
           child: Padding(
@@ -809,8 +832,8 @@ class _StaffDayCell extends StatelessWidget {
                       ),
                       decoration: BoxDecoration(
                         color: isSelected
-                            ? Colors.white.withValues(alpha: 0.18)
-                            : const Color(0xFFE0F2FE),
+                            ? colorScheme.onPrimary.withValues(alpha: 0.18)
+                            : colorScheme.primaryContainer,
                         borderRadius: BorderRadius.circular(999),
                       ),
                       child: Text(
@@ -820,19 +843,19 @@ class _StaffDayCell extends StatelessWidget {
                           fontSize: 9,
                           fontWeight: FontWeight.w700,
                           color: isSelected
-                              ? Colors.white
-                              : const Color(0xFF0369A1),
+                              ? colorScheme.onPrimary
+                              : colorScheme.onPrimaryContainer,
                         ),
                       ),
                     ),
                   ),
                 if (isToday && !isSelected)
-                  const Align(
+                  Align(
                     alignment: Alignment.topRight,
                     child: Icon(
                       Icons.circle,
                       size: 8,
-                      color: Color(0xFF2563EB),
+                      color: colorScheme.primary,
                     ),
                   ),
               ],
@@ -852,23 +875,25 @@ class _SectionTitle extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Column(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Text(
           title,
-          style: const TextStyle(
+          style: textTheme.titleLarge?.copyWith(
             fontSize: 22,
             fontWeight: FontWeight.w800,
-            color: Color(0xFF0F172A),
+            color: colorScheme.onSurface,
           ),
         ),
         const SizedBox(height: 4),
         Text(
           subtitle,
-          style: const TextStyle(
+          style: textTheme.bodyMedium?.copyWith(
             fontSize: 14,
-            color: Color(0xFF64748B),
+            color: colorScheme.onSurfaceVariant,
             fontWeight: FontWeight.w500,
           ),
         ),
@@ -890,26 +915,34 @@ class _EmptyCard extends StatelessWidget {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        border: Border.all(color: const Color(0xFFE2E8F0)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         children: [
-          Icon(icon, size: 36, color: const Color(0xFF64748B)),
+          Icon(icon, size: 36, color: colorScheme.onSurfaceVariant),
           const SizedBox(height: 12),
           Text(
             title,
-            style: const TextStyle(fontSize: 18, fontWeight: FontWeight.w800),
+            style: textTheme.titleMedium?.copyWith(
+              fontSize: 18,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 6),
           Text(
             message,
             textAlign: TextAlign.center,
-            style: const TextStyle(color: Color(0xFF64748B)),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
         ],
       ),

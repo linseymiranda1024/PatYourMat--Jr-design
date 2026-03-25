@@ -28,7 +28,6 @@ class ScreenStaffProfile extends ConsumerWidget {
     }).toList()..sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
     return Scaffold(
-      backgroundColor: const Color(0xFFF5F7FB),
       body: SafeArea(
         child: SingleChildScrollView(
           padding: const EdgeInsets.fromLTRB(20, 16, 20, 32),
@@ -41,7 +40,7 @@ class ScreenStaffProfile extends ConsumerWidget {
               const SizedBox(height: 20),
               _buildManagementTools(context, auth, profile),
               const SizedBox(height: 20),
-              _buildScheduleSection(upcomingClasses, profile),
+              _buildScheduleSection(context, upcomingClasses, profile),
             ],
           ),
         ),
@@ -50,15 +49,20 @@ class ScreenStaffProfile extends ConsumerWidget {
   }
 
   Widget _buildHeader(BuildContext context, ProviderUserProfile profile) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(24),
       decoration: BoxDecoration(
         borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
+        gradient: LinearGradient(
           begin: Alignment.topLeft,
           end: Alignment.bottomRight,
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
+          colors: isDark
+              ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+              : const [AppColors.gradientStart, AppColors.gradientEnd],
         ),
       ),
       child: Column(
@@ -70,7 +74,12 @@ class ScreenStaffProfile extends ConsumerWidget {
                 padding: const EdgeInsets.all(3),
                 decoration: BoxDecoration(
                   shape: BoxShape.circle,
-                  border: Border.all(color: const Color(0xFFFFC857), width: 2),
+                  border: Border.all(
+                    color: isDark
+                        ? AppColors.warning.withValues(alpha: 0.45)
+                        : const Color(0xFFFFC857),
+                    width: 2,
+                  ),
                 ),
                 child: ProfileAvatar(
                   radius: 34,
@@ -92,7 +101,7 @@ class ScreenStaffProfile extends ConsumerWidget {
                       style: const TextStyle(
                         fontSize: 28,
                         fontWeight: FontWeight.w800,
-                        color: Colors.white,
+                        color: AppColors.headerOnBrand,
                       ),
                     ),
                     const SizedBox(height: 6),
@@ -104,15 +113,23 @@ class ScreenStaffProfile extends ConsumerWidget {
                           label: profile.isActiveInstructor
                               ? 'ACTIVE STAFF'
                               : 'STAFF',
-                          background: const Color(0xFFF8FAFF),
-                          foreground: const Color(0xFF2F3D5C),
+                          background: isDark
+                              ? AppColors.headerOnBrand.withValues(alpha: 0.08)
+                              : const Color(0xFFF8FAFF),
+                          foreground: isDark
+                              ? AppColors.headerOnBrand
+                              : const Color(0xFF2F3D5C),
                         ),
                         _buildHeaderBadge(
                           label: profile.allowClassCreation
                               ? 'CAN CREATE CLASSES'
                               : 'PROFILE ACCESS',
-                          background: const Color(0xFFFFD27A),
-                          foreground: const Color(0xFF5E3A00),
+                          background: isDark
+                              ? AppColors.warning.withValues(alpha: 0.18)
+                              : const Color(0xFFFFD27A),
+                          foreground: isDark
+                              ? colorScheme.onSurface
+                              : const Color(0xFF5E3A00),
                         ),
                       ],
                     ),
@@ -131,7 +148,7 @@ class ScreenStaffProfile extends ConsumerWidget {
             style: TextStyle(
               height: 1.45,
               fontSize: 14,
-              color: Colors.white.withValues(alpha: 0.80),
+              color: AppColors.headerOnBrand.withValues(alpha: 0.80),
             ),
           ),
         ],
@@ -169,11 +186,13 @@ class ScreenStaffProfile extends ConsumerWidget {
     ProviderUserProfile profile,
   ) {
     return _buildPanel(
+      context: context,
       title: 'Management Tools',
       subtitle: 'Compact shortcuts for the staff tasks that matter here.',
       child: Column(
         children: [
           _buildToolRow(
+            context: context,
             icon: Icons.add_box_outlined,
             label: 'Create Class',
             description: 'Add a new class to the schedule.',
@@ -182,6 +201,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _buildToolRow(
+            context: context,
             icon: Icons.person_outline,
             label: 'Edit Profile',
             description: 'Update contact details, bio, and staff info.',
@@ -190,6 +210,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           ),
           const SizedBox(height: 10),
           _buildToolRow(
+            context: context,
             icon: Icons.logout,
             label: 'Log Out',
             description: 'Sign out of the staff account.',
@@ -209,6 +230,7 @@ class ScreenStaffProfile extends ConsumerWidget {
     ProviderUserProfile profile,
   ) {
     return _buildPanel(
+      context: context,
       title: 'Account & Preferences',
       subtitle: 'Basic profile access for staff accounts.',
       child: Column(
@@ -218,13 +240,16 @@ class ScreenStaffProfile extends ConsumerWidget {
             width: double.infinity,
             padding: const EdgeInsets.all(16),
             decoration: BoxDecoration(
-              color: const Color(0xFFF7F9FD),
+              color: Theme.of(context).colorScheme.surfaceContainer,
               borderRadius: BorderRadius.circular(20),
-              border: Border.all(color: const Color(0xFFE6ECF5)),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
             ),
             child: Column(
               children: [
                 _buildAccountRow(
+                  context: context,
                   icon: Icons.mail_outline,
                   label: 'Email',
                   value: profile.email.isEmpty ? 'Not provided' : profile.email,
@@ -234,6 +259,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           ),
           const SizedBox(height: 18),
           _buildToolRow(
+            context: context,
             icon: Icons.settings_outlined,
             label: 'Settings',
             description: 'Manage app and account preferences.',
@@ -246,10 +272,12 @@ class ScreenStaffProfile extends ConsumerWidget {
   }
 
   Widget _buildScheduleSection(
+    BuildContext context,
     List<GymClass> upcomingClasses,
     ProviderUserProfile profile,
   ) {
     return _buildPanel(
+      context: context,
       title: 'Upcoming Schedule',
       subtitle: 'Classes matched to your instructor profile.',
       child: upcomingClasses.isEmpty
@@ -257,15 +285,20 @@ class ScreenStaffProfile extends ConsumerWidget {
               width: double.infinity,
               padding: const EdgeInsets.all(20),
               decoration: BoxDecoration(
-                color: const Color(0xFFF7F9FD),
+                color: Theme.of(context).colorScheme.surfaceContainer,
                 borderRadius: BorderRadius.circular(18),
-                border: Border.all(color: const Color(0xFFE4EAF4)),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
               ),
               child: Text(
                 profile.wholeName.trim().isEmpty
                     ? 'No upcoming classes are linked to this staff account yet.'
                     : 'No upcoming classes currently list ${profile.wholeName} as instructor.',
-                style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                  height: 1.4,
+                ),
               ),
             )
           : Column(
@@ -274,7 +307,7 @@ class ScreenStaffProfile extends ConsumerWidget {
                   .map(
                     (gymClass) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildClassCard(gymClass),
+                      child: _buildClassCard(context, gymClass),
                     ),
                   )
                   .toList(),
@@ -283,21 +316,24 @@ class ScreenStaffProfile extends ConsumerWidget {
   }
 
   Widget _buildPanel({
+    required BuildContext context,
     required String title,
     required String subtitle,
     required Widget child,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(24),
-        boxShadow: const [
+        boxShadow: [
           BoxShadow(
-            color: Color(0x120E1726),
+            color: Colors.black.withValues(alpha: 0.08),
             blurRadius: 20,
-            offset: Offset(0, 8),
+            offset: const Offset(0, 8),
           ),
         ],
       ),
@@ -306,14 +342,21 @@ class ScreenStaffProfile extends ConsumerWidget {
         children: [
           Text(
             title,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+            style: textTheme.titleLarge?.copyWith(
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
           ),
           const SizedBox(height: 4),
           Text(
             subtitle,
             maxLines: 3,
             overflow: TextOverflow.ellipsis,
-            style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
           ),
           const SizedBox(height: 18),
           child,
@@ -323,12 +366,15 @@ class ScreenStaffProfile extends ConsumerWidget {
   }
 
   Widget _buildAccountRow({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String value,
     String? supportingText,
-    Color valueColor = const Color(0xFF111827),
+    Color? valueColor,
   }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Row(
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
@@ -347,10 +393,10 @@ class ScreenStaffProfile extends ConsumerWidget {
             children: [
               Text(
                 label,
-                style: const TextStyle(
+                style: textTheme.labelSmall?.copyWith(
                   fontSize: 13,
                   fontWeight: FontWeight.w700,
-                  color: Color(0xFF5D6470),
+                  color: colorScheme.onSurfaceVariant,
                 ),
               ),
               const SizedBox(height: 2),
@@ -367,7 +413,7 @@ class ScreenStaffProfile extends ConsumerWidget {
                         style: TextStyle(
                           fontSize: 15,
                           fontWeight: FontWeight.w800,
-                          color: valueColor,
+                          color: valueColor ?? colorScheme.onSurface,
                         ),
                       ),
                     ),
@@ -378,8 +424,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                 const SizedBox(height: 2),
                 Text(
                   supportingText,
-                  style: const TextStyle(
-                    color: Color(0xFF5D6470),
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     height: 1.35,
                   ),
                 ),
@@ -392,6 +438,7 @@ class ScreenStaffProfile extends ConsumerWidget {
   }
 
   Widget _buildToolRow({
+    required BuildContext context,
     required IconData icon,
     required String label,
     required String description,
@@ -399,19 +446,22 @@ class ScreenStaffProfile extends ConsumerWidget {
     required VoidCallback onTap,
     bool isDestructive = false,
   }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return InkWell(
       onTap: onTap,
       borderRadius: BorderRadius.circular(20),
       child: Container(
         decoration: BoxDecoration(
           color: isDestructive
-              ? const Color(0xFFFFF3F1)
-              : accent.withValues(alpha: 0.08),
+              ? colorScheme.errorContainer.withValues(alpha: isDark ? 0.3 : 1)
+              : accent.withValues(alpha: isDark ? 0.18 : 0.08),
           borderRadius: BorderRadius.circular(20),
           border: Border.all(
             color: isDestructive
-                ? const Color(0xFFF2C7C2)
-                : accent.withValues(alpha: 0.14),
+                ? colorScheme.error.withValues(alpha: 0.25)
+                : accent.withValues(alpha: isDark ? 0.28 : 0.14),
           ),
         ),
         child: Padding(
@@ -422,13 +472,13 @@ class ScreenStaffProfile extends ConsumerWidget {
                 padding: const EdgeInsets.all(10),
                 decoration: BoxDecoration(
                   color: isDestructive
-                      ? const Color(0xFFB3261E).withValues(alpha: 0.12)
+                      ? colorScheme.error.withValues(alpha: 0.12)
                       : accent.withValues(alpha: 0.12),
                   borderRadius: BorderRadius.circular(14),
                 ),
                 child: Icon(
                   icon,
-                  color: isDestructive ? const Color(0xFFB3261E) : accent,
+                  color: isDestructive ? colorScheme.error : accent,
                   size: 22,
                 ),
               ),
@@ -445,8 +495,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                         fontSize: 15,
                         fontWeight: FontWeight.w800,
                         color: isDestructive
-                            ? const Color(0xFFB3261E)
-                            : const Color(0xFF111827),
+                            ? colorScheme.error
+                            : colorScheme.onSurface,
                       ),
                     ),
                     const SizedBox(height: 2),
@@ -454,8 +504,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                       description,
                       maxLines: 2,
                       overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        color: Color(0xFF4B5563),
+                      style: textTheme.bodySmall?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
                         height: 1.35,
                       ),
                     ),
@@ -465,8 +515,8 @@ class ScreenStaffProfile extends ConsumerWidget {
               Icon(
                 Icons.chevron_right,
                 color: isDestructive
-                    ? const Color(0xFFB3261E)
-                    : const Color(0xFF8A94A6),
+                    ? colorScheme.error
+                    : colorScheme.onSurfaceVariant,
               ),
             ],
           ),
@@ -475,7 +525,9 @@ class ScreenStaffProfile extends ConsumerWidget {
     );
   }
 
-  Widget _buildClassCard(GymClass gymClass) {
+  Widget _buildClassCard(BuildContext context, GymClass gymClass) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     final occupancy = gymClass.capacity == 0
         ? 0.0
         : gymClass.filled / gymClass.capacity;
@@ -483,9 +535,9 @@ class ScreenStaffProfile extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.all(18),
       decoration: BoxDecoration(
-        color: Colors.white,
+        color: colorScheme.surfaceContainer,
         borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: const Color(0xFFE4EAF4)),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
@@ -498,8 +550,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                   gymClass.title,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF111827),
+                  style: textTheme.titleMedium?.copyWith(
+                    color: colorScheme.onSurface,
                     fontSize: 17,
                     fontWeight: FontWeight.w800,
                   ),
@@ -512,8 +564,8 @@ class ScreenStaffProfile extends ConsumerWidget {
                   textAlign: TextAlign.end,
                   maxLines: 2,
                   overflow: TextOverflow.ellipsis,
-                  style: const TextStyle(
-                    color: Color(0xFF5D6470),
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w600,
                   ),
                 ),
@@ -523,7 +575,9 @@ class ScreenStaffProfile extends ConsumerWidget {
           const SizedBox(height: 6),
           Text(
             '${gymClass.dateText} • ${gymClass.location}',
-            style: const TextStyle(color: Color(0xFF5D6470)),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+            ),
           ),
           const SizedBox(height: 14),
           ClipRRect(
@@ -531,17 +585,17 @@ class ScreenStaffProfile extends ConsumerWidget {
             child: LinearProgressIndicator(
               value: occupancy,
               minHeight: 8,
-              backgroundColor: const Color(0xFFE8EDF5),
+              backgroundColor: colorScheme.outlineVariant,
               valueColor: const AlwaysStoppedAnimation<Color>(
-                Color(0xFFFFC857),
+                AppColors.warning,
               ),
             ),
           ),
           const SizedBox(height: 8),
           Text(
             '${gymClass.filled}/${gymClass.capacity} seats filled',
-            style: const TextStyle(
-              color: Color(0xFF5D6470),
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
               fontWeight: FontWeight.w500,
             ),
           ),

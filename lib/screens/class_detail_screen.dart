@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/gym_class.dart';
 import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
+import '../theme/app_colors.dart';
 import 'reservation_confirmation_screen.dart';
 
 class ClassDetailScreen extends ConsumerStatefulWidget {
@@ -67,6 +68,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       initialData: widget.gymClass,
       builder: (context, snapshot) {
         final gClass = snapshot.data ?? widget.gymClass;
+        final colorScheme = Theme.of(context).colorScheme;
+        final textTheme = Theme.of(context).textTheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
 
         final reservations = ref.watch(reservationsProvider).reservations;
         final isRegistered = reservations.any((r) => r.id == gClass.id);
@@ -86,7 +90,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                   gradient: LinearGradient(
                     begin: Alignment.topCenter,
                     end: Alignment.bottomCenter,
-                    colors: [Color(0xFF8A2BFF), Color(0xFF6A1B9A)],
+                    colors: [AppColors.gradientStart, AppColors.gradientEnd],
                   ),
                 ),
               ),
@@ -105,7 +109,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                           IconButton(
                             icon: const Icon(
                               Icons.arrow_back,
-                              color: Colors.white,
+                              color: AppColors.headerOnBrand,
                               size: 28,
                             ),
                             onPressed: () => Navigator.pop(context),
@@ -114,7 +118,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                             child: Text(
                               gClass.title,
                               style: const TextStyle(
-                                color: Colors.white,
+                                color: AppColors.headerOnBrand,
                                 fontSize: 24,
                                 fontWeight: FontWeight.bold,
                                 height: 1.2,
@@ -128,8 +132,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     // White content area
                     Expanded(
                       child: Container(
-                        decoration: const BoxDecoration(
-                          color: Colors.white,
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
                           borderRadius: BorderRadius.vertical(
                             top: Radius.circular(32),
                           ),
@@ -140,11 +144,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
                               // ── Class Status ────────────────────────────────────────
-                              const Text(
+                              Text(
                                 'Class Status',
-                                style: TextStyle(
+                                style: textTheme.titleMedium?.copyWith(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 12),
@@ -157,9 +162,10 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     isRegistered
                                         ? 'You are registered'
                                         : '$spotsLeft Spots Left',
-                                    style: const TextStyle(
+                                    style: textTheme.titleLarge?.copyWith(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w600,
+                                      color: colorScheme.onSurface,
                                     ),
                                   ),
                                   Container(
@@ -169,22 +175,26 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     ),
                                     decoration: BoxDecoration(
                                       color: isRegistered
-                                          ? Colors.blue.shade50
+                                          ? colorScheme.primaryContainer
                                           : (gClass.status == ClassStatus.open
-                                                ? const Color(0xFFE8F5E9)
-                                                : const Color(0xFFFBE2E2)),
+                                                ? AppColors.success.withValues(
+                                                    alpha: isDark ? 0.24 : 0.14,
+                                                  )
+                                                : AppColors.error.withValues(
+                                                    alpha: isDark ? 0.24 : 0.14,
+                                                  )),
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
                                       isRegistered
                                           ? 'REGISTERED'
                                           : gClass.status.name.toUpperCase(),
-                                      style: TextStyle(
+                                      style: textTheme.labelMedium?.copyWith(
                                         color: isRegistered
-                                            ? Colors.blue.shade700
+                                            ? colorScheme.onPrimaryContainer
                                             : (gClass.status == ClassStatus.open
-                                                  ? const Color(0xFF2E7D32)
-                                                  : const Color(0xFFB00020)),
+                                                  ? AppColors.success
+                                                  : AppColors.error),
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -200,11 +210,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 child: LinearProgressIndicator(
                                   value: progress,
                                   minHeight: 12,
-                                  backgroundColor: Colors.grey.shade200,
+                                  backgroundColor: colorScheme.outlineVariant,
                                   valueColor: AlwaysStoppedAnimation(
                                     gClass.status == ClassStatus.full
-                                        ? Colors.red
-                                        : Colors.green,
+                                        ? colorScheme.error
+                                        : AppColors.success,
                                   ),
                                 ),
                               ),
@@ -212,8 +222,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 8),
                               Text(
                                 '${gClass.filled} / ${gClass.capacity} registered',
-                                style: const TextStyle(
-                                  color: Colors.grey,
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.onSurfaceVariant,
                                   fontSize: 14,
                                 ),
                               ),
@@ -221,11 +231,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 32),
 
                               // ── Class Information ───────────────────────────────────
-                              const Text(
+                              Text(
                                 'Class Information',
-                                style: TextStyle(
+                                style: textTheme.titleMedium?.copyWith(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 16),
@@ -259,24 +270,25 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 32),
 
                               // ── About This Class ────────────────────────────────────
-                              const Text(
+                              Text(
                                 'About This Class',
-                                style: TextStyle(
+                                style: textTheme.titleMedium?.copyWith(
                                   fontSize: 18,
                                   fontWeight: FontWeight.w700,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
                               const SizedBox(height: 12),
 
-                              const Text(
+                              Text(
                                 'Join us for an energizing session!\n'
                                 'This class is perfect for all levels and focuses on '
                                 'building strength, flexibility, and mindfulness.\n\n'
                                 'Bring your water bottle and get ready to sweat!',
-                                style: TextStyle(
+                                style: textTheme.bodyLarge?.copyWith(
                                   fontSize: 16,
                                   height: 1.45,
-                                  color: Colors.black87,
+                                  color: colorScheme.onSurface,
                                 ),
                               ),
 
@@ -294,16 +306,16 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                       ? null
                                       : () => _registerForClass(gClass),
                                   style: ElevatedButton.styleFrom(
-                                    backgroundColor: const Color(0xFF6200EE),
-                                    foregroundColor: Colors.white,
+                                    backgroundColor: colorScheme.primary,
+                                    foregroundColor: colorScheme.onPrimary,
                                     shape: RoundedRectangleBorder(
                                       borderRadius: BorderRadius.circular(28),
                                     ),
                                     elevation: 2,
                                   ),
                                   child: _isLoading
-                                      ? const CircularProgressIndicator(
-                                          color: Colors.white,
+                                      ? CircularProgressIndicator(
+                                          color: colorScheme.onPrimary,
                                         )
                                       : Text(
                                           isRegistered
@@ -332,12 +344,14 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   }
 
   Widget _buildInfoRow(IconData icon, String label, String value) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: const Color(0xFF6200EE), size: 26),
+          Icon(icon, color: colorScheme.primary, size: 26),
           const SizedBox(width: 16),
           Expanded(
             child: Column(
@@ -345,18 +359,19 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               children: [
                 Text(
                   label,
-                  style: const TextStyle(
+                  style: textTheme.bodyMedium?.copyWith(
                     fontSize: 15,
-                    color: Colors.grey,
+                    color: colorScheme.onSurfaceVariant,
                     fontWeight: FontWeight.w500,
                   ),
                 ),
                 const SizedBox(height: 4),
                 Text(
                   value,
-                  style: const TextStyle(
+                  style: textTheme.titleMedium?.copyWith(
                     fontSize: 17,
                     fontWeight: FontWeight.w600,
+                    color: colorScheme.onSurface,
                   ),
                 ),
               ],

@@ -35,6 +35,7 @@ import 'screens/staff/screen_staff_class_list.dart';
 import 'screens/staff/screen_create_class.dart';
 import 'providers/provider_auth.dart';
 import 'util/file/util_file.dart';
+import 'util/message_display/snackbar.dart';
 import 'firebase_options.dart';
 import 'theme/theme.dart';
 
@@ -54,6 +55,7 @@ final providerAuth = ChangeNotifierProvider<ProviderAuth>(
 final providerGymClass = ChangeNotifierProvider<ProviderGymClass>(
   (ref) => ProviderGymClass(),
 );
+final providerThemePreviewMode = StateProvider<bool?>((ref) => null);
 
 //////////////////////////////////////////////////////////////////////////
 // MAIN entry point to start app.
@@ -87,17 +89,17 @@ Future<void> main() async {
 //////////////////////////////////////////////////////////////////////////
 // Main class which is the root of the app.
 //////////////////////////////////////////////////////////////////////////
-class MyApp extends StatefulWidget {
+class MyApp extends ConsumerStatefulWidget {
   const MyApp({super.key});
 
   @override
-  State<MyApp> createState() => _MyAppState();
+  ConsumerState<MyApp> createState() => _MyAppState();
 }
 
 //////////////////////////////////////////////////////////////////////////
 // The actual STATE which is managed by the above widget.
 //////////////////////////////////////////////////////////////////////////
-class _MyAppState extends State<MyApp> {
+class _MyAppState extends ConsumerState<MyApp> {
   // Router
   final GoRouter _router = GoRouter(
     initialLocation: ScreenLoginValidation.routeName,
@@ -171,12 +173,20 @@ class _MyAppState extends State<MyApp> {
 
   @override
   Widget build(BuildContext context) {
+    final previewDarkModeEnabled = ref.watch(providerThemePreviewMode);
+    final savedDarkModeEnabled = ref.watch(
+      providerUserProfile.select((profile) => profile.darkModeEnabled),
+    );
+    final darkModeEnabled = previewDarkModeEnabled ?? savedDarkModeEnabled;
+
     return MaterialApp.router(
+      scaffoldMessengerKey: appScaffoldMessengerKey,
       routerConfig: _router,
       title: 'Pat Your Mat!',
       theme: lightTheme,
       darkTheme: darkTheme,
-      themeMode: ThemeMode.light,
+      themeMode: darkModeEnabled ? ThemeMode.dark : ThemeMode.light,
+      themeAnimationDuration: Duration.zero,
       debugShowCheckedModeBanner: false,
     );
   }

@@ -18,13 +18,14 @@ import 'package:flutter/material.dart';
 // state object.
 //////////////////////////////////////////////////////////////////////////
 class ProfileAvatar extends StatefulWidget {
-  const ProfileAvatar(
-      {super.key,
-      required this.radius,
-      this.initialsSize = 0,
-      required this.userImage,
-      required this.userWholeName,
-      this.isInAppBar = false});
+  const ProfileAvatar({
+    super.key,
+    required this.radius,
+    this.initialsSize = 0,
+    required this.userImage,
+    required this.userWholeName,
+    this.isInAppBar = false,
+  });
 
   //radius of CircleAvatar
   final double radius;
@@ -76,7 +77,9 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
 
   void getInitials() {
     // Update initial size, if needed
-    textSize = widget.initialsSize == 0 ? (widget.radius * .7) : widget.initialsSize;
+    textSize = widget.initialsSize == 0
+        ? (widget.radius * .7)
+        : widget.initialsSize;
 
     // Now, get the initials themselves
     try {
@@ -102,15 +105,23 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
     // If current image is null, set to intials. Else, display user's photo
     // If no user data is loaded, the profile photo will default to "ME" initials
     if (widget.userImage == null && initials != "") {
-      return Stack(children: [
-        CircleAvatar(
+      return Stack(
+        children: [
+          CircleAvatar(
             radius: widget.radius,
-            backgroundColor: Color.fromARGB(255, 137, 137, 137),
+            backgroundColor: Theme.of(
+              context,
+            ).colorScheme.surfaceContainerHighest,
             child: Text(
               initials,
-              style: TextStyle(fontSize: textSize),
-            )),
-      ]);
+              style: TextStyle(
+                fontSize: textSize,
+                color: Theme.of(context).colorScheme.onSurface,
+              ),
+            ),
+          ),
+        ],
+      );
     } else if (!widget.isInAppBar) {
       // This version of the avatar has the gapless playback feature
       // enabled to prevent the image from flickering when the user
