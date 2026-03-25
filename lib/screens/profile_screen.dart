@@ -59,137 +59,176 @@ class ProfileScreen extends ConsumerWidget {
   Widget _buildHeader(BuildContext context, ProviderUserProfile profile) {
     final memberSince = _formatMemberSince(profile.accountCreationTime);
 
-    return Container(
-      width: double.infinity,
-      padding: const EdgeInsets.all(24),
-      decoration: BoxDecoration(
-        borderRadius: BorderRadius.circular(28),
-        gradient: const LinearGradient(
-          begin: Alignment.topLeft,
-          end: Alignment.bottomRight,
-          colors: [AppColors.gradientStart, AppColors.gradientEnd],
-        ),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Container(
-            padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
-            decoration: BoxDecoration(
-              color: Colors.white.withValues(alpha: 0.14),
-              borderRadius: BorderRadius.circular(999),
-              border: Border.all(color: Colors.white.withValues(alpha: 0.18)),
-            ),
-            child: Text(
-              'Member Profile',
-              style: TextStyle(
-                fontSize: 12,
-                fontWeight: FontWeight.w700,
-                color: Colors.white.withValues(alpha: 0.92),
-              ),
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final isCompact = constraints.maxWidth < 380;
+        final avatarRadius = isCompact ? 30.0 : 34.0;
+
+        return Container(
+          width: double.infinity,
+          padding: EdgeInsets.all(isCompact ? 18 : 24),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(isCompact ? 24 : 28),
+            gradient: const LinearGradient(
+              begin: Alignment.topLeft,
+              end: Alignment.bottomRight,
+              colors: [AppColors.gradientStart, AppColors.gradientEnd],
             ),
           ),
-          const SizedBox(height: 18),
-          Row(
-            crossAxisAlignment: CrossAxisAlignment.center,
+          child: Column(
+            crossAxisAlignment: isCompact
+                ? CrossAxisAlignment.center
+                : CrossAxisAlignment.start,
             children: [
-              Container(
-                padding: const EdgeInsets.all(3),
-                decoration: BoxDecoration(
-                  shape: BoxShape.circle,
-                  border: Border.all(
-                    color: Colors.white.withValues(alpha: 0.50),
-                    width: 3,
+              Align(
+                alignment: isCompact ? Alignment.center : Alignment.centerLeft,
+                child: Container(
+                  padding: EdgeInsets.symmetric(
+                    horizontal: isCompact ? 10 : 12,
+                    vertical: isCompact ? 6 : 7,
+                  ),
+                  decoration: BoxDecoration(
+                    color: Colors.white.withValues(alpha: 0.14),
+                    borderRadius: BorderRadius.circular(999),
+                    border: Border.all(
+                      color: Colors.white.withValues(alpha: 0.18),
+                    ),
+                  ),
+                  child: Text(
+                    'Member Profile',
+                    style: TextStyle(
+                      fontSize: isCompact ? 11 : 12,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.white.withValues(alpha: 0.92),
+                    ),
                   ),
                 ),
-                child: ProfileAvatar(
-                  radius: 34,
-                  userImage: profile.userImage,
-                  userWholeName: profile.wholeName,
-                ),
               ),
-              const SizedBox(width: 16),
-              Expanded(
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      profile.wholeName.trim().isEmpty
-                          ? 'Your Profile'
-                          : profile.wholeName,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: const TextStyle(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                        color: Colors.white,
+              SizedBox(height: isCompact ? 14 : 18),
+              Column(
+                crossAxisAlignment: isCompact
+                    ? CrossAxisAlignment.center
+                    : CrossAxisAlignment.start,
+                children: [
+                  Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.50),
+                        width: 3,
                       ),
                     ),
-                    const SizedBox(height: 4),
-                    Text(
-                      memberSince ?? profile.email,
-                      maxLines: 2,
-                      overflow: TextOverflow.ellipsis,
-                      style: TextStyle(
-                        fontSize: 14,
-                        color: Colors.white.withValues(alpha: 0.82),
+                    child: ProfileAvatar(
+                      radius: avatarRadius,
+                      userImage: profile.userImage,
+                      userWholeName: profile.wholeName,
+                    ),
+                  ),
+                  SizedBox(height: isCompact ? 12 : 16),
+                  ConstrainedBox(
+                    constraints: const BoxConstraints(maxWidth: 320),
+                    child: _buildHeaderText(
+                      profile,
+                      memberSince,
+                      isCompact: isCompact,
+                    ),
+                  ),
+                ],
+              ),
+              SizedBox(height: isCompact ? 16 : 20),
+              if (isCompact)
+                SizedBox(
+                  width: double.infinity,
+                  child: Column(
+                    children: [
+                      SizedBox(
+                        width: double.infinity,
+                        child: OutlinedButton.icon(
+                          onPressed: () =>
+                              context.push(ScreenProfileEdit.routeName),
+                          style: OutlinedButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            side: const BorderSide(color: Colors.white54),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: const Icon(Icons.edit_outlined, size: 18),
+                          label: const Text(
+                            'Edit Profile',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                      const SizedBox(height: 10),
+                      SizedBox(
+                        width: double.infinity,
+                        child: TextButton.icon(
+                          onPressed: () =>
+                              context.push(ScreenSettings.routeName),
+                          style: TextButton.styleFrom(
+                            foregroundColor: Colors.white,
+                            backgroundColor: Colors.white.withValues(
+                              alpha: 0.16,
+                            ),
+                            padding: const EdgeInsets.symmetric(vertical: 13),
+                            shape: RoundedRectangleBorder(
+                              borderRadius: BorderRadius.circular(16),
+                            ),
+                          ),
+                          icon: const Icon(Icons.tune, size: 18),
+                          label: const Text(
+                            'Settings',
+                            overflow: TextOverflow.ellipsis,
+                          ),
+                        ),
+                      ),
+                    ],
+                  ),
+                )
+              else
+                Row(
+                  children: [
+                    Expanded(
+                      child: OutlinedButton.icon(
+                        onPressed: () =>
+                            context.push(ScreenProfileEdit.routeName),
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          side: const BorderSide(color: Colors.white54),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        icon: const Icon(Icons.edit_outlined, size: 18),
+                        label: const Text('Edit Profile'),
+                      ),
+                    ),
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: TextButton.icon(
+                        onPressed: () => context.push(ScreenSettings.routeName),
+                        style: TextButton.styleFrom(
+                          foregroundColor: Colors.white,
+                          backgroundColor: Colors.white.withValues(alpha: 0.16),
+                          padding: const EdgeInsets.symmetric(vertical: 14),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(16),
+                          ),
+                        ),
+                        icon: const Icon(Icons.tune, size: 18),
+                        label: const Text('Settings'),
                       ),
                     ),
                   ],
                 ),
-              ),
             ],
           ),
-          const SizedBox(height: 20),
-          LayoutBuilder(
-            builder: (context, constraints) {
-              final isCompact = constraints.maxWidth < 360;
-              return Flex(
-                direction: isCompact ? Axis.vertical : Axis.horizontal,
-                children: [
-                  Expanded(
-                    flex: isCompact ? 0 : 1,
-                    child: OutlinedButton.icon(
-                      onPressed: () =>
-                          context.push(ScreenProfileEdit.routeName),
-                      style: OutlinedButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        side: const BorderSide(color: Colors.white54),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: const Icon(Icons.edit_outlined),
-                      label: const Text('Edit Profile'),
-                    ),
-                  ),
-                  SizedBox(
-                    width: isCompact ? 0 : 12,
-                    height: isCompact ? 12 : 0,
-                  ),
-                  Expanded(
-                    flex: isCompact ? 0 : 1,
-                    child: TextButton.icon(
-                      onPressed: () => context.push(ScreenSettings.routeName),
-                      style: TextButton.styleFrom(
-                        foregroundColor: Colors.white,
-                        backgroundColor: Colors.white.withValues(alpha: 0.16),
-                        padding: const EdgeInsets.symmetric(vertical: 14),
-                        shape: RoundedRectangleBorder(
-                          borderRadius: BorderRadius.circular(16),
-                        ),
-                      ),
-                      icon: const Icon(Icons.tune),
-                      label: const Text('Settings'),
-                    ),
-                  ),
-                ],
-              );
-            },
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 
@@ -208,30 +247,29 @@ class ProfileScreen extends ConsumerWidget {
         const SizedBox(height: 12),
         LayoutBuilder(
           builder: (context, constraints) {
-            final isCompact = constraints.maxWidth < 360;
-            final cardWidth = isCompact
-                ? constraints.maxWidth
-                : (constraints.maxWidth - 12) / 2;
-            return Wrap(
-              spacing: 12,
-              runSpacing: 12,
+            final crossAxisCount = constraints.maxWidth < 520 ? 2 : 3;
+            final childAspectRatio = constraints.maxWidth < 380 ? 1.05 : 1.18;
+            return GridView.count(
+              crossAxisCount: crossAxisCount,
+              crossAxisSpacing: 12,
+              mainAxisSpacing: 12,
+              childAspectRatio: childAspectRatio,
+              shrinkWrap: true,
+              physics: const NeverScrollableScrollPhysics(),
               children: [
                 _buildStatCard(
-                  width: cardWidth,
                   label: 'Upcoming Classes',
                   value: '${reservations.length}',
                   icon: Icons.event_available,
                   accent: AppColors.deepPurple,
                 ),
                 _buildStatCard(
-                  width: cardWidth,
                   label: 'Classes This Month',
                   value: '$thisMonthCount',
                   icon: Icons.calendar_month_outlined,
                   accent: const Color(0xFF1F8F71),
                 ),
                 _buildStatCard(
-                  width: cardWidth,
                   label: 'Next Mat Spot',
                   value: nextReservation?.matNumber ?? 'None',
                   icon: Icons.place_outlined,
@@ -246,15 +284,13 @@ class ProfileScreen extends ConsumerWidget {
   }
 
   Widget _buildStatCard({
-    required double width,
     required String label,
     required String value,
     required IconData icon,
     required Color accent,
   }) {
     return Container(
-      width: width,
-      padding: const EdgeInsets.all(18),
+      padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
         color: accent.withValues(alpha: 0.07),
         borderRadius: BorderRadius.circular(20),
@@ -271,14 +307,14 @@ class ProfileScreen extends ConsumerWidget {
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
           Container(
-            padding: const EdgeInsets.all(10),
+            padding: const EdgeInsets.all(9),
             decoration: BoxDecoration(
               color: accent.withValues(alpha: 0.10),
               borderRadius: BorderRadius.circular(14),
             ),
             child: Icon(icon, color: accent, size: 20),
           ),
-          const SizedBox(height: 12),
+          const Spacer(),
           Text(
             value,
             maxLines: 1,
@@ -288,8 +324,11 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
+              height: 1.25,
               color: Color(0xFF4B5563),
               fontWeight: FontWeight.w600,
             ),
@@ -620,8 +659,10 @@ class ProfileScreen extends ConsumerWidget {
               const SizedBox(height: 2),
               Text(
                 value,
+                softWrap: true,
                 style: TextStyle(
                   fontSize: 15,
+                  height: 1.3,
                   color: valueColor ?? const Color(0xFF111827),
                   fontWeight: FontWeight.w600,
                 ),
@@ -640,6 +681,57 @@ class ProfileScreen extends ConsumerWidget {
             ],
           ),
         ),
+      ],
+    );
+  }
+
+  Widget _buildHeaderText(
+    ProviderUserProfile profile,
+    String? memberSince, {
+    required bool isCompact,
+  }) {
+    return Column(
+      crossAxisAlignment: isCompact
+          ? CrossAxisAlignment.center
+          : CrossAxisAlignment.start,
+      children: [
+        Text(
+          profile.wholeName.trim().isEmpty ? 'Your Profile' : profile.wholeName,
+          maxLines: 2,
+          overflow: TextOverflow.ellipsis,
+          textAlign: isCompact ? TextAlign.center : TextAlign.start,
+          style: TextStyle(
+            fontSize: isCompact ? 24 : 28,
+            height: 1.08,
+            fontWeight: FontWeight.w800,
+            color: Colors.white,
+          ),
+        ),
+        const SizedBox(height: 8),
+        Text(
+          profile.email.isEmpty ? 'No email on file' : profile.email,
+          maxLines: 1,
+          overflow: TextOverflow.ellipsis,
+          textAlign: isCompact ? TextAlign.center : TextAlign.start,
+          style: TextStyle(
+            fontSize: isCompact ? 14 : 15,
+            height: 1.2,
+            color: Colors.white.withValues(alpha: 0.88),
+          ),
+        ),
+        if (memberSince != null) ...[
+          const SizedBox(height: 4),
+          Text(
+            memberSince,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            textAlign: isCompact ? TextAlign.center : TextAlign.start,
+            style: TextStyle(
+              fontSize: isCompact ? 12 : 13,
+              color: Colors.white.withValues(alpha: 0.72),
+            ),
+          ),
+        ],
       ],
     );
   }
