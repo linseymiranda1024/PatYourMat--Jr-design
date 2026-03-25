@@ -25,6 +25,16 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   TimeOfDay _selectedTime = TimeOfDay.now();
   bool _isSubmitting = false;
 
+  String _selectedClassType = 'Yoga';
+  final List<String> _classTypes = [
+    'Yoga',
+    'Cardio',
+    'Pilates',
+    'Strength',
+    'HIIT',
+    'Other'
+  ];
+
   @override
   void dispose() {
     _titleController.dispose();
@@ -64,7 +74,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
 
     final newClass = GymClass(
       id: '',
-      title: _titleController.text.trim(),
+      title: "${_titleController.text.trim()} ($_selectedClassType)",
       instructor: _instructorController.text.trim(),
       dateTime: DateTime(
         _selectedDate.year,
@@ -169,6 +179,16 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                       ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  value: _selectedClassType,
+                  decoration: const InputDecoration(labelText: 'Class Type'),
+                  items: _classTypes
+                      .map((t) => DropdownMenuItem(value: t, child: Text(t)))
+                      .toList(),
+                  onChanged: (val) =>
+                      setState(() => _selectedClassType = val ?? 'Other'),
                 ),
                 const SizedBox(height: 24),
                 Row(
