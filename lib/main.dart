@@ -31,6 +31,7 @@ import 'providers/provider_user_profile.dart';
 import 'providers/provider_gym_class.dart';
 import 'screens/settings/screen_settings.dart';
 import 'screens/staff/screen_staff_profile.dart';
+import 'screens/staff/screen_staff_class_list.dart';
 import 'screens/staff/screen_create_class.dart';
 import 'providers/provider_auth.dart';
 import 'util/file/util_file.dart';
@@ -127,6 +128,15 @@ class _MyAppState extends State<MyApp> {
       GoRoute(
         path: ScreenStaffProfile.routeName,
         builder: (context, state) => const ScreenStaffProfile(),
+      ),
+      GoRoute(
+        path: ScreenStaffClassList.routeName,
+        builder: (context, state) {
+          final extra = state.extra as Map<String, dynamic>? ?? {};
+          return ScreenStaffClassList(
+            showPast: extra['showPast'] as bool? ?? false,
+          );
+        },
       ),
       GoRoute(
         path: ScreenCreateClass.routeName,

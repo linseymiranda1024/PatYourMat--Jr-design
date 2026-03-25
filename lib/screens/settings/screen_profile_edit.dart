@@ -9,12 +9,10 @@
 // Imports
 //////////////////////////////////////////////////////////////////////////
 // Flutter external package imports
-import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:pat_your_mat/widgets/navigation/widget_primary_app_bar.dart';
 
 // App relative file imports
-import '../../widgets/general/widget_scrollable_background.dart';
 import '../auth/screen_profile_setup.dart';
 
 //////////////////////////////////////////////////////////////////
@@ -42,20 +40,13 @@ class _ScreenProfileEditState extends State<ScreenProfileEdit> {
   Widget build(BuildContext context) {
     // Return the widget to show
     return Scaffold(
-      appBar: WidgetPrimaryAppBar(
-        title: Text('Edit Profile'),
-        actionButtons: [
-          // IconButton(
-          //   icon: const Icon(Icons.arrow_back),
-          //   onPressed: () => context.pop(),
-          // )
-        ],
-      ),
-      body: ScrollableBackground(
-        child: ScreenProfileSetup(
-          isAuth: false,
+      backgroundColor: const Color(0xFFF5F7FB),
+      appBar: WidgetPrimaryAppBar(title: const Text('Edit Profile')),
+      body: SafeArea(
+        child: Padding(
+          padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+          child: ScreenProfileSetup(isAuth: false),
         ),
-        padding: 20,
       ),
     );
   }

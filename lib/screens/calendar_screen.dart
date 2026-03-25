@@ -5,6 +5,7 @@ import 'package:intl/intl.dart';
 import '../main.dart';
 import '../models/gym_class.dart';
 import '../models/reservation.dart';
+import '../models/user_profile.dart';
 import '../providers/provider_reservations.dart';
 import 'class_detail_screen.dart';
 
@@ -17,15 +18,19 @@ class CalendarScreen extends ConsumerStatefulWidget {
 
 class _CalendarScreenState extends ConsumerState<CalendarScreen> {
   late DateTime _selectedDay;
+  late DateTime _visibleMonth;
 
   @override
   void initState() {
     super.initState();
     _selectedDay = _dateOnly(DateTime.now());
+    _visibleMonth = DateTime(_selectedDay.year, _selectedDay.month);
   }
 
   @override
   Widget build(BuildContext context) {
+    final userProfile = ref.watch(providerUserProfile);
+    final isStaff = userProfile.role == UserRole.STAFF;
     final reservations = ref.watch(reservationsProvider).reservations;
     final classes = ref.watch(providerGymClass).classes;
     final reservedClassIds = reservations
@@ -45,6 +50,89 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
     final upcomingReservations = reservations.where((reservation) {
       return !reservation.date.isBefore(_dateOnly(DateTime.now()));
     }).length;
+
+    if (isStaff) {
+      final selectedClasses =
+          classes
+              .where((gymClass) => _isSameDay(gymClass.dateTime, _selectedDay))
+              .toList()
+            ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+      final monthClasses = classes
+          .where(
+            (gymClass) =>
+                gymClass.dateTime.year == _visibleMonth.year &&
+                gymClass.dateTime.month == _visibleMonth.month,
+          )
+          .toList();
+
+      return SafeArea(
+        child: Container(
+          decoration: const BoxDecoration(
+            gradient: LinearGradient(
+              begin: Alignment.topCenter,
+              end: Alignment.bottomCenter,
+              colors: [Color(0xFFF3F7FF), Color(0xFFFFFFFF)],
+            ),
+          ),
+          child: ListView(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 24),
+            children: [
+              _StaffCalendarHero(
+                visibleMonth: _visibleMonth,
+                monthlyClassCount: monthClasses.length,
+              ),
+              const SizedBox(height: 14),
+              _StaffMonthCard(
+                visibleMonth: _visibleMonth,
+                selectedDay: _selectedDay,
+                classes: classes,
+                onPreviousMonth: () => setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month - 1,
+                  );
+                  _clampSelectionToVisibleMonth();
+                }),
+                onNextMonth: () => setState(() {
+                  _visibleMonth = DateTime(
+                    _visibleMonth.year,
+                    _visibleMonth.month + 1,
+                  );
+                  _clampSelectionToVisibleMonth();
+                }),
+                onSelectDay: (day) => setState(() => _selectedDay = day),
+              ),
+              const SizedBox(height: 18),
+              _SectionTitle(
+                title: 'Classes On ${DateFormat.MMMd().format(_selectedDay)}',
+                subtitle: selectedClasses.isEmpty
+                    ? 'No classes scheduled for this day.'
+                    : '${selectedClasses.length} class${selectedClasses.length == 1 ? '' : 'es'} scheduled. Tap a class to open details.',
+              ),
+              const SizedBox(height: 10),
+              if (selectedClasses.isEmpty)
+                const _EmptyCard(
+                  icon: Icons.calendar_view_month,
+                  title: 'No classes scheduled',
+                  message:
+                      'Select another day in the month view to check class coverage.',
+                )
+              else
+                ...selectedClasses.map(
+                  (gymClass) => Padding(
+                    padding: const EdgeInsets.only(bottom: 12),
+                    child: _ClassTile(
+                      gymClass: gymClass,
+                      isReserved: false,
+                      showTapHint: true,
+                    ),
+                  ),
+                ),
+            ],
+          ),
+        ),
+      );
+    }
 
     return SafeArea(
       child: Container(
@@ -135,6 +223,22 @@ class _CalendarScreenState extends ConsumerState<CalendarScreen> {
         ),
       ),
     );
+  }
+
+  void _clampSelectionToVisibleMonth() {
+    if (_selectedDay.year == _visibleMonth.year &&
+        _selectedDay.month == _visibleMonth.month) {
+      return;
+    }
+
+    final today = _dateOnly(DateTime.now());
+    if (today.year == _visibleMonth.year &&
+        today.month == _visibleMonth.month) {
+      _selectedDay = today;
+      return;
+    }
+
+    _selectedDay = DateTime(_visibleMonth.year, _visibleMonth.month, 1);
   }
 }
 
@@ -348,8 +452,13 @@ class _ReservationTile extends StatelessWidget {
 class _ClassTile extends ConsumerWidget {
   final GymClass gymClass;
   final bool isReserved;
+  final bool showTapHint;
 
-  const _ClassTile({required this.gymClass, required this.isReserved});
+  const _ClassTile({
+    required this.gymClass,
+    required this.isReserved,
+    this.showTapHint = true,
+  });
 
   @override
   Widget build(BuildContext context, WidgetRef ref) {
@@ -428,7 +537,306 @@ class _ClassTile extends ConsumerWidget {
                     ? const Color(0xFF166534)
                     : const Color(0xFF334155),
               ),
+              if (showTapHint) ...[
+                const SizedBox(width: 8),
+                const Icon(Icons.chevron_right, color: Color(0xFF94A3B8)),
+              ],
             ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _StaffCalendarHero extends StatelessWidget {
+  final DateTime visibleMonth;
+  final int monthlyClassCount;
+
+  const _StaffCalendarHero({
+    required this.visibleMonth,
+    required this.monthlyClassCount,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(20),
+      decoration: BoxDecoration(
+        borderRadius: BorderRadius.circular(28),
+        gradient: const LinearGradient(
+          begin: Alignment.topLeft,
+          end: Alignment.bottomRight,
+          colors: [Color(0xFF0F766E), Color(0xFF2563EB)],
+        ),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 18,
+            offset: Offset(0, 12),
+            color: Color(0x22133466),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text(
+            DateFormat('MMMM yyyy').format(visibleMonth),
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 28,
+              fontWeight: FontWeight.w800,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Text(
+            monthlyClassCount == 0
+                ? 'No classes are scheduled this month.'
+                : '$monthlyClassCount class${monthlyClassCount == 1 ? '' : 'es'} scheduled this month.',
+            style: const TextStyle(
+              color: Color(0xE8FFFFFF),
+              fontSize: 15,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffMonthCard extends StatelessWidget {
+  final DateTime visibleMonth;
+  final DateTime selectedDay;
+  final List<GymClass> classes;
+  final VoidCallback onPreviousMonth;
+  final VoidCallback onNextMonth;
+  final ValueChanged<DateTime> onSelectDay;
+
+  const _StaffMonthCard({
+    required this.visibleMonth,
+    required this.selectedDay,
+    required this.classes,
+    required this.onPreviousMonth,
+    required this.onNextMonth,
+    required this.onSelectDay,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final firstDayOfMonth = DateTime(visibleMonth.year, visibleMonth.month, 1);
+    final startOffset = firstDayOfMonth.weekday % 7;
+    final gridStart = firstDayOfMonth.subtract(Duration(days: startOffset));
+    final today = _dateOnly(DateTime.now());
+
+    return Container(
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: Colors.white,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: const [
+          BoxShadow(
+            blurRadius: 14,
+            offset: Offset(0, 8),
+            color: Color(0x12000000),
+          ),
+        ],
+      ),
+      child: Column(
+        children: [
+          Row(
+            children: [
+              IconButton(
+                onPressed: onPreviousMonth,
+                icon: const Icon(Icons.chevron_left),
+              ),
+              Expanded(
+                child: Text(
+                  DateFormat('MMMM yyyy').format(visibleMonth),
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    fontSize: 18,
+                    fontWeight: FontWeight.w800,
+                    color: Color(0xFF0F172A),
+                  ),
+                ),
+              ),
+              IconButton(
+                onPressed: onNextMonth,
+                icon: const Icon(Icons.chevron_right),
+              ),
+            ],
+          ),
+          const SizedBox(height: 8),
+          const Align(
+            alignment: Alignment.centerLeft,
+            child: Text(
+              'Tap any day to load that class list below.',
+              style: TextStyle(
+                fontSize: 13,
+                color: Color(0xFF64748B),
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+          const SizedBox(height: 12),
+          Row(
+            children: List.generate(7, (index) {
+              final weekday = DateFormat(
+                'E',
+              ).format(DateTime(2024, 1, index + 7));
+              return Expanded(
+                child: Center(
+                  child: Text(
+                    weekday.substring(0, 1),
+                    style: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                      color: Color(0xFF64748B),
+                    ),
+                  ),
+                ),
+              );
+            }),
+          ),
+          const SizedBox(height: 10),
+          ...List.generate(6, (row) {
+            return Padding(
+              padding: EdgeInsets.only(bottom: row == 5 ? 0 : 8),
+              child: Row(
+                children: List.generate(7, (column) {
+                  final day = _dateOnly(
+                    gridStart.add(Duration(days: row * 7 + column)),
+                  );
+                  final classCount = classes
+                      .where((gymClass) => _isSameDay(gymClass.dateTime, day))
+                      .length;
+                  return Expanded(
+                    child: Padding(
+                      padding: const EdgeInsets.symmetric(horizontal: 2),
+                      child: _StaffDayCell(
+                        day: day,
+                        isCurrentMonth: day.month == visibleMonth.month,
+                        isSelected: _isSameDay(day, selectedDay),
+                        isToday: _isSameDay(day, today),
+                        classCount: classCount,
+                        onTap: () => onSelectDay(day),
+                      ),
+                    ),
+                  );
+                }),
+              ),
+            );
+          }),
+        ],
+      ),
+    );
+  }
+}
+
+class _StaffDayCell extends StatelessWidget {
+  final DateTime day;
+  final bool isCurrentMonth;
+  final bool isSelected;
+  final bool isToday;
+  final int classCount;
+  final VoidCallback onTap;
+
+  const _StaffDayCell({
+    required this.day,
+    required this.isCurrentMonth,
+    required this.isSelected,
+    required this.isToday,
+    required this.classCount,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final foreground = !isCurrentMonth
+        ? const Color(0xFF94A3B8)
+        : isSelected
+        ? Colors.white
+        : const Color(0xFF0F172A);
+
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(16),
+        child: Container(
+          height: 52,
+          decoration: BoxDecoration(
+            color: isSelected
+                ? const Color(0xFF0F172A)
+                : const Color(0xFFF8FAFC),
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(
+              color: isToday
+                  ? const Color(0xFF2563EB)
+                  : isSelected
+                  ? const Color(0xFF0F172A)
+                  : const Color(0xFFE2E8F0),
+            ),
+          ),
+          child: Padding(
+            padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 5),
+            child: Stack(
+              children: [
+                Align(
+                  alignment: Alignment.topLeft,
+                  child: Text(
+                    '${day.day}',
+                    style: TextStyle(
+                      fontSize: 14,
+                      fontWeight: FontWeight.w800,
+                      color: foreground,
+                    ),
+                  ),
+                ),
+                if (classCount > 0)
+                  Align(
+                    alignment: Alignment.bottomRight,
+                    child: Container(
+                      constraints: const BoxConstraints(
+                        minWidth: 14,
+                        minHeight: 14,
+                      ),
+                      padding: const EdgeInsets.symmetric(
+                        horizontal: 4,
+                        vertical: 1,
+                      ),
+                      decoration: BoxDecoration(
+                        color: isSelected
+                            ? Colors.white.withValues(alpha: 0.18)
+                            : const Color(0xFFE0F2FE),
+                        borderRadius: BorderRadius.circular(999),
+                      ),
+                      child: Text(
+                        classCount > 9 ? '9+' : '$classCount',
+                        textAlign: TextAlign.center,
+                        style: TextStyle(
+                          fontSize: 9,
+                          fontWeight: FontWeight.w700,
+                          color: isSelected
+                              ? Colors.white
+                              : const Color(0xFF0369A1),
+                        ),
+                      ),
+                    ),
+                  ),
+                if (isToday && !isSelected)
+                  const Align(
+                    alignment: Alignment.topRight,
+                    child: Icon(
+                      Icons.circle,
+                      size: 8,
+                      color: Color(0xFF2563EB),
+                    ),
+                  ),
+              ],
+            ),
           ),
         ),
       ),
