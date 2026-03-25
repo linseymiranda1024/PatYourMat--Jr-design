@@ -62,11 +62,15 @@ class ReservationsNotifier extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<String?> registerForClass(GymClass gymClass) async {
+  Future<String?> registerForClass(GymClass gymClass, {String? matNumber}) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
 
-    return await DBReservations.registerForClass(user.uid, gymClass);
+    return await DBReservations.registerForClass(
+      user.uid,
+      gymClass,
+      matNumber: matNumber,
+    );
   }
 
   Future<void> cancelReservation(Reservation reservation) async {

@@ -9,23 +9,58 @@ class DBReservations {
   static const String _classesCollection = 'classes';
   static const String _registrationsCollection = 'registrations';
 
-  static Future<String?> registerForClass(String userId, GymClass gymClass) async {
-    final mat = Random().nextInt(30) + 1;
-    final matNumber = 'Mat #$mat';
+  static Future<String?> registerForClass(
+    String userId,
+    GymClass gymClass, {
+    String? matNumber,
+  }) async {
+    final selectedMatNumber =
+        matNumber ?? 'Mat #${Random().nextInt(gymClass.capacity.clamp(1, 30)) + 1}';
     final checkInCode = 'CHECKIN-${Random().nextInt(900000) + 100000}';
 
     try {
-      await _registerWithClassTracking(userId, gymClass, matNumber, checkInCode);
-      return matNumber;
+      await _registerWithClassTracking(
+        userId,
+        gymClass,
+        selectedMatNumber,
+        checkInCode,
+      );
+      return selectedMatNumber;
     } on FirebaseException catch (e) {
       // Some projects allow users to write profile registrations but not class counters.
       // If so, still register the user so profile/confirmation flow works.
       if (e.code == 'permission-denied') {
-        await _registerUserOnly(userId, gymClass, matNumber, checkInCode);
-        return matNumber;
+        await _registerUserOnly(
+          userId,
+          gymClass,
+          selectedMatNumber,
+          checkInCode,
+        );
+        return selectedMatNumber;
       }
       throw Exception(_friendlyFirestoreError(e));
     }
+  }
+
+  static Stream<Set<int>> getReservedMatNumbersStream(String classId) {
+    return _db
+        .collection(_classesCollection)
+        .doc(classId)
+        .collection(_registrationsCollection)
+        .snapshots()
+        .map((snapshot) {
+          final reserved = <int>{};
+          for (final doc in snapshot.docs) {
+            final raw = doc.data()['matNumber'];
+            if (raw is! String) continue;
+            final match = RegExp(r'(\d+)').firstMatch(raw);
+            final number = int.tryParse(match?.group(1) ?? '');
+            if (number != null) {
+              reserved.add(number);
+            }
+          }
+          return reserved;
+        });
   }
 
   static Stream<List<Reservation>> getReservationsStream(String userId) {
@@ -155,9 +190,25 @@ class DBReservations {
       final data = classSnap.data() as Map<String, dynamic>;
       final capacity = _asInt(data['capacity']);
       final currentFilled = _asInt(data['filled'] ?? data['registeredCount']);
+      final classRegistrationSnap = await transaction.get(classRegistrationRef);
 
       if (capacity <= 0 || currentFilled >= capacity) {
         throw Exception('The class is already at full capacity.');
+      }
+      if (classRegistrationSnap.exists) {
+        throw Exception('You are already registered for this class.');
+      }
+
+      final existingMats = _extractReservedMats(
+        (await _db
+                .collection(_classesCollection)
+                .doc(gymClass.id)
+                .collection(_registrationsCollection)
+                .get())
+            .docs,
+      );
+      if (existingMats.contains(matNumber)) {
+        throw Exception('That mat is already reserved.');
       }
 
       final nextFilled = currentFilled + 1;
@@ -168,6 +219,7 @@ class DBReservations {
       transaction.set(classRegistrationRef, {
         'userId': userId,
         'classId': gymClass.id,
+        'matNumber': matNumber,
         'createdAt': FieldValue.serverTimestamp(),
       });
       transaction.update(classRef, {
@@ -216,5 +268,14 @@ class DBReservations {
       'classId': gymClass.id,
       'createdAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  static Set<String> _extractReservedMats(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs
+        .map((doc) => doc.data()['matNumber'])
+        .whereType<String>()
+        .toSet();
   }
 }

@@ -2,10 +2,11 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../db_helpers/db_gym_class.dart';
 import '../main.dart';
 import '../models/gym_class.dart';
 import '../providers/provider_reservations.dart';
-import '../db_helpers/db_gym_class.dart';
+import 'mat_selection_screen.dart';
 import 'reservation_confirmation_screen.dart';
 
 class ClassDetailScreen extends ConsumerStatefulWidget {
@@ -45,7 +46,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       }
     } catch (e) {
       if (mounted) {
-        String message = e.toString();
+        var message = e.toString();
         if (message.startsWith('Exception: ')) {
           message = message.replaceFirst('Exception: ', '');
         }
@@ -79,7 +80,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         return Scaffold(
           body: Stack(
             children: [
-              // Purple gradient header background
               Container(
                 height: 220,
                 decoration: const BoxDecoration(
@@ -90,11 +90,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                   ),
                 ),
               ),
-
               SafeArea(
                 child: Column(
                   children: [
-                    // Back button + title
                     Padding(
                       padding: const EdgeInsets.symmetric(
                         horizontal: 8,
@@ -124,8 +122,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                         ],
                       ),
                     ),
-
-                    // White content area
                     Expanded(
                       child: Container(
                         decoration: const BoxDecoration(
@@ -139,7 +135,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
                             children: [
-                              // ── Class Status ────────────────────────────────────────
                               const Text(
                                 'Class Status',
                                 style: TextStyle(
@@ -148,7 +143,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-
                               Row(
                                 mainAxisAlignment:
                                     MainAxisAlignment.spaceBetween,
@@ -192,9 +186,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   ),
                                 ],
                               ),
-
                               const SizedBox(height: 12),
-
                               ClipRRect(
                                 borderRadius: BorderRadius.circular(12),
                                 child: LinearProgressIndicator(
@@ -208,7 +200,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   ),
                                 ),
                               ),
-
                               const SizedBox(height: 8),
                               Text(
                                 '${gClass.filled} / ${gClass.capacity} registered',
@@ -217,10 +208,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   fontSize: 14,
                                 ),
                               ),
-
                               const SizedBox(height: 32),
-
-                              // ── Class Information ───────────────────────────────────
                               const Text(
                                 'Class Information',
                                 style: TextStyle(
@@ -229,7 +217,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 16),
-
+                              _buildInfoRow(
+                                Icons.category_outlined,
+                                'Type',
+                                gClass.type,
+                              ),
                               _buildInfoRow(
                                 Icons.person_outline,
                                 'Instructor',
@@ -255,10 +247,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 'Capacity',
                                 '${gClass.capacity} mats',
                               ),
-
                               const SizedBox(height: 32),
-
-                              // ── About This Class ────────────────────────────────────
                               const Text(
                                 'About This Class',
                                 style: TextStyle(
@@ -267,22 +256,17 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 ),
                               ),
                               const SizedBox(height: 12),
-
-                              const Text(
-                                'Join us for an energizing session!\n'
-                                'This class is perfect for all levels and focuses on '
-                                'building strength, flexibility, and mindfulness.\n\n'
-                                'Bring your water bottle and get ready to sweat!',
-                                style: TextStyle(
+                              Text(
+                                gClass.description.isEmpty
+                                    ? 'Class details will be added soon.'
+                                    : gClass.description,
+                                style: const TextStyle(
                                   fontSize: 16,
                                   height: 1.45,
                                   color: Colors.black87,
                                 ),
                               ),
-
                               const SizedBox(height: 48),
-
-                              // ── Reserve Button ──────────────────────────────────────
                               SizedBox(
                                 width: double.infinity,
                                 height: 56,
@@ -314,6 +298,30 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 54,
+                                child: OutlinedButton.icon(
+                                  onPressed: () {
+                                    context.push(
+                                      MatSelectionScreen.routeName,
+                                      extra: gClass,
+                                    );
+                                  },
+                                  icon: const Icon(Icons.grid_view_rounded),
+                                  label: const Text('Choose Your Mat'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: const Color(0xFF6200EE),
+                                    side: const BorderSide(
+                                      color: Color(0xFF6200EE),
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],

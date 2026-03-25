@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:pat_your_mat/screens/class_detail_screen.dart';
+import 'package:pat_your_mat/screens/mat_selection_screen.dart';
 import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
 import 'models/gym_class.dart';
 
@@ -141,6 +142,13 @@ class _MyAppState extends State<MyApp> {
         builder: (context, state) {
           final gymClass = state.extra as GymClass;
           return ClassDetailScreen(gymClass: gymClass);
+        },
+      ),
+      GoRoute(
+        path: MatSelectionScreen.routeName,
+        builder: (context, state) {
+          final gymClass = state.extra as GymClass;
+          return MatSelectionScreen(gymClass: gymClass);
         },
       ),
       GoRoute(

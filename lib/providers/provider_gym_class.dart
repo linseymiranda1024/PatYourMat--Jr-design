@@ -1,8 +1,9 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
-import '../models/gym_class.dart';
+
 import '../db_helpers/db_gym_class.dart';
+import '../models/gym_class.dart';
 
 class ProviderGymClass extends ChangeNotifier {
   List<GymClass> _classes = [];
@@ -102,6 +103,8 @@ class ProviderGymClass extends ChangeNotifier {
     _classes[index] = GymClass(
       id: existing.id,
       title: existing.title,
+      type: existing.type,
+      description: existing.description,
       instructor: existing.instructor,
       dateTime: existing.dateTime,
       durationMinutes: existing.durationMinutes,

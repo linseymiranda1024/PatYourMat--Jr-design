@@ -1,8 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import 'screen_create_class.dart';
+
 import '../../main.dart';
+import 'screen_create_class.dart';
 
 class ScreenStaffPortal extends ConsumerWidget {
   static const routeName = '/staff_portal';
@@ -62,8 +63,6 @@ class ScreenStaffPortal extends ConsumerWidget {
               ],
             ),
             const SizedBox(height: 32),
-
-            // Stats Row
             Row(
               children: [
                 _buildStatCard(
@@ -99,14 +98,12 @@ class ScreenStaffPortal extends ConsumerWidget {
                 ),
               ],
             ),
-
             const SizedBox(height: 40),
             const Text(
               'Class Management',
               style: TextStyle(fontSize: 22, fontWeight: FontWeight.bold),
             ),
             const SizedBox(height: 16),
-
             if (gymClassProvider.isLoading)
               const Center(child: CircularProgressIndicator())
             else if (classes.isEmpty)
@@ -119,6 +116,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                       ref,
                       c.id,
                       c.title,
+                      c.type,
                       c.instructor,
                       c.timeText,
                       '${c.filled}/${c.capacity}',
@@ -172,6 +170,7 @@ class ScreenStaffPortal extends ConsumerWidget {
     WidgetRef ref,
     String id,
     String title,
+    String type,
     String instructor,
     String time,
     String filled,
@@ -204,7 +203,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                   ),
                 ),
                 Text(
-                  '$instructor • $time',
+                  '$type • $instructor • $time',
                   style: const TextStyle(color: Colors.black54),
                 ),
               ],

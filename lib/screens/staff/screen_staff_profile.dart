@@ -1,14 +1,16 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
-import '../../providers/provider_user_profile.dart';
+
+import '../../main.dart';
+import '../../models/gym_class.dart' as model;
+import '../../models/user_profile.dart';
 import '../../providers/provider_auth.dart';
 import '../../providers/provider_gym_class.dart';
-import '../../models/user_profile.dart';
-import '../../models/gym_class.dart' as model;
+import '../../providers/provider_user_profile.dart';
 import '../../widgets/general/widget_profile_avatar.dart';
 import '../settings/screen_profile_edit.dart';
-import '../../main.dart';
+import 'screen_create_class.dart';
 
 class ScreenStaffProfile extends ConsumerWidget {
   static const routeName = '/staff_profile';
@@ -259,7 +261,7 @@ class ScreenStaffProfile extends ConsumerWidget {
         children: [
           _buildStatTile("Total Taught", "142", Icons.fitness_center),
           _buildStatTile("Avg Atten.", "18", Icons.people),
-          _buildStatTile("Avg Rating", "4.9 ⭐", Icons.star),
+          _buildStatTile("Avg Rating", "4.9", Icons.star),
           _buildStatTile("Popular", "Power Yoga", Icons.trending_up),
         ],
       ),
@@ -286,7 +288,7 @@ class ScreenStaffProfile extends ConsumerWidget {
             ],
           ),
           child: ElevatedButton(
-            onPressed: () {},
+            onPressed: () => context.push(ScreenCreateClass.routeName),
             style: ElevatedButton.styleFrom(
               backgroundColor: Colors.transparent,
               shadowColor: Colors.transparent,
@@ -412,11 +414,13 @@ class ScreenStaffProfile extends ConsumerWidget {
           Row(
             mainAxisAlignment: MainAxisAlignment.spaceBetween,
             children: [
-              Text(
-                c.title,
-                style: const TextStyle(
-                  fontWeight: FontWeight.bold,
-                  fontSize: 16,
+              Expanded(
+                child: Text(
+                  c.title,
+                  style: const TextStyle(
+                    fontWeight: FontWeight.bold,
+                    fontSize: 16,
+                  ),
                 ),
               ),
               Text(
@@ -427,7 +431,7 @@ class ScreenStaffProfile extends ConsumerWidget {
           ),
           const SizedBox(height: 4),
           Text(
-            "${c.dateText} • ${c.location}",
+            "${c.type} • ${c.dateText} • ${c.location}",
             style: const TextStyle(color: Colors.black45, fontSize: 13),
           ),
           const SizedBox(height: 8),
