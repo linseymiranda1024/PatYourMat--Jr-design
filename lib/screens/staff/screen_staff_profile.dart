@@ -9,6 +9,7 @@ import '../../providers/provider_auth.dart';
 import '../../providers/provider_user_profile.dart';
 import '../../widgets/general/widget_profile_avatar.dart';
 import '../settings/screen_profile_edit.dart';
+import '../settings/screen_settings.dart';
 import 'screen_create_class.dart';
 
 class ScreenStaffProfile extends ConsumerWidget {
@@ -26,15 +27,6 @@ class ScreenStaffProfile extends ConsumerWidget {
       return gymClass.dateTime.isAfter(DateTime.now());
     }).toList()..sort((a, b) => a.dateTime.compareTo(b.dateTime));
 
-    final totalCapacity = managedClasses.fold<int>(
-      0,
-      (total, gymClass) => total + gymClass.capacity,
-    );
-    final totalFilled = managedClasses.fold<int>(
-      0,
-      (total, gymClass) => total + gymClass.filled,
-    );
-
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
       body: SafeArea(
@@ -45,14 +37,7 @@ class ScreenStaffProfile extends ConsumerWidget {
             children: [
               _buildHeader(context, profile),
               const SizedBox(height: 20),
-              _buildStatsSection(
-                managedClasses: managedClasses,
-                upcomingCount: upcomingClasses.length,
-                totalFilled: totalFilled,
-                occupancy: totalCapacity == 0
-                    ? '0%'
-                    : '${((totalFilled / totalCapacity) * 100).round()}%',
-              ),
+              _buildAccountSection(context, profile),
               const SizedBox(height: 20),
               _buildManagementTools(context, auth, profile),
               const SizedBox(height: 20),
@@ -119,15 +104,15 @@ class ScreenStaffProfile extends ConsumerWidget {
                           label: profile.isActiveInstructor
                               ? 'ACTIVE STAFF'
                               : 'STAFF',
-                          background: const Color(0x1AFFFFFF),
-                          foreground: Colors.white,
+                          background: const Color(0xFFF8FAFF),
+                          foreground: const Color(0xFF2F3D5C),
                         ),
                         _buildHeaderBadge(
                           label: profile.allowClassCreation
                               ? 'CAN CREATE CLASSES'
                               : 'PROFILE ACCESS',
-                          background: const Color(0x26FFC857),
-                          foreground: const Color(0xFFFFD87E),
+                          background: const Color(0xFFFFD27A),
+                          foreground: const Color(0xFF5E3A00),
                         ),
                       ],
                     ),
@@ -162,9 +147,9 @@ class ScreenStaffProfile extends ConsumerWidget {
     return Container(
       padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 7),
       decoration: BoxDecoration(
-        color: background.withValues(alpha: 0.90),
+        color: background,
         borderRadius: BorderRadius.circular(999),
-        border: Border.all(color: foreground.withValues(alpha: 0.18)),
+        border: Border.all(color: foreground.withValues(alpha: 0.14)),
       ),
       child: Text(
         label,
@@ -174,57 +159,6 @@ class ScreenStaffProfile extends ConsumerWidget {
           fontWeight: FontWeight.w800,
           letterSpacing: 0.2,
         ),
-      ),
-    );
-  }
-
-  Widget _buildStatsSection({
-    required List<GymClass> managedClasses,
-    required int upcomingCount,
-    required int totalFilled,
-    required String occupancy,
-  }) {
-    return _buildPanel(
-      title: 'Teaching Snapshot',
-      subtitle: 'Only real class data tied to your instructor profile.',
-      child: LayoutBuilder(
-        builder: (context, constraints) {
-          final crossAxisCount = constraints.maxWidth < 360 ? 1 : 2;
-          return GridView.count(
-            shrinkWrap: true,
-            physics: const NeverScrollableScrollPhysics(),
-            crossAxisCount: crossAxisCount,
-            crossAxisSpacing: 12,
-            mainAxisSpacing: 12,
-            mainAxisExtent: 118,
-            children: [
-              _buildStatTile(
-                label: 'Classes Assigned',
-                value: '${managedClasses.length}',
-                icon: Icons.class_outlined,
-                accent: AppColors.deepPurple,
-              ),
-              _buildStatTile(
-                label: 'Upcoming Classes',
-                value: '$upcomingCount',
-                icon: Icons.schedule_outlined,
-                accent: const Color(0xFF1F8F71),
-              ),
-              _buildStatTile(
-                label: 'Total Seats Filled',
-                value: '$totalFilled',
-                icon: Icons.people_outline,
-                accent: const Color(0xFFC77718),
-              ),
-              _buildStatTile(
-                label: 'Average Occupancy',
-                value: occupancy,
-                icon: Icons.analytics_outlined,
-                accent: AppColors.primaryPurple,
-              ),
-            ],
-          );
-        },
       ),
     );
   }
@@ -250,18 +184,8 @@ class ScreenStaffProfile extends ConsumerWidget {
           _buildToolRow(
             icon: Icons.person_outline,
             label: 'Edit Profile',
-            description: 'Update contact details and profile image.',
+            description: 'Update contact details, bio, and staff info.',
             accent: const Color(0xFF1F8F71),
-            onTap: () => context.push(ScreenProfileEdit.routeName),
-          ),
-          const SizedBox(height: 10),
-          _buildToolRow(
-            icon: Icons.edit_note,
-            label: 'Edit Bio',
-            description: profile.bio.isEmpty
-                ? 'Add staff bio details.'
-                : 'Refresh the bio shown to members.',
-            accent: const Color(0xFFC77718),
             onTap: () => context.push(ScreenProfileEdit.routeName),
           ),
           const SizedBox(height: 10),
@@ -274,6 +198,47 @@ class ScreenStaffProfile extends ConsumerWidget {
             onTap: () => auth.promptAndClearAuthedUserDetailsAndSignout(
               context: context,
             ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAccountSection(
+    BuildContext context,
+    ProviderUserProfile profile,
+  ) {
+    return _buildPanel(
+      title: 'Account & Preferences',
+      subtitle: 'Basic profile access for staff accounts.',
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: double.infinity,
+            padding: const EdgeInsets.all(16),
+            decoration: BoxDecoration(
+              color: const Color(0xFFF7F9FD),
+              borderRadius: BorderRadius.circular(20),
+              border: Border.all(color: const Color(0xFFE6ECF5)),
+            ),
+            child: Column(
+              children: [
+                _buildAccountRow(
+                  icon: Icons.mail_outline,
+                  label: 'Email',
+                  value: profile.email.isEmpty ? 'Not provided' : profile.email,
+                ),
+              ],
+            ),
+          ),
+          const SizedBox(height: 18),
+          _buildToolRow(
+            icon: Icons.settings_outlined,
+            label: 'Settings',
+            description: 'Manage app and account preferences.',
+            accent: AppColors.primaryPurple,
+            onTap: () => context.push(ScreenSettings.routeName),
           ),
         ],
       ),
@@ -357,44 +322,72 @@ class ScreenStaffProfile extends ConsumerWidget {
     );
   }
 
-  Widget _buildStatTile({
+  Widget _buildAccountRow({
+    required IconData icon,
     required String label,
     required String value,
-    required IconData icon,
-    required Color accent,
+    String? supportingText,
+    Color valueColor = const Color(0xFF111827),
   }) {
-    return Container(
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: accent.withValues(alpha: 0.08),
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: accent.withValues(alpha: 0.14)),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        mainAxisAlignment: MainAxisAlignment.center,
-        children: [
-          Icon(icon, size: 20, color: accent),
-          const SizedBox(height: 10),
-          Text(
-            value,
-            maxLines: 1,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          padding: const EdgeInsets.all(10),
+          decoration: BoxDecoration(
+            color: AppColors.deepPurple.withValues(alpha: 0.08),
+            borderRadius: BorderRadius.circular(14),
           ),
-          const SizedBox(height: 4),
-          Text(
-            label,
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: const TextStyle(
-              fontSize: 12,
-              color: Color(0xFF4B5563),
-              fontWeight: FontWeight.w600,
-            ),
+          child: Icon(icon, color: AppColors.deepPurple, size: 20),
+        ),
+        const SizedBox(width: 14),
+        Expanded(
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text(
+                label,
+                style: const TextStyle(
+                  fontSize: 13,
+                  fontWeight: FontWeight.w700,
+                  color: Color(0xFF5D6470),
+                ),
+              ),
+              const SizedBox(height: 2),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  return SizedBox(
+                    width: constraints.maxWidth,
+                    child: FittedBox(
+                      fit: BoxFit.scaleDown,
+                      alignment: Alignment.centerLeft,
+                      child: Text(
+                        value,
+                        maxLines: 1,
+                        style: TextStyle(
+                          fontSize: 15,
+                          fontWeight: FontWeight.w800,
+                          color: valueColor,
+                        ),
+                      ),
+                    ),
+                  );
+                },
+              ),
+              if (supportingText != null) ...[
+                const SizedBox(height: 2),
+                Text(
+                  supportingText,
+                  style: const TextStyle(
+                    color: Color(0xFF5D6470),
+                    height: 1.35,
+                  ),
+                ),
+              ],
+            ],
           ),
-        ],
-      ),
+        ),
+      ],
     );
   }
 

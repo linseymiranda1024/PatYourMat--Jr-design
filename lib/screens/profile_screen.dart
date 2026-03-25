@@ -39,6 +39,10 @@ class ProfileScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context, profile),
+              if (profile.bio.trim().isNotEmpty) ...[
+                const SizedBox(height: 20),
+                _buildBioSection(profile.bio.trim()),
+              ],
               const SizedBox(height: 20),
               _buildStatsSection(
                 reservations: reservations,
@@ -229,6 +233,21 @@ class ProfileScreen extends ConsumerWidget {
           ),
         );
       },
+    );
+  }
+
+  Widget _buildBioSection(String bio) {
+    return _buildSectionCard(
+      title: 'About You',
+      subtitle: '',
+      child: Text(
+        bio,
+        style: const TextStyle(
+          fontSize: 15,
+          height: 1.5,
+          color: Color(0xFF39414D),
+        ),
+      ),
     );
   }
 
@@ -491,11 +510,9 @@ class ProfileScreen extends ConsumerWidget {
     ProviderUserProfile profile,
     ProviderAuth auth,
   ) {
-    final hasPhone = profile.phoneNumber.trim().isNotEmpty;
-
     return _buildSectionCard(
       title: 'Account & Info',
-      subtitle: 'Contact details and quick account actions.',
+      subtitle: 'Account details and quick actions.',
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
@@ -514,21 +531,6 @@ class ProfileScreen extends ConsumerWidget {
                   label: 'Email',
                   value: profile.email.isEmpty ? 'Not provided' : profile.email,
                 ),
-                const Padding(
-                  padding: EdgeInsets.symmetric(vertical: 14),
-                  child: Divider(height: 1, color: Color(0xFFE1E7F0)),
-                ),
-                _buildAccountRow(
-                  icon: Icons.call_outlined,
-                  label: 'Phone',
-                  value: hasPhone ? profile.phoneNumber : 'Add phone number',
-                  supportingText: hasPhone
-                      ? 'Saved on your profile.'
-                      : 'Open Edit Profile to add one.',
-                  valueColor: hasPhone
-                      ? const Color(0xFF111827)
-                      : AppColors.deepPurple,
-                ),
               ],
             ),
           ),
@@ -542,20 +544,6 @@ class ProfileScreen extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 18),
-          _buildActionTile(
-            icon: Icons.person_outline,
-            label: 'Edit Profile',
-            subtitle: 'Update your photo, name, and phone number.',
-            onTap: () => context.push(ScreenProfileEdit.routeName),
-          ),
-          const SizedBox(height: 10),
-          _buildActionTile(
-            icon: Icons.settings_outlined,
-            label: 'Settings',
-            subtitle: 'Manage app and account preferences.',
-            onTap: () => context.push(ScreenSettings.routeName),
-          ),
-          const SizedBox(height: 10),
           _buildActionTile(
             icon: Icons.logout,
             label: 'Log Out',
@@ -575,6 +563,8 @@ class ProfileScreen extends ConsumerWidget {
     required String subtitle,
     required Widget child,
   }) {
+    final hasSubtitle = subtitle.trim().isNotEmpty;
+
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -596,12 +586,15 @@ class ProfileScreen extends ConsumerWidget {
             title,
             style: const TextStyle(fontSize: 20, fontWeight: FontWeight.w800),
           ),
-          const SizedBox(height: 4),
-          Text(
-            subtitle,
-            style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
-          ),
-          const SizedBox(height: 18),
+          if (hasSubtitle) ...[
+            const SizedBox(height: 4),
+            Text(
+              subtitle,
+              style: const TextStyle(color: Color(0xFF5D6470), height: 1.4),
+            ),
+            const SizedBox(height: 18),
+          ] else
+            const SizedBox(height: 14),
           child,
         ],
       ),
@@ -636,14 +629,14 @@ class ProfileScreen extends ConsumerWidget {
       crossAxisAlignment: CrossAxisAlignment.start,
       children: [
         Container(
-          padding: const EdgeInsets.all(10),
+          padding: const EdgeInsets.all(8),
           decoration: BoxDecoration(
             color: const Color(0xFFF3F6FB),
-            borderRadius: BorderRadius.circular(14),
+            borderRadius: BorderRadius.circular(12),
           ),
           child: Icon(icon, size: 18, color: const Color(0xFF2957C8)),
         ),
-        const SizedBox(width: 12),
+        const SizedBox(width: 10),
         Expanded(
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
@@ -651,18 +644,18 @@ class ProfileScreen extends ConsumerWidget {
               Text(
                 label,
                 style: const TextStyle(
-                  fontSize: 13,
+                  fontSize: 12,
                   color: Color(0xFF5D6470),
                   fontWeight: FontWeight.w600,
                 ),
               ),
-              const SizedBox(height: 2),
-              Text(
+              const SizedBox(height: 4),
+              _buildScaledSingleLineText(
                 value,
-                softWrap: true,
+                alignment: Alignment.centerLeft,
                 style: TextStyle(
-                  fontSize: 15,
-                  height: 1.3,
+                  fontSize: 14,
+                  height: 1.15,
                   color: valueColor ?? const Color(0xFF111827),
                   fontWeight: FontWeight.w600,
                 ),
@@ -708,11 +701,9 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ),
         const SizedBox(height: 8),
-        Text(
+        _buildScaledSingleLineText(
           profile.email.isEmpty ? 'No email on file' : profile.email,
-          maxLines: 1,
-          overflow: TextOverflow.ellipsis,
-          textAlign: isCompact ? TextAlign.center : TextAlign.start,
+          alignment: isCompact ? Alignment.center : Alignment.centerLeft,
           style: TextStyle(
             fontSize: isCompact ? 14 : 15,
             height: 1.2,
@@ -733,6 +724,25 @@ class ProfileScreen extends ConsumerWidget {
           ),
         ],
       ],
+    );
+  }
+
+  Widget _buildScaledSingleLineText(
+    String text, {
+    required TextStyle style,
+    required Alignment alignment,
+  }) {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        return SizedBox(
+          width: constraints.maxWidth,
+          child: FittedBox(
+            fit: BoxFit.scaleDown,
+            alignment: alignment,
+            child: Text(text, maxLines: 1, softWrap: false, style: style),
+          ),
+        );
+      },
     );
   }
 

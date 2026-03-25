@@ -11,7 +11,6 @@
 //////////////////////////////////////////////////////////////////////////
 // Flutter external package imports
 import 'package:flutter_riverpod/flutter_riverpod.dart';
-import 'package:firebase_auth/firebase_auth.dart';
 import 'package:image_picker/image_picker.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/cupertino.dart';
@@ -57,11 +56,9 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   bool editingPicture = false;
 
   // Finals used in this widget
-  final _auth = FirebaseAuth.instance;
   final _formKey = GlobalKey<FormState>();
   final _firstNameController = TextEditingController();
   final _lastNameController = TextEditingController();
-  final _phoneNumberController = TextEditingController();
   final _bioController = TextEditingController();
 
   ////////////////////////////////////////////////////////////////
@@ -77,7 +74,6 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       if (!widget.isAuth) {
         _firstNameController.text = _providerUserProfile.firstName;
         _lastNameController.text = _providerUserProfile.lastName;
-        _phoneNumberController.text = _providerUserProfile.phoneNumber;
         _bioController.text = _providerUserProfile.bio;
       }
 
@@ -112,89 +108,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   void dispose() {
     _firstNameController.dispose();
     _lastNameController.dispose();
-    _phoneNumberController.dispose();
     _bioController.dispose();
     super.dispose();
-  }
-
-  ////////////////////////////////////////////////////////////////
-  // Attempts to either login to existing account or signup for
-  // new account.
-  ////////////////////////////////////////////////////////////////
-  void _submitAuthForm(
-    String email,
-    String password,
-    bool isLogin,
-    BuildContext ctx,
-  ) async {
-    try {
-      // Update screen to indicate loading spinner
-      setState(() {});
-
-      // If in "login mode", attempt to login with email/password...
-      User? user = _auth.currentUser;
-      if (isLogin) {
-        // Attempt login
-        String errorMessage = (await _providerAuth.signinWithPassword(
-          email,
-          password,
-          _providerUserProfile.role,
-        )).trim();
-
-        // If there was an error, display it...otherwise return true for success
-        if (errorMessage.isNotEmpty) {
-          //Snackbar.show(SnackbarDisplayType.SB_ERROR, errorMessage, false, context);
-          setState(() {});
-        }
-
-        // }
-      } else {
-        // ...otherwise, attempt to create a new account
-        // Attempt to create a new account
-        await _auth.createUserWithEmailAndPassword(
-          email: email,
-          password: password,
-        );
-
-        // Send verification e-mail and create initial user profile
-        try {
-          await FirebaseAuth.instance.currentUser?.sendEmailVerification();
-          _providerUserProfile.email = user?.email ?? email;
-          _providerUserProfile.accountCreationStep =
-              AccountCreationStep.ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO;
-          await _providerUserProfile.writeUserProfileToDb();
-          _providerAuth.isSigningIn = false;
-        } catch (e) {
-          AppLogger.warning(
-            "Issue with sending email verification or writing to user profile.  email: $e",
-          );
-        }
-
-        // ...and send verification email
-        if (user != null && !user.emailVerified) {
-          await user.sendEmailVerification();
-
-          // ...and display to user as "Snack bar" pop-up at bottom of screen
-          if (mounted) {
-            Snackbar.show(
-              SnackbarDisplayType.SB_INFO,
-              'Check ${user.email} for verification link.',
-              context,
-            );
-          }
-        }
-      }
-    } on FirebaseAuthException catch (err) {
-      // If error, dis-engage loading screen and display to user
-      setState(() {});
-
-      // If error occurs, gather error message...
-      var message = 'An error occurred, please check your credentials!';
-      if (err.message != null) message = err.message!;
-      if (mounted) {
-        Snackbar.show(SnackbarDisplayType.SB_ERROR, message, ctx);
-      }
-    }
   }
 
   ////////////////////////////////////////////////////////////////
@@ -214,7 +129,6 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
       // Update profile information and write to database
       _providerUserProfile.firstName = _firstNameController.text.trim();
       _providerUserProfile.lastName = _lastNameController.text.trim();
-      _providerUserProfile.phoneNumber = _phoneNumberController.text.trim();
       _providerUserProfile.bio = _bioController.text.trim();
       _providerUserProfile.accountCreationStep =
           AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
@@ -439,8 +353,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                           const SizedBox(height: 6),
                           Text(
                             isStaff
-                                ? 'Keep your contact info and instructor bio current.'
-                                : 'Keep your contact details current for reservations and account support.',
+                                ? 'Keep your instructor profile current.'
+                                : 'Keep your profile details current.',
                             style: const TextStyle(
                               color: Colors.white70,
                               height: 1.4,
@@ -607,34 +521,18 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                         Padding(
                           padding: const EdgeInsets.symmetric(vertical: 5),
                           child: TextFormField(
-                            controller: _phoneNumberController,
-                            autofillHints: const [
-                              AutofillHints.telephoneNumber,
-                            ],
-                            keyboardType: TextInputType.phone,
+                            controller: _bioController,
+                            textCapitalization: TextCapitalization.sentences,
+                            keyboardType: TextInputType.multiline,
+                            minLines: 4,
+                            maxLines: 6,
                             decoration: const InputDecoration(
-                              labelText: 'Phone Number',
+                              labelText: 'Bio',
+                              alignLabelWithHint: true,
                             ),
                           ),
                         ),
-                        if (_providerUserProfile.role == UserRole.STAFF)
-                          Padding(
-                            padding: const EdgeInsets.symmetric(vertical: 5),
-                            child: TextFormField(
-                              controller: _bioController,
-                              textCapitalization: TextCapitalization.sentences,
-                              keyboardType: TextInputType.multiline,
-                              minLines: 4,
-                              maxLines: 6,
-                              decoration: const InputDecoration(
-                                labelText: 'Bio',
-                                alignLabelWithHint: true,
-                                helperText:
-                                    'Shown on the staff profile for members.',
-                              ),
-                            ),
-                          ),
-                        const SizedBox(height: 12),
+                        SizedBox(height: isStaff ? 12 : 6),
                         SizedBox(
                           width: double.infinity,
                           child: ElevatedButton(

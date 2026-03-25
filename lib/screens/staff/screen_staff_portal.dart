@@ -5,6 +5,8 @@ import 'package:pat_your_mat/theme/app_colors.dart';
 import 'package:pat_your_mat/theme/colors.dart';
 
 import '../../models/gym_class.dart';
+import '../../widgets/navigation/widget_app_outline.dart';
+import 'screen_staff_class_list.dart';
 import 'screen_create_class.dart';
 import '../../main.dart';
 
@@ -17,18 +19,23 @@ class ScreenStaffPortal extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final userProfile = ref.watch(providerUserProfile);
     final gymClassProvider = ref.watch(providerGymClass);
-    final classes = gymClassProvider.classes;
-    final totalSeats = classes.fold<int>(
+    final now = DateTime.now();
+    final classes = [...gymClassProvider.classes]
+      ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+    final upcomingClasses = classes
+        .where((gymClass) => !gymClass.dateTime.isBefore(now))
+        .toList();
+    final previousClasses =
+        classes.where((gymClass) => gymClass.dateTime.isBefore(now)).toList()
+          ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
+    final todayClasses = upcomingClasses
+        .where((gymClass) => _isSameDay(gymClass.dateTime, now))
+        .toList();
+    final nextClass = upcomingClasses.isEmpty ? null : upcomingClasses.first;
+    final totalOpenSpotsToday = todayClasses.fold<int>(
       0,
-      (total, gymClass) => total + gymClass.capacity,
+      (total, gymClass) => total + (gymClass.capacity - gymClass.filled),
     );
-    final seatsFilled = classes.fold<int>(
-      0,
-      (total, gymClass) => total + gymClass.filled,
-    );
-    final averageOccupancy = totalSeats == 0
-        ? '0%'
-        : '${((seatsFilled / totalSeats) * 100).round()}%';
 
     return Scaffold(
       backgroundColor: const Color(0xFFF5F7FB),
@@ -38,48 +45,64 @@ class ScreenStaffPortal extends ConsumerWidget {
           child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              _buildHeaderCard(context, userProfile),
+              _buildHeaderCard(
+                context,
+                userProfile,
+                todayCount: todayClasses.length,
+                nextClass: nextClass,
+              ),
               const SizedBox(height: 20),
               _buildPanel(
-                title: 'Portal Snapshot',
-                subtitle: 'Useful, real metrics from the current class roster.',
+                title: 'Today At A Glance',
+                subtitle: 'A compact view of what needs attention right now.',
                 child: LayoutBuilder(
                   builder: (context, constraints) {
-                    final isCompact = constraints.maxWidth < 360;
-                    final cardWidth = isCompact
-                        ? constraints.maxWidth
-                        : (constraints.maxWidth - 12) / 2;
+                    final isNarrow = constraints.maxWidth < 380;
+                    final cardWidth = (constraints.maxWidth - 12) / 2;
+                    final cardHeight = isNarrow ? 132.0 : 120.0;
                     return Wrap(
                       spacing: 12,
                       runSpacing: 12,
                       children: [
-                        _buildStatCard(
+                        SizedBox(
                           width: cardWidth,
-                          label: 'Active Classes',
-                          value: '${classes.length}',
-                          icon: Icons.class_,
-                          color: AppColors.deepPurple,
+                          height: cardHeight,
+                          child: _buildStatCard(
+                            label: 'Classes Today',
+                            value: '${todayClasses.length}',
+                            icon: Icons.today_outlined,
+                            color: AppColors.deepPurple,
+                          ),
                         ),
-                        _buildStatCard(
+                        SizedBox(
                           width: cardWidth,
-                          label: 'Total Capacity',
-                          value: '$totalSeats',
-                          icon: Icons.event_seat_outlined,
-                          color: CustomColors.statusInfo,
+                          height: cardHeight,
+                          child: _buildStatCard(
+                            label: 'Next Start',
+                            value: nextClass?.timeText ?? 'None',
+                            icon: Icons.schedule_outlined,
+                            color: const Color(0xFF1F8F71),
+                          ),
                         ),
-                        _buildStatCard(
+                        SizedBox(
                           width: cardWidth,
-                          label: 'Total Seats Filled',
-                          value: '$seatsFilled',
-                          icon: Icons.people_outline,
-                          color: const Color(0xFFC77718),
+                          height: cardHeight,
+                          child: _buildStatCard(
+                            label: 'Open Spots Today',
+                            value: '$totalOpenSpotsToday',
+                            icon: Icons.event_seat_outlined,
+                            color: CustomColors.statusInfo,
+                          ),
                         ),
-                        _buildStatCard(
+                        SizedBox(
                           width: cardWidth,
-                          label: 'Average Occupancy',
-                          value: averageOccupancy,
-                          icon: Icons.pie_chart_outline,
-                          color: AppColors.primaryPurple,
+                          height: cardHeight,
+                          child: _buildStatCard(
+                            label: 'Upcoming Classes',
+                            value: '${upcomingClasses.length}',
+                            icon: Icons.class_,
+                            color: const Color(0xFFC77718),
+                          ),
                         ),
                       ],
                     );
@@ -88,12 +111,38 @@ class ScreenStaffPortal extends ConsumerWidget {
               ),
               const SizedBox(height: 20),
               _buildPanel(
-                title: 'Class Management',
+                title: 'Quick Actions',
                 subtitle:
-                    'Current classes with capacity visibility and quick cleanup.',
+                    'Keep the class schedule moving without extra clutter.',
+                child: Column(
+                  children: [
+                    _buildActionRow(
+                      icon: Icons.add_box_outlined,
+                      label: 'Create Class',
+                      description: 'Add a new class to the schedule.',
+                      accent: AppColors.deepPurple,
+                      onTap: () => context.push(ScreenCreateClass.routeName),
+                    ),
+                    const SizedBox(height: 10),
+                    _buildActionRow(
+                      icon: Icons.person_outline,
+                      label: 'View Staff Profile',
+                      description:
+                          'Review teaching details and instructor settings.',
+                      accent: const Color(0xFF1F8F71),
+                      onTap: () =>
+                          context.go('${WidgetAppOutline.routeName}?tab=3'),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              _buildPanel(
+                title: 'Active Classes',
+                subtitle: 'Preview the live schedule, then open the full list.',
                 child: gymClassProvider.isLoading
                     ? const Center(child: CircularProgressIndicator())
-                    : classes.isEmpty
+                    : upcomingClasses.isEmpty
                     ? Container(
                         width: double.infinity,
                         padding: const EdgeInsets.all(20),
@@ -103,7 +152,7 @@ class ScreenStaffPortal extends ConsumerWidget {
                           border: Border.all(color: const Color(0xFFE4EAF4)),
                         ),
                         child: const Text(
-                          'No classes created yet.',
+                          'No active classes are scheduled yet.',
                           style: TextStyle(
                             color: Color(0xFF5D6470),
                             height: 1.4,
@@ -111,15 +160,105 @@ class ScreenStaffPortal extends ConsumerWidget {
                         ),
                       )
                     : Column(
-                        children: classes
-                            .map(
-                              (c) => Padding(
-                                padding: const EdgeInsets.only(bottom: 12),
-                                child: _buildManagementItem(context, ref, c),
+                        children: [
+                          ...upcomingClasses
+                              .take(3)
+                              .map(
+                                (c) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildManagementItem(context, ref, c),
+                                ),
                               ),
-                            )
-                            .toList(),
+                          _buildViewAllButton(
+                            label: 'View all active classes',
+                            onTap: () => context.push(
+                              ScreenStaffClassList.routeName,
+                              extra: {'showPast': false},
+                            ),
+                          ),
+                        ],
                       ),
+              ),
+              const SizedBox(height: 20),
+              _buildPanel(
+                title: 'Recent Classes',
+                subtitle:
+                    'A short look at recently completed classes and history.',
+                child: gymClassProvider.isLoading
+                    ? const Center(child: CircularProgressIndicator())
+                    : previousClasses.isEmpty
+                    ? Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          color: const Color(0xFFF7F9FD),
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: const Color(0xFFE4EAF4)),
+                        ),
+                        child: const Text(
+                          'No recent classes yet.',
+                          style: TextStyle(
+                            color: Color(0xFF5D6470),
+                            height: 1.4,
+                          ),
+                        ),
+                      )
+                    : Column(
+                        children: [
+                          ...previousClasses
+                              .take(3)
+                              .map(
+                                (c) => Padding(
+                                  padding: const EdgeInsets.only(bottom: 12),
+                                  child: _buildManagementItem(context, ref, c),
+                                ),
+                              ),
+                          _buildViewAllButton(
+                            label: 'View all recent classes',
+                            onTap: () => context.push(
+                              ScreenStaffClassList.routeName,
+                              extra: {'showPast': true},
+                            ),
+                          ),
+                        ],
+                      ),
+              ),
+              const SizedBox(height: 20),
+              _buildPanel(
+                title: 'Schedule Coverage',
+                subtitle: 'High-level support for planning the full roster.',
+                child: LayoutBuilder(
+                  builder: (context, constraints) {
+                    final cardWidth = (constraints.maxWidth - 12) / 2;
+                    return Wrap(
+                      spacing: 12,
+                      runSpacing: 12,
+                      children: [
+                        SizedBox(
+                          width: cardWidth,
+                          height: 120,
+                          child: _buildStatCard(
+                            label: 'Total Scheduled',
+                            value: '${classes.length}',
+                            icon: Icons.calendar_month_outlined,
+                            color: AppColors.primaryPurple,
+                          ),
+                        ),
+                        SizedBox(
+                          width: cardWidth,
+                          height: 120,
+                          child: _buildStatCard(
+                            label: 'Listed Instructors',
+                            value:
+                                '${classes.map((c) => c.instructor).toSet().length}',
+                            icon: Icons.groups_2_outlined,
+                            color: const Color(0xFFC77718),
+                          ),
+                        ),
+                      ],
+                    );
+                  },
+                ),
               ),
             ],
           ),
@@ -128,7 +267,12 @@ class ScreenStaffPortal extends ConsumerWidget {
     );
   }
 
-  Widget _buildHeaderCard(BuildContext context, userProfile) {
+  Widget _buildHeaderCard(
+    BuildContext context,
+    userProfile, {
+    required int todayCount,
+    required GymClass? nextClass,
+  }) {
     return Container(
       width: double.infinity,
       padding: const EdgeInsets.all(20),
@@ -156,13 +300,30 @@ class ScreenStaffPortal extends ConsumerWidget {
               const SizedBox(height: 8),
               Text(
                 userProfile.firstName.trim().isEmpty
-                    ? 'Manage classes and monitor capacity in one place.'
-                    : 'Welcome back, ${userProfile.firstName}. Manage classes and monitor capacity in one place.',
+                    ? 'Run today’s schedule, check class coverage, and create new sessions.'
+                    : 'Welcome back, ${userProfile.firstName}. Run today’s schedule, check class coverage, and create new sessions.',
                 style: TextStyle(
                   fontSize: 14,
                   height: 1.4,
                   color: Colors.white.withValues(alpha: 0.82),
                 ),
+              ),
+              const SizedBox(height: 16),
+              Wrap(
+                spacing: 10,
+                runSpacing: 10,
+                children: [
+                  _buildHeaderBadge(
+                    icon: Icons.today_outlined,
+                    label: '$todayCount today',
+                  ),
+                  _buildHeaderBadge(
+                    icon: Icons.schedule_outlined,
+                    label: nextClass == null
+                        ? 'No next class'
+                        : 'Next ${nextClass.timeText}',
+                  ),
+                ],
               ),
               const SizedBox(height: 16),
               Wrap(
@@ -176,16 +337,43 @@ class ScreenStaffPortal extends ConsumerWidget {
                     onTap: () => context.push(ScreenCreateClass.routeName),
                   ),
                   _buildHeaderAction(
-                    label: 'Class Setup',
-                    icon: Icons.calendar_month_outlined,
+                    label: 'Staff Profile',
+                    icon: Icons.person_outline,
                     filled: false,
-                    onTap: () => context.push(ScreenCreateClass.routeName),
+                    onTap: () =>
+                        context.go('${WidgetAppOutline.routeName}?tab=3'),
                   ),
                 ],
               ),
             ],
           );
         },
+      ),
+    );
+  }
+
+  Widget _buildHeaderBadge({required IconData icon, required String label}) {
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      decoration: BoxDecoration(
+        color: Colors.white.withValues(alpha: 0.12),
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: Colors.white.withValues(alpha: 0.14)),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(icon, size: 16, color: Colors.white),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
       ),
     );
   }
@@ -273,15 +461,13 @@ class ScreenStaffPortal extends ConsumerWidget {
   }
 
   Widget _buildStatCard({
-    required double width,
     required String label,
     required String value,
     required IconData icon,
     required Color color,
   }) {
     return Container(
-      width: width,
-      padding: const EdgeInsets.all(16),
+      padding: const EdgeInsets.all(14),
       decoration: BoxDecoration(
         color: color.withValues(alpha: 0.08),
         borderRadius: BorderRadius.circular(20),
@@ -290,8 +476,15 @@ class ScreenStaffPortal extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Icon(icon, color: color, size: 22),
-          const SizedBox(height: 8),
+          Container(
+            padding: const EdgeInsets.all(8),
+            decoration: BoxDecoration(
+              color: color.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(12),
+            ),
+            child: Icon(icon, color: color, size: 20),
+          ),
+          const Spacer(),
           Text(
             value,
             maxLines: 1,
@@ -301,13 +494,97 @@ class ScreenStaffPortal extends ConsumerWidget {
           const SizedBox(height: 4),
           Text(
             label,
+            maxLines: 2,
+            overflow: TextOverflow.ellipsis,
             style: const TextStyle(
               fontSize: 12,
+              height: 1.25,
               color: Color(0xFF4B5563),
               fontWeight: FontWeight.w600,
             ),
           ),
         ],
+      ),
+    );
+  }
+
+  Widget _buildActionRow({
+    required IconData icon,
+    required String label,
+    required String description,
+    required Color accent,
+    required VoidCallback onTap,
+  }) {
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Container(
+        decoration: BoxDecoration(
+          color: accent.withValues(alpha: 0.08),
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: accent.withValues(alpha: 0.14)),
+        ),
+        child: Padding(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 14),
+          child: Row(
+            children: [
+              Container(
+                padding: const EdgeInsets.all(10),
+                decoration: BoxDecoration(
+                  color: accent.withValues(alpha: 0.12),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: Icon(icon, color: accent, size: 22),
+              ),
+              const SizedBox(width: 14),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      label,
+                      style: const TextStyle(
+                        fontSize: 15,
+                        fontWeight: FontWeight.w800,
+                        color: Color(0xFF111827),
+                      ),
+                    ),
+                    const SizedBox(height: 2),
+                    Text(
+                      description,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: const TextStyle(
+                        color: Color(0xFF4B5563),
+                        height: 1.35,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const Icon(Icons.chevron_right, color: Color(0xFF8A94A6)),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildViewAllButton({
+    required String label,
+    required VoidCallback onTap,
+  }) {
+    return Align(
+      alignment: Alignment.centerLeft,
+      child: TextButton.icon(
+        onPressed: onTap,
+        icon: const Icon(Icons.arrow_forward),
+        label: Text(label),
+        style: TextButton.styleFrom(
+          foregroundColor: AppColors.deepPurple,
+          padding: const EdgeInsets.symmetric(horizontal: 4, vertical: 10),
+          textStyle: const TextStyle(fontWeight: FontWeight.w700),
+        ),
       ),
     );
   }
@@ -429,5 +706,11 @@ class ScreenStaffPortal extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  static bool _isSameDay(DateTime first, DateTime second) {
+    return first.year == second.year &&
+        first.month == second.month &&
+        first.day == second.day;
   }
 }
