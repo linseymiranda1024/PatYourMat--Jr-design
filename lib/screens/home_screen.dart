@@ -17,6 +17,7 @@ class HomeScreen extends ConsumerStatefulWidget {
 
 class _HomeScreenState extends ConsumerState<HomeScreen> {
   String _searchQuery = '';
+  String _selectedFilter = 'Today';
 
   @override
   Widget build(BuildContext context) {
@@ -24,8 +25,23 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final classes = gymClassProvider.classes;
     final filteredClasses = classes.where((c) {
       final query = _searchQuery.toLowerCase();
-      return c.title.toLowerCase().contains(query) ||
+      final matchesSearch = c.title.toLowerCase().contains(query) ||
           c.instructor.toLowerCase().contains(query);
+
+      if (!matchesSearch) return false;
+
+      if (_selectedFilter == 'Today') {
+        final now = DateTime.now();
+        return c.dateTime.year == now.year &&
+            c.dateTime.month == now.month &&
+            c.dateTime.day == now.day;
+      } else if (_selectedFilter == 'Yoga') {
+        return c.title.toLowerCase().contains('yoga');
+      } else if (_selectedFilter == 'Cardio') {
+        return c.title.toLowerCase().contains('cardio');
+      }
+
+      return true;
     }).toList();
 
     return SafeArea(
@@ -92,17 +108,41 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: const [
+                  children: [
                     _FilterChip(
-                      selected: true,
+                      selected: _selectedFilter == 'Today',
                       icon: Icons.calendar_month,
                       label: 'Today',
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter =
+                              _selectedFilter == 'Today' ? 'All' : 'Today';
+                        });
+                      },
                     ),
-                    SizedBox(width: 10),
-                    _FilterChip(label: 'Yoga'),
-                    SizedBox(width: 10),
-                    _FilterChip(label: 'Cardio'),
-                    SizedBox(width: 10),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      selected: _selectedFilter == 'Yoga',
+                      label: 'Yoga',
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter =
+                              _selectedFilter == 'Yoga' ? 'All' : 'Yoga';
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      selected: _selectedFilter == 'Cardio',
+                      label: 'Cardio',
+                      onTap: () {
+                        setState(() {
+                          _selectedFilter =
+                              _selectedFilter == 'Cardio' ? 'All' : 'Cardio';
+                        });
+                      },
+                    ),
+                    const SizedBox(width: 10),
                     _FilterChip(icon: Icons.tune, label: 'More'),
                   ],
                 ),
@@ -178,7 +218,7 @@ class _SearchBar extends StatelessWidget {
               decoration: InputDecoration(
                 hintText: hintText,
                 hintStyle: TextStyle(
-                  color: Colors.black.withOpacity(0.4),
+                  color: Colors.black.withValues(alpha: 0.4),
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
                 ),
@@ -200,48 +240,57 @@ class _FilterChip extends StatelessWidget {
   final bool selected;
   final IconData? icon;
   final String label;
+  final VoidCallback? onTap;
 
   const _FilterChip({
     this.selected = false,
     this.icon,
     required this.label,
+    this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final purple = const Color(0xFF7A2CFF);
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: selected ? purple : Colors.white,
-        borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: selected ? purple : const Color(0xFFE3E6EF)),
-        boxShadow: selected
-            ? const [
-                BoxShadow(
-                  blurRadius: 12,
-                  offset: Offset(0, 6),
-                  color: Color(0x22000000),
-                )
-              ]
-            : null,
-      ),
-      child: Row(
-        children: [
-          if (icon != null) ...[
-            Icon(icon, size: 20, color: selected ? Colors.white : Colors.black87),
-            const SizedBox(width: 8),
-          ],
-          Text(
-            label,
-            style: TextStyle(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: selected ? Colors.white : Colors.black87,
+    return GestureDetector(
+      onTap: onTap,
+      child: Container(
+        padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+        decoration: BoxDecoration(
+          color: selected ? purple : Colors.white,
+          borderRadius: BorderRadius.circular(26),
+          border: Border.all(
+              color: selected ? purple : const Color(0xFFE3E6EF)),
+          boxShadow: selected
+              ? const [
+                  BoxShadow(
+                    blurRadius: 12,
+                    offset: Offset(0, 6),
+                    color: Color(0x22000000),
+                  )
+                ]
+              : null,
+        ),
+        child: Row(
+          children: [
+            if (icon != null) ...[
+              Icon(
+                  icon,
+                  size: 20,
+                  color: selected ? Colors.white : Colors.black87),
+              const SizedBox(width: 8),
+            ],
+            Text(
+              label,
+              style: TextStyle(
+                fontWeight: FontWeight.w700,
+                fontSize: 16,
+                color: selected ? Colors.white : Colors.black87,
+              ),
             ),
-          ),
-        ],
+          ],
+        ),
       ),
     );
   }
@@ -316,86 +365,86 @@ class ClassCard extends StatelessWidget {
                   ),
                 ],
               ),
-            const SizedBox(height: 8),
-            Text(
-              instructor,
-              style: const TextStyle(
-                fontSize: 18,
-                color: Colors.black54,
-                fontWeight: FontWeight.w500,
-              ),
-            ),
-            const SizedBox(height: 14),
-            Row(
-              children: [
-                const Icon(
-                  Icons.calendar_today_outlined,
-                  size: 20,
+              const SizedBox(height: 8),
+              Text(
+                instructor,
+                style: const TextStyle(
+                  fontSize: 18,
                   color: Colors.black54,
+                  fontWeight: FontWeight.w500,
                 ),
-                const SizedBox(width: 10),
-                Text(
-                  dateText,
-                  style: const TextStyle(
-                    fontSize: 16,
+              ),
+              const SizedBox(height: 14),
+              Row(
+                children: [
+                  const Icon(
+                    Icons.calendar_today_outlined,
+                    size: 20,
                     color: Colors.black54,
-                    fontWeight: FontWeight.w600,
                   ),
-                ),
-                const SizedBox(width: 16),
-                Text(
-                  timeText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black87,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 10),
+                  Text(
+                    dateText,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                const Text(
-                  '•',
-                  style: TextStyle(color: Colors.black45, fontSize: 16),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  durationText,
-                  style: const TextStyle(
-                    fontSize: 16,
-                    color: Colors.black54,
-                    fontWeight: FontWeight.w600,
+                  const SizedBox(width: 16),
+                  Text(
+                    timeText,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black87,
+                      fontWeight: FontWeight.w600,
+                    ),
                   ),
-                ),
-              ],
-            ),
-            const SizedBox(height: 18),
-            Row(
-              children: [
-                Expanded(
-                  child: ClipRRect(
-                    borderRadius: BorderRadius.circular(10),
-                    child: LinearProgressIndicator(
-                      value: progress,
-                      minHeight: 10,
-                      backgroundColor: const Color(0xFFE9ECF3),
-                      valueColor: AlwaysStoppedAnimation<Color>(
-                        status == model.ClassStatus.full
-                            ? const Color(0xFFB00020)
-                            : const Color(0xFF7A2CFF),
+                  const SizedBox(width: 14),
+                  const Text(
+                    '•',
+                    style: TextStyle(color: Colors.black45, fontSize: 16),
+                  ),
+                  const SizedBox(width: 14),
+                  Text(
+                    durationText,
+                    style: const TextStyle(
+                      fontSize: 16,
+                      color: Colors.black54,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 18),
+              Row(
+                children: [
+                  Expanded(
+                    child: ClipRRect(
+                      borderRadius: BorderRadius.circular(10),
+                      child: LinearProgressIndicator(
+                        value: progress,
+                        minHeight: 10,
+                        backgroundColor: const Color(0xFFE9ECF3),
+                        valueColor: AlwaysStoppedAnimation<Color>(
+                          status == model.ClassStatus.full
+                              ? const Color(0xFFB00020)
+                              : const Color(0xFF7A2CFF),
+                        ),
                       ),
                     ),
                   ),
-                ),
-                const SizedBox(width: 14),
-                Text(
-                  '$filled/$capacity',
-                  style: const TextStyle(
-                    fontSize: 16,
-                    fontWeight: FontWeight.w700,
-                    color: Colors.black54,
+                  const SizedBox(width: 14),
+                  Text(
+                    '$filled/$capacity',
+                    style: const TextStyle(
+                      fontSize: 16,
+                      fontWeight: FontWeight.w700,
+                      color: Colors.black54,
+                    ),
                   ),
-                ),
-              ],
-            ),
+                ],
+              ),
             ],
           ),
         ),
@@ -410,7 +459,8 @@ class ClassCard extends StatelessWidget {
       case model.ClassStatus.full:
         return const _StatusStyle('Full', Color(0xFFFBE2E2), Color(0xFFB00020));
       case model.ClassStatus.standby:
-        return const _StatusStyle('Standby', Color(0xFFFFE9D6), Color(0xFFB85A00));
+        return const _StatusStyle(
+            'Standby', Color(0xFFFFE9D6), Color(0xFFB85A00));
     }
   }
 }
