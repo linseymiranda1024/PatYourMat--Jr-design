@@ -102,6 +102,7 @@ class ProviderGymClass extends ChangeNotifier {
     _classes[index] = GymClass(
       id: existing.id,
       title: existing.title,
+      description: existing.description,
       instructor: existing.instructor,
       dateTime: existing.dateTime,
       durationMinutes: existing.durationMinutes,

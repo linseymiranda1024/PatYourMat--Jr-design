@@ -5,6 +5,7 @@ enum ClassStatus { open, full, standby }
 class GymClass {
   final String id;
   final String title;
+  final String description;
   final String instructor;
   final DateTime dateTime;
   final int durationMinutes;
@@ -16,6 +17,7 @@ class GymClass {
   GymClass({
     required this.id,
     required this.title,
+    required this.description,
     required this.instructor,
     required this.dateTime,
     required this.durationMinutes,
@@ -31,9 +33,10 @@ class GymClass {
       return GymClass(
         id: doc.id,
         title: data['title'] ?? 'Untitled Class',
+        description: data['description'] ?? '',
         instructor: data['instructor'] ?? 'Unknown Instructor',
-        dateTime: data['dateTime'] is Timestamp 
-            ? (data['dateTime'] as Timestamp).toDate() 
+        dateTime: data['dateTime'] is Timestamp
+            ? (data['dateTime'] as Timestamp).toDate()
             : DateTime.now(),
         durationMinutes: (data['durationMinutes'] ?? 0).toInt(),
         location: data['location'] ?? 'No Location',
@@ -47,6 +50,7 @@ class GymClass {
       return GymClass(
         id: doc.id,
         title: 'Error Loading Class',
+        description: '',
         instructor: '',
         dateTime: DateTime.now(),
         durationMinutes: 0,
@@ -61,6 +65,7 @@ class GymClass {
   Map<String, dynamic> toFirestore() {
     return {
       'title': title,
+      'description': description,
       'instructor': instructor,
       'dateTime': Timestamp.fromDate(dateTime),
       'durationMinutes': durationMinutes,
@@ -86,13 +91,28 @@ class GymClass {
 
   String get dateText {
     // Basic formatting, can be improved with intl package
-    final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+    final months = [
+      'Jan',
+      'Feb',
+      'Mar',
+      'Apr',
+      'May',
+      'Jun',
+      'Jul',
+      'Aug',
+      'Sep',
+      'Oct',
+      'Nov',
+      'Dec',
+    ];
     final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
     return '${weekdays[dateTime.weekday - 1]}, ${months[dateTime.month - 1]} ${dateTime.day}';
   }
 
   String get timeText {
-    final hour = dateTime.hour > 12 ? dateTime.hour - 12 : (dateTime.hour == 0 ? 12 : dateTime.hour);
+    final hour = dateTime.hour > 12
+        ? dateTime.hour - 12
+        : (dateTime.hour == 0 ? 12 : dateTime.hour);
     final amPm = dateTime.hour >= 12 ? 'PM' : 'AM';
     final minute = dateTime.minute.toString().padLeft(2, '0');
     return '$hour:$minute $amPm';

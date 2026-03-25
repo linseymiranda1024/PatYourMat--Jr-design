@@ -281,10 +281,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 12),
 
                               Text(
-                                'Join us for an energizing session!\n'
-                                'This class is perfect for all levels and focuses on '
-                                'building strength, flexibility, and mindfulness.\n\n'
-                                'Bring your water bottle and get ready to sweat!',
+                                gClass.description.trim().isEmpty
+                                    ? 'No description provided yet.'
+                                    : gClass.description,
                                 style: textTheme.bodyLarge?.copyWith(
                                   fontSize: 16,
                                   height: 1.45,

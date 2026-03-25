@@ -741,47 +741,68 @@ class ScreenStaffPortal extends ConsumerWidget {
             ),
           ),
           const SizedBox(height: 8),
-          Row(
-            children: [
-              Text(
-                '${gymClass.filled}/${gymClass.capacity} seats filled',
-                style: textTheme.bodySmall?.copyWith(
-                  color: colorScheme.onSurfaceVariant,
-                  fontSize: 13,
-                  fontWeight: FontWeight.w500,
+          Text(
+            '${gymClass.filled}/${gymClass.capacity} seats filled',
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              fontSize: 13,
+              fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 8),
+          Align(
+            alignment: Alignment.centerRight,
+            child: Wrap(
+              spacing: 4,
+              runSpacing: 4,
+              alignment: WrapAlignment.end,
+              children: [
+                TextButton.icon(
+                  onPressed: () => context.push(
+                    ScreenCreateClass.routeName,
+                    extra: gymClass,
+                  ),
+                  icon: const Icon(Icons.edit_outlined),
+                  label: const Text('Edit'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: colorScheme.primary,
+                  ),
                 ),
-              ),
-              const Spacer(),
-              TextButton.icon(
-                onPressed: () {
-                  showDialog(
-                    context: context,
-                    builder: (context) => AlertDialog(
-                      title: const Text('Delete Class'),
-                      content: const Text(
-                        'Are you sure you want to delete this class?',
+                TextButton.icon(
+                  onPressed: () {
+                    showDialog(
+                      context: context,
+                      builder: (context) => AlertDialog(
+                        title: const Text('Delete Class'),
+                        content: const Text(
+                          'Are you sure you want to delete this class?',
+                        ),
+                        actions: [
+                          TextButton(
+                            onPressed: () => Navigator.pop(context),
+                            child: const Text('Cancel'),
+                          ),
+                          TextButton(
+                            onPressed: () {
+                              ref
+                                  .read(providerGymClass)
+                                  .deleteClass(gymClass.id);
+                              Navigator.pop(context);
+                            },
+                            child: const Text('Delete'),
+                          ),
+                        ],
                       ),
-                      actions: [
-                        TextButton(
-                          onPressed: () => Navigator.pop(context),
-                          child: const Text('Cancel'),
-                        ),
-                        TextButton(
-                          onPressed: () {
-                            ref.read(providerGymClass).deleteClass(gymClass.id);
-                            Navigator.pop(context);
-                          },
-                          child: const Text('Delete'),
-                        ),
-                      ],
-                    ),
-                  );
-                },
-                icon: const Icon(Icons.delete_outline),
-                label: const Text('Delete'),
-                style: TextButton.styleFrom(foregroundColor: AppColors.warning),
-              ),
-            ],
+                    );
+                  },
+                  icon: const Icon(Icons.delete_outline),
+                  label: const Text('Delete'),
+                  style: TextButton.styleFrom(
+                    foregroundColor: AppColors.warning,
+                  ),
+                ),
+              ],
+            ),
           ),
         ],
       ),

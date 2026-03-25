@@ -6,8 +6,9 @@ import '../../models/gym_class.dart';
 
 class ScreenCreateClass extends ConsumerStatefulWidget {
   static const routeName = '/staff/create-class';
+  final GymClass? existingClass;
 
-  const ScreenCreateClass({super.key});
+  const ScreenCreateClass({super.key, this.existingClass});
 
   @override
   ConsumerState<ScreenCreateClass> createState() => _ScreenCreateClassState();
@@ -16,6 +17,7 @@ class ScreenCreateClass extends ConsumerStatefulWidget {
 class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   final _formKey = GlobalKey<FormState>();
   final _titleController = TextEditingController();
+  final _descriptionController = TextEditingController();
   final _instructorController = TextEditingController();
   final _locationController = TextEditingController();
   final _capacityController = TextEditingController();
@@ -24,10 +26,30 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   bool _isSubmitting = false;
+  bool get _isEditing => widget.existingClass != null;
+
+  @override
+  void initState() {
+    super.initState();
+    final existingClass = widget.existingClass;
+    if (existingClass == null) {
+      return;
+    }
+
+    _titleController.text = existingClass.title;
+    _descriptionController.text = existingClass.description;
+    _instructorController.text = existingClass.instructor;
+    _locationController.text = existingClass.location;
+    _capacityController.text = existingClass.capacity.toString();
+    _durationController.text = existingClass.durationMinutes.toString();
+    _selectedDate = existingClass.dateTime;
+    _selectedTime = TimeOfDay.fromDateTime(existingClass.dateTime);
+  }
 
   @override
   void dispose() {
     _titleController.dispose();
+    _descriptionController.dispose();
     _instructorController.dispose();
     _locationController.dispose();
     _capacityController.dispose();
@@ -36,11 +58,15 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   }
 
   Future<void> _pickDate() async {
+    final today = DateTime.now();
+    final firstDate = _isEditing && _selectedDate.isBefore(today)
+        ? DateTime(_selectedDate.year, _selectedDate.month, _selectedDate.day)
+        : DateTime(today.year, today.month, today.day);
     final date = await showDatePicker(
       context: context,
       initialDate: _selectedDate,
-      firstDate: DateTime.now(),
-      lastDate: DateTime.now().add(const Duration(days: 365)),
+      firstDate: firstDate,
+      lastDate: today.add(const Duration(days: 365)),
     );
     if (date != null) setState(() => _selectedDate = date);
   }
@@ -53,7 +79,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     if (time != null) setState(() => _selectedTime = time);
   }
 
-  Future<void> _createClass() async {
+  Future<void> _submitClass() async {
     if (_isSubmitting) return;
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) return;
@@ -62,9 +88,21 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       _isSubmitting = true;
     });
 
-    final newClass = GymClass(
-      id: '',
+    final existingClass = widget.existingClass;
+    final capacity = int.tryParse(_capacityController.text.trim()) ?? 20;
+    final filled = existingClass == null
+        ? 0
+        : existingClass.filled.clamp(0, capacity);
+    final status = filled >= capacity
+        ? ClassStatus.full
+        : (existingClass?.status == ClassStatus.standby
+              ? ClassStatus.standby
+              : ClassStatus.open);
+
+    final classToSave = GymClass(
+      id: existingClass?.id ?? '',
       title: _titleController.text.trim(),
+      description: _descriptionController.text.trim(),
       instructor: _instructorController.text.trim(),
       dateTime: DateTime(
         _selectedDate.year,
@@ -75,13 +113,17 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       ),
       durationMinutes: int.tryParse(_durationController.text.trim()) ?? 60,
       location: _locationController.text.trim(),
-      capacity: int.tryParse(_capacityController.text.trim()) ?? 20,
-      filled: 0,
-      status: ClassStatus.open,
+      capacity: capacity,
+      filled: filled,
+      status: status,
     );
 
     try {
-      await ref.read(providerGymClass).addClass(newClass);
+      if (_isEditing) {
+        await ref.read(providerGymClass).updateClass(classToSave);
+      } else {
+        await ref.read(providerGymClass).addClass(classToSave);
+      }
       if (!mounted) return;
       Navigator.of(context).pop();
     } finally {
@@ -96,7 +138,9 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   @override
   Widget build(BuildContext context) {
     return Scaffold(
-      appBar: AppBar(title: const Text('Create New Class')),
+      appBar: AppBar(
+        title: Text(_isEditing ? 'Edit Class' : 'Create New Class'),
+      ),
       body: SingleChildScrollView(
         child: Padding(
           padding: const EdgeInsets.all(16),
@@ -110,6 +154,19 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                   decoration: const InputDecoration(labelText: 'Class Title'),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter a title'
+                      : null,
+                ),
+                const SizedBox(height: 12),
+                TextFormField(
+                  controller: _descriptionController,
+                  minLines: 3,
+                  maxLines: 5,
+                  decoration: const InputDecoration(
+                    labelText: 'Description',
+                    alignLabelWithHint: true,
+                  ),
+                  validator: (value) => value == null || value.trim().isEmpty
+                      ? 'Please enter a description'
                       : null,
                 ),
                 const SizedBox(height: 12),
@@ -206,14 +263,14 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
-                    onPressed: _isSubmitting ? null : _createClass,
+                    onPressed: _isSubmitting ? null : _submitClass,
                     child: _isSubmitting
                         ? const SizedBox(
                             width: 20,
                             height: 20,
                             child: CircularProgressIndicator(strokeWidth: 2),
                           )
-                        : const Text('Create Class'),
+                        : Text(_isEditing ? 'Save Changes' : 'Create Class'),
                   ),
                 ),
               ],

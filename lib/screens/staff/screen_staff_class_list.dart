@@ -1,9 +1,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 
 import '../../main.dart';
 import '../../models/gym_class.dart';
 import '../../theme/app_colors.dart';
+import 'screen_create_class.dart';
 
 class ScreenStaffClassList extends ConsumerWidget {
   static const routeName = '/staff/classes';
@@ -166,6 +168,17 @@ class ScreenStaffClassList extends ConsumerWidget {
               color: colorScheme.onSurfaceVariant,
               fontSize: 13,
               fontWeight: FontWeight.w500,
+            ),
+          ),
+          const SizedBox(height: 10),
+          Align(
+            alignment: Alignment.centerRight,
+            child: TextButton.icon(
+              onPressed: () =>
+                  context.push(ScreenCreateClass.routeName, extra: gymClass),
+              icon: const Icon(Icons.edit_outlined),
+              label: const Text('Edit'),
+              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
             ),
           ),
         ],

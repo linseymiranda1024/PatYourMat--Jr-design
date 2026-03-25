@@ -7,16 +7,161 @@ import '../models/gym_class.dart' as model;
 import '../theme/app_colors.dart';
 import 'class_detail_screen.dart';
 
-class HomeScreen extends ConsumerWidget {
+const String homeTodayFilterKey = '__today__';
+
+List<model.GymClass> filterHomeClasses({
+  required List<model.GymClass> classes,
+  required String searchQuery,
+  required String? selectedFilterKey,
+  DateTime? now,
+}) {
+  final normalizedQuery = searchQuery.trim().toLowerCase();
+  final currentDate = now ?? DateTime.now();
+
+  return classes.where((gymClass) {
+    final matchesSearch =
+        normalizedQuery.isEmpty ||
+        gymClass.title.toLowerCase().contains(normalizedQuery) ||
+        gymClass.instructor.toLowerCase().contains(normalizedQuery);
+
+    if (!matchesSearch) {
+      return false;
+    }
+
+    if (selectedFilterKey == null) {
+      return true;
+    }
+
+    if (selectedFilterKey == homeTodayFilterKey) {
+      final classDate = gymClass.dateTime;
+      return classDate.year == currentDate.year &&
+          classDate.month == currentDate.month &&
+          classDate.day == currentDate.day;
+    }
+
+    return homeCategoryKeyForClassTitle(gymClass.title) == selectedFilterKey;
+  }).toList();
+}
+
+String homeCategoryKeyForClassTitle(String title) {
+  final normalizedTitle = title.trim().toLowerCase();
+  const categoryKeywords = <String, String>{
+    'hip hop': 'hip-hop',
+    'yoga': 'yoga',
+    'cardio': 'cardio',
+    'pilates': 'pilates',
+    'soccer': 'soccer',
+    'boxing': 'boxing',
+    'dance': 'dance',
+    'strength': 'strength',
+    'cycle': 'cycling',
+    'spin': 'cycling',
+    'hiit': 'hiit',
+  };
+
+  for (final entry in categoryKeywords.entries) {
+    if (normalizedTitle.contains(entry.key)) {
+      return entry.value;
+    }
+  }
+
+  const ignoredWords = <String>{
+    'morning',
+    'evening',
+    'power',
+    'gentle',
+    'beginner',
+    'advanced',
+    'sunrise',
+    'sunset',
+    'lunchtime',
+    'all',
+    'levels',
+    'flow',
+    'blast',
+    'reset',
+    'session',
+    'class',
+  };
+  final words = normalizedTitle.split(RegExp(r'\s+'));
+  for (final word in words) {
+    if (word.isNotEmpty && !ignoredWords.contains(word)) {
+      return word;
+    }
+  }
+
+  return 'class';
+}
+
+String homeCategoryLabelForKey(String key) {
+  switch (key) {
+    case 'hip-hop':
+      return 'Hip Hop';
+    case 'hiit':
+      return 'HIIT';
+    default:
+      return key
+          .split('-')
+          .map(
+            (part) => part.isEmpty
+                ? part
+                : '${part[0].toUpperCase()}${part.substring(1)}',
+          )
+          .join(' ');
+  }
+}
+
+List<String> homeFilterCategoryKeys(
+  List<model.GymClass> classes, {
+  int maxCount = 3,
+}) {
+  final categoryKeys = <String>[];
+  final seenKeys = <String>{};
+
+  for (final gymClass in classes) {
+    final key = homeCategoryKeyForClassTitle(gymClass.title);
+    if (seenKeys.add(key)) {
+      categoryKeys.add(key);
+    }
+    if (categoryKeys.length >= maxCount) {
+      break;
+    }
+  }
+
+  return categoryKeys;
+}
+
+class HomeScreen extends ConsumerStatefulWidget {
   static const routeName = "/home";
 
   const HomeScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<HomeScreen> createState() => _HomeScreenState();
+}
+
+class _HomeScreenState extends ConsumerState<HomeScreen> {
+  String _searchQuery = '';
+  String? _selectedFilterKey = homeTodayFilterKey;
+
+  void _toggleFilter(String filterKey) {
+    setState(() {
+      _selectedFilterKey = _selectedFilterKey == filterKey ? null : filterKey;
+    });
+  }
+
+  @override
+  Widget build(BuildContext context) {
     final gymClassProvider = ref.watch(providerGymClass);
     final classes = gymClassProvider.classes;
+    final categoryFilterKeys = homeFilterCategoryKeys(classes);
+    final filteredClasses = filterHomeClasses(
+      classes: classes,
+      searchQuery: _searchQuery,
+      selectedFilterKey: _selectedFilterKey,
+    );
     final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
     final headerGradient = theme.brightness == Brightness.dark
         ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
@@ -69,7 +214,12 @@ class HomeScreen extends ConsumerWidget {
                       ),
                     ),
                     const SizedBox(height: 18),
-                    _SearchBar(hintText: 'Search classes...'),
+                    _SearchBar(
+                      hintText: 'Search classes...',
+                      onChanged: (value) {
+                        setState(() => _searchQuery = value);
+                      },
+                    ),
                   ],
                 ),
               ),
@@ -79,18 +229,28 @@ class HomeScreen extends ConsumerWidget {
               child: SingleChildScrollView(
                 scrollDirection: Axis.horizontal,
                 child: Row(
-                  children: const [
+                  children: [
                     _FilterChip(
-                      selected: true,
+                      selected: _selectedFilterKey == homeTodayFilterKey,
                       icon: Icons.calendar_month,
                       label: 'Today',
+                      onTap: () => _toggleFilter(homeTodayFilterKey),
                     ),
-                    SizedBox(width: 10),
-                    _FilterChip(label: 'Yoga'),
-                    SizedBox(width: 10),
-                    _FilterChip(label: 'Cardio'),
-                    SizedBox(width: 10),
-                    _FilterChip(icon: Icons.tune, label: 'More'),
+                    for (final categoryKey in categoryFilterKeys) ...[
+                      const SizedBox(width: 10),
+                      _FilterChip(
+                        selected: _selectedFilterKey == categoryKey,
+                        label: homeCategoryLabelForKey(categoryKey),
+                        onTap: () => _toggleFilter(categoryKey),
+                      ),
+                    ],
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      selected: _selectedFilterKey == null,
+                      icon: Icons.tune,
+                      label: 'All',
+                      onTap: () => setState(() => _selectedFilterKey = null),
+                    ),
                   ],
                 ),
               ),
@@ -102,8 +262,15 @@ class HomeScreen extends ConsumerWidget {
                   ? const Center(child: CircularProgressIndicator())
                   : classes.isEmpty
                   ? const Center(child: Text('No classes available yet.'))
+                  : filteredClasses.isEmpty
+                  ? _HomeEmptyState(
+                      title: 'No classes found',
+                      message: _searchQuery.trim().isEmpty
+                          ? 'Try a different filter to see more classes.'
+                          : 'Try a different search or clear the active filter.',
+                    )
                   : Column(
-                      children: classes
+                      children: filteredClasses
                           .map(
                             (c) => Column(
                               children: [
@@ -128,6 +295,23 @@ class HomeScreen extends ConsumerWidget {
                           .toList(),
                     ),
             ),
+            if (_searchQuery.trim().isNotEmpty ||
+                _selectedFilterKey != null) ...[
+              const SizedBox(height: 8),
+              Padding(
+                padding: const EdgeInsets.symmetric(horizontal: 20),
+                child: Align(
+                  alignment: Alignment.centerLeft,
+                  child: Text(
+                    'Showing ${filteredClasses.length} class${filteredClasses.length == 1 ? '' : 'es'}',
+                    style: textTheme.bodyMedium?.copyWith(
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w600,
+                    ),
+                  ),
+                ),
+              ),
+            ],
           ],
         ),
       ),
@@ -137,8 +321,9 @@ class HomeScreen extends ConsumerWidget {
 
 class _SearchBar extends StatelessWidget {
   final String hintText;
+  final ValueChanged<String>? onChanged;
 
-  const _SearchBar({required this.hintText});
+  const _SearchBar({required this.hintText, this.onChanged});
 
   @override
   Widget build(BuildContext context) {
@@ -160,12 +345,31 @@ class _SearchBar extends StatelessWidget {
             color: AppColors.headerOnBrand.withValues(alpha: 0.76),
           ),
           const SizedBox(width: 10),
-          Text(
-            hintText,
-            style: textTheme.titleMedium?.copyWith(
-              color: AppColors.headerOnBrand.withValues(alpha: 0.76),
-              fontSize: 18,
-              fontWeight: FontWeight.w500,
+          Expanded(
+            child: TextField(
+              onChanged: onChanged,
+              textAlignVertical: TextAlignVertical.center,
+              style: textTheme.titleMedium?.copyWith(
+                color: AppColors.headerOnBrand,
+                fontSize: 18,
+                fontWeight: FontWeight.w600,
+              ),
+              cursorColor: AppColors.headerOnBrand,
+              decoration: InputDecoration(
+                isDense: true,
+                border: InputBorder.none,
+                enabledBorder: InputBorder.none,
+                focusedBorder: InputBorder.none,
+                filled: false,
+                fillColor: Colors.transparent,
+                contentPadding: EdgeInsets.zero,
+                hintText: hintText,
+                hintStyle: textTheme.titleMedium?.copyWith(
+                  color: AppColors.headerOnBrand.withValues(alpha: 0.76),
+                  fontSize: 18,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
             ),
           ),
         ],
@@ -178,8 +382,14 @@ class _FilterChip extends StatelessWidget {
   final bool selected;
   final IconData? icon;
   final String label;
+  final VoidCallback? onTap;
 
-  const _FilterChip({this.selected = false, this.icon, required this.label});
+  const _FilterChip({
+    this.selected = false,
+    this.icon,
+    required this.label,
+    this.onTap,
+  });
 
   @override
   Widget build(BuildContext context) {
@@ -195,34 +405,92 @@ class _FilterChip extends StatelessWidget {
         ? colorScheme.onPrimary
         : colorScheme.onSurface;
 
-    return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
-      decoration: BoxDecoration(
-        color: fillColor,
+    return Material(
+      color: Colors.transparent,
+      borderRadius: BorderRadius.circular(26),
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(26),
-        border: Border.all(color: outlineColor),
-        boxShadow: selected
-            ? [
-                BoxShadow(
-                  blurRadius: 12,
-                  offset: const Offset(0, 6),
-                  color: Colors.black.withValues(alpha: 0.12),
+        child: Container(
+          padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+          decoration: BoxDecoration(
+            color: fillColor,
+            borderRadius: BorderRadius.circular(26),
+            border: Border.all(color: outlineColor),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      blurRadius: 12,
+                      offset: const Offset(0, 6),
+                      color: Colors.black.withValues(alpha: 0.12),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Row(
+            children: [
+              if (icon != null) ...[
+                Icon(icon, size: 20, color: foregroundColor),
+                const SizedBox(width: 8),
+              ],
+              Text(
+                label,
+                style: textTheme.titleMedium?.copyWith(
+                  fontWeight: FontWeight.w700,
+                  fontSize: 16,
+                  color: foregroundColor,
                 ),
-              ]
-            : null,
+              ),
+            ],
+          ),
+        ),
       ),
-      child: Row(
+    );
+  }
+}
+
+class _HomeEmptyState extends StatelessWidget {
+  final String title;
+  final String message;
+
+  const _HomeEmptyState({required this.title, required this.message});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(24),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
         children: [
-          if (icon != null) ...[
-            Icon(icon, size: 20, color: foregroundColor),
-            const SizedBox(width: 8),
-          ],
+          Icon(
+            Icons.search_off_rounded,
+            size: 40,
+            color: colorScheme.onSurfaceVariant,
+          ),
+          const SizedBox(height: 12),
           Text(
-            label,
+            title,
             style: textTheme.titleMedium?.copyWith(
-              fontWeight: FontWeight.w700,
-              fontSize: 16,
-              color: foregroundColor,
+              fontSize: 20,
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            message,
+            textAlign: TextAlign.center,
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
             ),
           ),
         ],

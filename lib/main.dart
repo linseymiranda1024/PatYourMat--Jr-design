@@ -142,7 +142,11 @@ class _MyAppState extends ConsumerState<MyApp> {
       ),
       GoRoute(
         path: ScreenCreateClass.routeName,
-        builder: (context, state) => const ScreenCreateClass(),
+        builder: (context, state) => ScreenCreateClass(
+          existingClass: state.extra is GymClass
+              ? state.extra as GymClass
+              : null,
+        ),
       ),
       GoRoute(
         path: ScreenAlternate.routeName,
