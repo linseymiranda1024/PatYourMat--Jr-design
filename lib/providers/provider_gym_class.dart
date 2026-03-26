@@ -103,6 +103,7 @@ class ProviderGymClass extends ChangeNotifier {
       id: existing.id,
       title: existing.title,
       description: existing.description,
+      category: existing.category,
       instructor: existing.instructor,
       dateTime: existing.dateTime,
       durationMinutes: existing.durationMinutes,

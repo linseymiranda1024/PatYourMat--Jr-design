@@ -25,6 +25,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
+  String _selectedCategory = 'Other';
   bool _isSubmitting = false;
   bool get _isEditing => widget.existingClass != null;
 
@@ -42,6 +43,12 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     _locationController.text = existingClass.location;
     _capacityController.text = existingClass.capacity.toString();
     _durationController.text = existingClass.durationMinutes.toString();
+    final normalizedCategory = normalizeGymClassCategory(
+      existingClass.category,
+    );
+    _selectedCategory = gymClassCategories.contains(normalizedCategory)
+        ? normalizedCategory
+        : 'Other';
     _selectedDate = existingClass.dateTime;
     _selectedTime = TimeOfDay.fromDateTime(existingClass.dateTime);
   }
@@ -103,6 +110,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       id: existingClass?.id ?? '',
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
+      category: _selectedCategory,
       instructor: _instructorController.text.trim(),
       dateTime: DateTime(
         _selectedDate.year,
@@ -184,6 +192,23 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter a location'
                       : null,
+                ),
+                const SizedBox(height: 12),
+                DropdownButtonFormField<String>(
+                  initialValue: _selectedCategory,
+                  decoration: const InputDecoration(labelText: 'Category'),
+                  items: gymClassCategories
+                      .map(
+                        (category) => DropdownMenuItem<String>(
+                          value: category,
+                          child: Text(category),
+                        ),
+                      )
+                      .toList(),
+                  onChanged: (value) {
+                    if (value == null) return;
+                    setState(() => _selectedCategory = value);
+                  },
                 ),
                 const SizedBox(height: 12),
                 Row(

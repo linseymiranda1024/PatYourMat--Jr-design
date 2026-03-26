@@ -1,41 +1,112 @@
-// lib/screens/reservation_confirmation_screen.dart
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
+import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+
+import '../db_helpers/db_reservations.dart';
+import '../main.dart';
+import '../models/achievement.dart';
+import '../models/gym_class.dart';
+import '../models/reservation.dart';
+import '../providers/provider_reservations.dart';
 import '../widgets/navigation/widget_app_outline.dart';
 
-class ReservationConfirmationScreen extends StatelessWidget {
+class ReservationConfirmationScreen extends ConsumerStatefulWidget {
   static const String routeName = '/reservation_confirmed';
 
-  final String className;
-  final String instructor;
-  final String dateTime;
-  final String matNumber;
+  final GymClass gymClass;
+  final Reservation reservation;
 
   const ReservationConfirmationScreen({
     super.key,
-    required this.className,
-    required this.instructor,
-    required this.dateTime,
-    required this.matNumber,
+    required this.gymClass,
+    required this.reservation,
   });
 
   @override
+  ConsumerState<ReservationConfirmationScreen> createState() =>
+      _ReservationConfirmationScreenState();
+}
+
+class _ReservationConfirmationScreenState
+    extends ConsumerState<ReservationConfirmationScreen> {
+  bool _isCheckingIn = false;
+
+  Future<void> _checkInUser(Reservation reservation) async {
+    if (_isCheckingIn) return;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(const SnackBar(content: Text('You must be logged in.')));
+      return;
+    }
+
+    setState(() => _isCheckingIn = true);
+
+    try {
+      final result = await DBReservations.checkInUser(
+        user.uid,
+        reservation,
+        widget.gymClass,
+      );
+      ref
+          .read(providerUserProfile)
+          .applyAchievementProgress(
+            achievements: result.achievements,
+            categoryAttendance: result.categoryAttendance,
+          );
+
+      if (!mounted) return;
+
+      final unlockedTitles = result.newlyUnlockedAchievementIds
+          .map((id) => Achievement.byId(id)?.title ?? id)
+          .toList();
+      final message = unlockedTitles.isEmpty
+          ? 'Check-in recorded.'
+          : 'Check-in recorded. Unlocked: ${unlockedTitles.join(', ')}';
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } catch (error) {
+      if (!mounted) return;
+      var message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text('Check-in failed: $message')));
+    } finally {
+      if (mounted) {
+        setState(() => _isCheckingIn = false);
+      }
+    }
+  }
+
+  @override
   Widget build(BuildContext context) {
+    final liveReservation = _findReservation(
+      ref.watch(reservationsProvider).reservations,
+      widget.reservation.id,
+    );
+    final reservation = liveReservation ?? widget.reservation;
+    final isAttended = reservation.status.toUpperCase() == 'ATTENDED';
+
     return Scaffold(
       appBar: AppBar(
         leading: IconButton(
           icon: const Icon(Icons.arrow_back, color: Colors.white),
-          onPressed: () =>
-              context.pop(), // Pops back to previous screen (Class Detail)
+          onPressed: () => context.pop(),
         ),
-        title: const Text("Reservation Confirmed"),
-        backgroundColor: const Color(0xFF4CAF50), // Matches the success green
+        title: const Text('Reservation Confirmed'),
+        backgroundColor: const Color(0xFF4CAF50),
         foregroundColor: Colors.white,
         elevation: 0,
       ),
       body: Column(
         children: [
-          // Green success header
           Container(
             width: double.infinity,
             padding: const EdgeInsets.fromLTRB(24, 32, 24, 40),
@@ -46,8 +117,8 @@ class ReservationConfirmationScreen extends StatelessWidget {
                 end: Alignment.bottomCenter,
               ),
             ),
-            child: Column(
-              children: const [
+            child: const Column(
+              children: [
                 Icon(Icons.check_circle, size: 80, color: Colors.white),
                 SizedBox(height: 16),
                 Text(
@@ -60,43 +131,44 @@ class ReservationConfirmationScreen extends StatelessWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  "Your mat spot has been reserved",
+                  'Your mat spot has been reserved',
                   style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
               ],
             ),
           ),
-
           Expanded(
             child: SingleChildScrollView(
               padding: const EdgeInsets.all(20),
               child: Column(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // Reservation Details
                   const Text(
-                    "Reservation Details",
+                    'Reservation Details',
                     style: TextStyle(fontSize: 20, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 16),
                   _DetailRow(
                     icon: Icons.event,
-                    label: "Class Name",
-                    value: className,
+                    label: 'Class Name',
+                    value: reservation.className,
                   ),
                   _DetailRow(
                     icon: Icons.access_time,
-                    label: "Date & Time",
-                    value: dateTime,
+                    label: 'Date & Time',
+                    value: reservation.dateTime,
                   ),
                   _DetailRow(
                     icon: Icons.place,
-                    label: "Your Mat Location",
-                    value: matNumber,
+                    label: 'Your Mat Location',
+                    value: reservation.matNumber,
                   ),
-
+                  _DetailRow(
+                    icon: Icons.category_outlined,
+                    label: 'Category',
+                    value: widget.gymClass.category,
+                  ),
                   const SizedBox(height: 24),
-
                   Center(
                     child: Container(
                       padding: const EdgeInsets.all(24),
@@ -113,7 +185,7 @@ class ReservationConfirmationScreen extends StatelessWidget {
                           ),
                           SizedBox(height: 12),
                           Text(
-                            "Show this QR code at check-in",
+                            'Show this QR code at check-in',
                             style: TextStyle(
                               color: Colors.deepPurple,
                               fontWeight: FontWeight.w600,
@@ -123,12 +195,33 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
+                  const SizedBox(height: 24),
+                  SizedBox(
+                    width: double.infinity,
+                    height: 52,
+                    child: OutlinedButton.icon(
+                      onPressed: isAttended || _isCheckingIn
+                          ? null
+                          : () => _checkInUser(reservation),
+                      icon: _isCheckingIn
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : Icon(
+                              isAttended
+                                  ? Icons.verified
+                                  : Icons.fact_check_outlined,
+                            ),
+                      label: Text(
+                        isAttended ? 'Checked In' : 'Check In (Dev Only)',
+                      ),
+                    ),
+                  ),
                   const SizedBox(height: 32),
-
-                  // Important Reminders
                   const Text(
-                    "Important Reminders",
+                    'Important Reminders',
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
@@ -138,27 +231,24 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text("• Arrive at least 5 minutes early to check in"),
+                          Text('• Arrive at least 5 minutes early to check in'),
                           SizedBox(height: 8),
-                          Text("• Bring your student ID and water bottle"),
+                          Text('• Bring your student ID and water bottle'),
                           SizedBox(height: 8),
                           Text(
-                            "• Cancel at least 2 hours in advance to avoid penalty",
+                            '• Cancel at least 2 hours in advance to avoid penalty',
                           ),
                         ],
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 32),
-
-                  // Action buttons
                   Row(
                     children: [
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.calendar_today),
-                          label: const Text("Add to Calendar"),
+                          label: const Text('Add to Calendar'),
                           onPressed: () {},
                         ),
                       ),
@@ -166,16 +256,13 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       Expanded(
                         child: OutlinedButton.icon(
                           icon: const Icon(Icons.share),
-                          label: const Text("Share"),
+                          label: const Text('Share'),
                           onPressed: () {},
                         ),
                       ),
                     ],
                   ),
-
                   const SizedBox(height: 24),
-
-                  // View My Reservations button
                   SizedBox(
                     width: double.infinity,
                     height: 56,
@@ -187,12 +274,10 @@ class ReservationConfirmationScreen extends StatelessWidget {
                         ),
                       ),
                       onPressed: () {
-                        context.go(
-                          '${WidgetAppOutline.routeName}?tab=4',
-                        ); // Navigates to the Profile tab in the main shell
+                        context.go('${WidgetAppOutline.routeName}?tab=4');
                       },
                       child: const Text(
-                        "View My Reservations",
+                        'View My Reservations',
                         style: TextStyle(
                           color: Colors.white,
                           fontSize: 18,
@@ -201,10 +286,7 @@ class ReservationConfirmationScreen extends StatelessWidget {
                       ),
                     ),
                   ),
-
                   const SizedBox(height: 24),
-
-                  // Back to Home / Schedule option
                   Center(
                     child: TextButton.icon(
                       icon: const Icon(
@@ -212,16 +294,14 @@ class ReservationConfirmationScreen extends StatelessWidget {
                         color: Color(0xFF6200EE),
                       ),
                       label: const Text(
-                        "Back to Home",
+                        'Back to Home',
                         style: TextStyle(
                           fontSize: 16,
                           color: Color(0xFF6200EE),
                         ),
                       ),
                       onPressed: () {
-                        context.go(
-                          WidgetAppOutline.routeName,
-                        ); // or HomeScreen.routeName if you prefer named route
+                        context.go(WidgetAppOutline.routeName);
                       },
                     ),
                   ),
@@ -234,11 +314,36 @@ class ReservationConfirmationScreen extends StatelessWidget {
     );
   }
 
-  Widget _DetailRow({
-    required IconData icon,
-    required String label,
-    required String value,
-  }) {
+  Reservation? _findReservation(
+    List<Reservation> reservations,
+    String? reservationId,
+  ) {
+    if (reservationId == null) {
+      return null;
+    }
+
+    for (final reservation in reservations) {
+      if (reservation.id == reservationId) {
+        return reservation;
+      }
+    }
+    return null;
+  }
+}
+
+class _DetailRow extends StatelessWidget {
+  final IconData icon;
+  final String label;
+  final String value;
+
+  const _DetailRow({
+    required this.icon,
+    required this.label,
+    required this.value,
+  });
+
+  @override
+  Widget build(BuildContext context) {
     return Padding(
       padding: const EdgeInsets.symmetric(vertical: 10),
       child: Row(

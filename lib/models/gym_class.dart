@@ -2,10 +2,34 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ClassStatus { open, full, standby }
 
+const List<String> gymClassCategories = <String>[
+  'Yoga',
+  'Dance',
+  'Bike',
+  'Strength',
+  'Other',
+];
+
+String normalizeGymClassCategory(String? category) {
+  final trimmed = category?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return 'Other';
+  }
+
+  for (final option in gymClassCategories) {
+    if (option.toLowerCase() == trimmed.toLowerCase()) {
+      return option;
+    }
+  }
+
+  return trimmed;
+}
+
 class GymClass {
   final String id;
   final String title;
   final String description;
+  final String category;
   final String instructor;
   final DateTime dateTime;
   final int durationMinutes;
@@ -18,6 +42,7 @@ class GymClass {
     required this.id,
     required this.title,
     required this.description,
+    required this.category,
     required this.instructor,
     required this.dateTime,
     required this.durationMinutes,
@@ -34,6 +59,7 @@ class GymClass {
         id: doc.id,
         title: data['title'] ?? 'Untitled Class',
         description: data['description'] ?? '',
+        category: normalizeGymClassCategory(data['category'] as String?),
         instructor: data['instructor'] ?? 'Unknown Instructor',
         dateTime: data['dateTime'] is Timestamp
             ? (data['dateTime'] as Timestamp).toDate()
@@ -51,6 +77,7 @@ class GymClass {
         id: doc.id,
         title: 'Error Loading Class',
         description: '',
+        category: 'Other',
         instructor: '',
         dateTime: DateTime.now(),
         durationMinutes: 0,
@@ -66,6 +93,7 @@ class GymClass {
     return {
       'title': title,
       'description': description,
+      'category': normalizeGymClassCategory(category),
       'instructor': instructor,
       'dateTime': Timestamp.fromDate(dateTime),
       'durationMinutes': durationMinutes,

@@ -6,6 +6,7 @@ import '../main.dart';
 import '../models/gym_class.dart';
 import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
+import '../models/reservation.dart';
 import '../theme/app_colors.dart';
 import 'reservation_confirmation_screen.dart';
 
@@ -33,14 +34,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
       if (matNumber != null) {
         ref.read(providerGymClass).applyLocalRegistrationDelta(gClass.id, 1);
         if (mounted) {
+          final reservation = Reservation(
+            id: gClass.id,
+            className: gClass.title,
+            instructor: gClass.instructor,
+            dateTime: '${gClass.dateText} at ${gClass.timeText}',
+            matNumber: matNumber,
+            status: 'CONFIRMED',
+            date: gClass.dateTime,
+          );
           context.pushNamed(
             ReservationConfirmationScreen.routeName,
-            extra: {
-              'className': gClass.title,
-              'instructor': gClass.instructor,
-              'dateTime': '${gClass.dateText} at ${gClass.timeText}',
-              'matNumber': matNumber,
-            },
+            extra: {'gymClass': gClass, 'reservation': reservation},
           );
         }
       }
