@@ -2,34 +2,53 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ClassStatus { open, full, standby }
 
-const List<String> gymClassCategories = <String>[
+const List<String> gymClassTypes = <String>[
   'Yoga',
-  'Dance',
-  'Bike',
+  'Sport',
+  'Pilates',
+  'HIIT',
   'Strength',
-  'Other',
+  'Cardio',
+  'Dance',
+  'Mobility',
+  'Meditation',
+  'Recovery',
 ];
 
-String normalizeGymClassCategory(String? category) {
-  final trimmed = category?.trim() ?? '';
+String normalizeGymClassType(String? type) {
+  final trimmed = type?.trim() ?? '';
   if (trimmed.isEmpty) {
-    return 'Other';
+    return 'Recovery';
   }
 
-  for (final option in gymClassCategories) {
+  for (final option in gymClassTypes) {
     if (option.toLowerCase() == trimmed.toLowerCase()) {
       return option;
     }
   }
 
-  return trimmed;
+  const legacyAliases = <String, String>{
+    'bike': 'Cardio',
+    'cycling': 'Cardio',
+    'spin': 'Cardio',
+    'other': 'Recovery',
+    'boxing': 'Sport',
+    'soccer': 'Sport',
+  };
+
+  final legacyMatch = legacyAliases[trimmed.toLowerCase()];
+  if (legacyMatch != null) {
+    return legacyMatch;
+  }
+
+  return 'Recovery';
 }
 
 class GymClass {
   final String id;
   final String title;
   final String description;
-  final String category;
+  final String type;
   final String instructor;
   final DateTime dateTime;
   final int durationMinutes;
@@ -42,7 +61,7 @@ class GymClass {
     required this.id,
     required this.title,
     required this.description,
-    required this.category,
+    required this.type,
     required this.instructor,
     required this.dateTime,
     required this.durationMinutes,
@@ -59,7 +78,9 @@ class GymClass {
         id: doc.id,
         title: data['title'] ?? 'Untitled Class',
         description: data['description'] ?? '',
-        category: normalizeGymClassCategory(data['category'] as String?),
+        type: normalizeGymClassType(
+          data['type'] as String? ?? data['category'] as String?,
+        ),
         instructor: data['instructor'] ?? 'Unknown Instructor',
         dateTime: data['dateTime'] is Timestamp
             ? (data['dateTime'] as Timestamp).toDate()
@@ -77,7 +98,7 @@ class GymClass {
         id: doc.id,
         title: 'Error Loading Class',
         description: '',
-        category: 'Other',
+        type: 'Recovery',
         instructor: '',
         dateTime: DateTime.now(),
         durationMinutes: 0,
@@ -93,7 +114,7 @@ class GymClass {
     return {
       'title': title,
       'description': description,
-      'category': normalizeGymClassCategory(category),
+      'type': normalizeGymClassType(type),
       'instructor': instructor,
       'dateTime': Timestamp.fromDate(dateTime),
       'durationMinutes': durationMinutes,

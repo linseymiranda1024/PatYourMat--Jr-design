@@ -8,6 +8,7 @@ import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
 import '../models/reservation.dart';
 import '../theme/app_colors.dart';
+import 'mat_selection_screen.dart';
 import 'reservation_confirmation_screen.dart';
 
 class ClassDetailScreen extends ConsumerStatefulWidget {
@@ -247,6 +248,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                               const SizedBox(height: 16),
 
                               _buildInfoRow(
+                                Icons.category_outlined,
+                                'Type',
+                                gClass.type,
+                              ),
+                              _buildInfoRow(
                                 Icons.person_outline,
                                 'Instructor',
                                 gClass.instructor,
@@ -330,6 +336,35 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                             fontWeight: FontWeight.bold,
                                           ),
                                         ),
+                                ),
+                              ),
+                              const SizedBox(height: 14),
+                              SizedBox(
+                                width: double.infinity,
+                                height: 54,
+                                child: OutlinedButton.icon(
+                                  onPressed:
+                                      (_isLoading ||
+                                          isRegistered ||
+                                          gClass.status != ClassStatus.open)
+                                      ? null
+                                      : () {
+                                          context.push(
+                                            MatSelectionScreen.routeName,
+                                            extra: gClass,
+                                          );
+                                        },
+                                  icon: const Icon(Icons.grid_view_rounded),
+                                  label: const Text('Choose Your Mat'),
+                                  style: OutlinedButton.styleFrom(
+                                    foregroundColor: colorScheme.primary,
+                                    side: BorderSide(
+                                      color: colorScheme.primary,
+                                    ),
+                                    shape: RoundedRectangleBorder(
+                                      borderRadius: BorderRadius.circular(28),
+                                    ),
+                                  ),
                                 ),
                               ),
                             ],

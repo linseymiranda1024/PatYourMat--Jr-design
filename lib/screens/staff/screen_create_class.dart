@@ -25,9 +25,22 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
-  String _selectedCategory = 'Other';
+  String _selectedType = gymClassTypes.first;
   bool _isSubmitting = false;
   bool get _isEditing => widget.existingClass != null;
+
+  DateTime get _selectedDateTime => DateTime(
+    _selectedDate.year,
+    _selectedDate.month,
+    _selectedDate.day,
+    _selectedTime.hour,
+    _selectedTime.minute,
+  );
+
+  DateTime get _selectedEndDateTime {
+    final duration = int.tryParse(_durationController.text.trim()) ?? 60;
+    return _selectedDateTime.add(Duration(minutes: duration.clamp(1, 1440)));
+  }
 
   @override
   void initState() {
@@ -43,12 +56,10 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     _locationController.text = existingClass.location;
     _capacityController.text = existingClass.capacity.toString();
     _durationController.text = existingClass.durationMinutes.toString();
-    final normalizedCategory = normalizeGymClassCategory(
-      existingClass.category,
-    );
-    _selectedCategory = gymClassCategories.contains(normalizedCategory)
-        ? normalizedCategory
-        : 'Other';
+    final normalizedType = normalizeGymClassType(existingClass.type);
+    _selectedType = gymClassTypes.contains(normalizedType)
+        ? normalizedType
+        : gymClassTypes.first;
     _selectedDate = existingClass.dateTime;
     _selectedTime = TimeOfDay.fromDateTime(existingClass.dateTime);
   }
@@ -86,10 +97,58 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     if (time != null) setState(() => _selectedTime = time);
   }
 
+  bool _isScheduleSelectionValid() {
+    final selectedDateTime = _selectedDateTime;
+    final now = DateTime.now();
+
+    if (!selectedDateTime.isBefore(now)) {
+      return true;
+    }
+
+    final existingClass = widget.existingClass;
+    if (existingClass == null) {
+      return false;
+    }
+
+    final existingDateTime = existingClass.dateTime;
+    return existingDateTime.year == selectedDateTime.year &&
+        existingDateTime.month == selectedDateTime.month &&
+        existingDateTime.day == selectedDateTime.day &&
+        existingDateTime.hour == selectedDateTime.hour &&
+        existingDateTime.minute == selectedDateTime.minute;
+  }
+
+  String? _validatePositiveNumber(
+    String? value, {
+    required String emptyMessage,
+    required String invalidMessage,
+    required int minValue,
+  }) {
+    if (value == null || value.trim().isEmpty) {
+      return emptyMessage;
+    }
+
+    final parsed = int.tryParse(value.trim());
+    if (parsed == null || parsed < minValue) {
+      return invalidMessage;
+    }
+    return null;
+  }
+
   Future<void> _submitClass() async {
     if (_isSubmitting) return;
     final isValid = _formKey.currentState?.validate() ?? false;
     if (!isValid) return;
+    if (!_isScheduleSelectionValid()) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text(
+            'Please choose a date and time that is not in the past.',
+          ),
+        ),
+      );
+      return;
+    }
 
     setState(() {
       _isSubmitting = true;
@@ -110,15 +169,9 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       id: existingClass?.id ?? '',
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
-      category: _selectedCategory,
+      type: _selectedType,
       instructor: _instructorController.text.trim(),
-      dateTime: DateTime(
-        _selectedDate.year,
-        _selectedDate.month,
-        _selectedDate.day,
-        _selectedTime.hour,
-        _selectedTime.minute,
-      ),
+      dateTime: _selectedDateTime,
       durationMinutes: int.tryParse(_durationController.text.trim()) ?? 60,
       location: _locationController.text.trim(),
       capacity: capacity,
@@ -145,6 +198,12 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final selectedDateTime = _selectedDateTime;
+    final endDateTime = _selectedEndDateTime;
+    final isScheduleValid = _isScheduleSelectionValid();
+
     return Scaffold(
       appBar: AppBar(
         title: Text(_isEditing ? 'Edit Class' : 'Create New Class'),
@@ -157,9 +216,27 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
             child: Column(
               crossAxisAlignment: CrossAxisAlignment.stretch,
               children: [
+                Text(
+                  'Class Details',
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Set the basics for how this class will appear across the app.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 TextFormField(
                   controller: _titleController,
-                  decoration: const InputDecoration(labelText: 'Class Title'),
+                  decoration: const InputDecoration(
+                    labelText: 'Class Title',
+                    prefixIcon: Icon(Icons.title_rounded),
+                  ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter a title'
                       : null,
@@ -172,6 +249,10 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                   decoration: const InputDecoration(
                     labelText: 'Description',
                     alignLabelWithHint: true,
+                    prefixIcon: Padding(
+                      padding: EdgeInsets.only(bottom: 64),
+                      child: Icon(Icons.subject_rounded),
+                    ),
                   ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter a description'
@@ -180,7 +261,10 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _instructorController,
-                  decoration: const InputDecoration(labelText: 'Instructor'),
+                  decoration: const InputDecoration(
+                    labelText: 'Instructor',
+                    prefixIcon: Icon(Icons.person_outline_rounded),
+                  ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter an instructor'
                       : null,
@@ -188,29 +272,55 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                 const SizedBox(height: 12),
                 TextFormField(
                   controller: _locationController,
-                  decoration: const InputDecoration(labelText: 'Location'),
+                  decoration: const InputDecoration(
+                    labelText: 'Location',
+                    prefixIcon: Icon(Icons.location_on_outlined),
+                  ),
                   validator: (value) => value == null || value.trim().isEmpty
                       ? 'Please enter a location'
                       : null,
                 ),
                 const SizedBox(height: 12),
                 DropdownButtonFormField<String>(
-                  initialValue: _selectedCategory,
-                  decoration: const InputDecoration(labelText: 'Category'),
-                  items: gymClassCategories
+                  initialValue: _selectedType,
+                  decoration: const InputDecoration(
+                    labelText: 'Type',
+                    prefixIcon: Icon(Icons.category_outlined),
+                  ),
+                  items: gymClassTypes
                       .map(
-                        (category) => DropdownMenuItem<String>(
-                          value: category,
-                          child: Text(category),
+                        (type) => DropdownMenuItem<String>(
+                          value: type,
+                          child: Text(type),
                         ),
                       )
                       .toList(),
                   onChanged: (value) {
                     if (value == null) return;
-                    setState(() => _selectedCategory = value);
+                    setState(() => _selectedType = value);
                   },
+                  validator: (value) => value == null || value.isEmpty
+                      ? 'Please select a class type'
+                      : null,
                 ),
-                const SizedBox(height: 12),
+                const SizedBox(height: 24),
+                Divider(color: colorScheme.outlineVariant),
+                const SizedBox(height: 20),
+                Text(
+                  'Scheduling',
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  'Choose when the class happens and how many spots are available.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 16),
                 Row(
                   children: [
                     Expanded(
@@ -218,17 +328,16 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                         controller: _capacityController,
                         decoration: const InputDecoration(
                           labelText: 'Capacity',
+                          prefixIcon: Icon(Icons.group_outlined),
                         ),
+                        onChanged: (_) => setState(() {}),
                         keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Enter capacity';
-                          }
-                          if (int.tryParse(value.trim()) == null) {
-                            return 'Valid number';
-                          }
-                          return null;
-                        },
+                        validator: (value) => _validatePositiveNumber(
+                          value,
+                          emptyMessage: 'Enter capacity',
+                          invalidMessage: 'Capacity must be at least 1',
+                          minValue: 1,
+                        ),
                       ),
                     ),
                     const SizedBox(width: 16),
@@ -237,58 +346,120 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                         controller: _durationController,
                         decoration: const InputDecoration(
                           labelText: 'Duration (min)',
+                          prefixIcon: Icon(Icons.timer_outlined),
                         ),
+                        onChanged: (_) => setState(() {}),
                         keyboardType: TextInputType.number,
-                        validator: (value) {
-                          if (value == null || value.trim().isEmpty) {
-                            return 'Enter duration';
-                          }
-                          if (int.tryParse(value.trim()) == null) {
-                            return 'Valid number';
-                          }
-                          return null;
-                        },
+                        validator: (value) => _validatePositiveNumber(
+                          value,
+                          emptyMessage: 'Enter duration',
+                          invalidMessage: 'Duration must be at least 15 min',
+                          minValue: 15,
+                        ),
                       ),
                     ),
                   ],
                 ),
                 const SizedBox(height: 24),
                 Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceAround,
                   children: [
-                    Column(
-                      children: [
-                        const Text(
-                          'Date',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextButton.icon(
-                          onPressed: _pickDate,
-                          icon: const Icon(Icons.calendar_today),
-                          label: Text(DateFormat.yMd().format(_selectedDate)),
-                        ),
-                      ],
+                    Expanded(
+                      child: _SchedulePickerCard(
+                        label: 'Date',
+                        value: DateFormat.yMMMMd().format(_selectedDate),
+                        icon: Icons.calendar_today,
+                        onTap: _pickDate,
+                      ),
                     ),
-                    Column(
-                      children: [
-                        const Text(
-                          'Time',
-                          style: TextStyle(fontWeight: FontWeight.bold),
-                        ),
-                        TextButton.icon(
-                          onPressed: _pickTime,
-                          icon: const Icon(Icons.access_time),
-                          label: Text(_selectedTime.format(context)),
-                        ),
-                      ],
+                    const SizedBox(width: 12),
+                    Expanded(
+                      child: _SchedulePickerCard(
+                        label: 'Time',
+                        value: _selectedTime.format(context),
+                        icon: Icons.access_time,
+                        onTap: _pickTime,
+                      ),
                     ),
                   ],
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(
+                      color: isScheduleValid
+                          ? colorScheme.outlineVariant
+                          : colorScheme.error.withValues(alpha: 0.5),
+                    ),
+                  ),
+                  child: Row(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Icon(
+                        isScheduleValid
+                            ? Icons.schedule_rounded
+                            : Icons.warning_amber_rounded,
+                        color: isScheduleValid
+                            ? colorScheme.primary
+                            : colorScheme.error,
+                      ),
+                      const SizedBox(width: 12),
+                      Expanded(
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            Text(
+                              'Schedule Preview',
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                            const SizedBox(height: 6),
+                            Text(
+                              '${DateFormat.yMMMMEEEEd().add_jm().format(selectedDateTime)} to ${DateFormat.jm().format(endDateTime)}',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: colorScheme.onSurface,
+                                fontWeight: FontWeight.w600,
+                                height: 1.4,
+                              ),
+                            ),
+                            const SizedBox(height: 4),
+                            Text(
+                              '$_selectedType • ${_capacityController.text.trim().isEmpty ? 'Capacity TBD' : '${_capacityController.text.trim()} mats'} • ${_durationController.text.trim().isEmpty ? 'Duration TBD' : '${_durationController.text.trim()} min'}',
+                              style: textTheme.bodySmall?.copyWith(
+                                color: colorScheme.onSurfaceVariant,
+                                height: 1.4,
+                              ),
+                            ),
+                            if (!isScheduleValid) ...[
+                              const SizedBox(height: 8),
+                              Text(
+                                'This class is scheduled in the past. Choose a future time to save it.',
+                                style: textTheme.bodySmall?.copyWith(
+                                  color: colorScheme.error,
+                                  fontWeight: FontWeight.w600,
+                                ),
+                              ),
+                            ],
+                          ],
+                        ),
+                      ),
+                    ],
+                  ),
                 ),
                 const SizedBox(height: 32),
                 SizedBox(
                   height: 48,
                   child: ElevatedButton(
                     onPressed: _isSubmitting ? null : _submitClass,
+                    style: ElevatedButton.styleFrom(
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(18),
+                      ),
+                    ),
                     child: _isSubmitting
                         ? const SizedBox(
                             width: 20,
@@ -301,6 +472,61 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
               ],
             ),
           ),
+        ),
+      ),
+    );
+  }
+}
+
+class _SchedulePickerCard extends StatelessWidget {
+  final String label;
+  final String value;
+  final IconData icon;
+  final VoidCallback onTap;
+
+  const _SchedulePickerCard({
+    required this.label,
+    required this.value,
+    required this.icon,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return InkWell(
+      onTap: onTap,
+      borderRadius: BorderRadius.circular(20),
+      child: Ink(
+        padding: const EdgeInsets.all(16),
+        decoration: BoxDecoration(
+          color: colorScheme.surfaceContainer,
+          borderRadius: BorderRadius.circular(20),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(icon, size: 20, color: colorScheme.primary),
+            const SizedBox(height: 12),
+            Text(
+              label,
+              style: textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              value,
+              style: textTheme.bodyMedium?.copyWith(
+                fontWeight: FontWeight.w700,
+                color: colorScheme.onSurface,
+              ),
+            ),
+          ],
         ),
       ),
     );

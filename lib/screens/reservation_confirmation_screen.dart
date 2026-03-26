@@ -197,8 +197,8 @@ class _ReservationConfirmationScreenState
                   ),
                   _DetailRow(
                     icon: Icons.category_outlined,
-                    label: 'Category',
-                    value: widget.gymClass.category,
+                    label: 'Type',
+                    value: widget.gymClass.type,
                   ),
                   const SizedBox(height: 24),
                   Center(
@@ -311,14 +311,20 @@ class _ReservationConfirmationScreenState
                       },
                       child: const Text(
                         'View My Reservations',
-                        style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
+                        style: TextStyle(
+                          fontSize: 18,
+                          fontWeight: FontWeight.bold,
+                        ),
                       ),
                     ),
                   ),
                   const SizedBox(height: 24),
                   Center(
                     child: TextButton.icon(
-                      icon: Icon(Icons.home_outlined, color: colorScheme.primary),
+                      icon: Icon(
+                        Icons.home_outlined,
+                        color: colorScheme.primary,
+                      ),
                       label: Text(
                         'Back to Home',
                         style: TextStyle(

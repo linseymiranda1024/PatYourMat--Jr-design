@@ -28,13 +28,13 @@ void main() {
       'standby_alerts_enabled': false,
       'dark_mode_enabled': true,
       'achievements': ['starter', 'night_owl'],
-      'category_attendance': {'Yoga': 4, 'Bike': 2},
+      'category_attendance': {'Yoga': 4, 'Cardio': 2},
     }, 'uid-123');
 
     expect(profile.pushNotificationsEnabled, isFalse);
     expect(profile.standbyAlertsEnabled, isFalse);
     expect(profile.darkModeEnabled, isTrue);
     expect(profile.achievements, ['starter', 'night_owl']);
-    expect(profile.categoryAttendance, {'Yoga': 4, 'Bike': 2});
+    expect(profile.categoryAttendance, {'Yoga': 4, 'Cardio': 2});
   });
 }

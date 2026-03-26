@@ -9,7 +9,7 @@ void main() {
       id: '0',
       title: 'Early Strength',
       description: 'A completed morning class.',
-      category: 'Strength',
+      type: 'Strength',
       instructor: 'Casey',
       dateTime: DateTime(2026, 3, 24, 7),
       durationMinutes: 45,
@@ -22,7 +22,7 @@ void main() {
       id: '1',
       title: 'Morning Yoga Flow',
       description: 'A smooth yoga class.',
-      category: 'Yoga',
+      type: 'Yoga',
       instructor: 'Taylor',
       dateTime: DateTime(2026, 3, 24, 10),
       durationMinutes: 60,
@@ -35,7 +35,7 @@ void main() {
       id: '2',
       title: 'Power Cardio Blast',
       description: 'A cardio conditioning class.',
-      category: 'Other',
+      type: 'Cardio',
       instructor: 'Jordan',
       dateTime: DateTime(2026, 3, 24, 12),
       durationMinutes: 45,
@@ -48,7 +48,7 @@ void main() {
       id: '3',
       title: 'Pilates Reset',
       description: 'A focused pilates session.',
-      category: 'Other',
+      type: 'Pilates',
       instructor: 'Morgan',
       dateTime: DateTime(2026, 3, 25, 8),
       durationMinutes: 50,
@@ -70,11 +70,75 @@ void main() {
     expect(filtered.map((gymClass) => gymClass.id), ['1', '2']);
   });
 
-  test('category filters come from model categories on upcoming classes', () {
-    expect(homeFilterCategoryKeys(classes, now: now), ['Yoga', 'Other']);
+  test('type filters come from model types on upcoming classes', () {
+    expect(homeFilterTypeKeys(classes, now: now), [
+      'Yoga',
+      'Cardio',
+      'Pilates',
+    ]);
   });
 
-  test('category filter and search query combine correctly', () {
+  test('smart filters infer useful browse tags from title and description', () {
+    final smartClasses = [
+      GymClass(
+        id: 'a',
+        title: 'Sunrise Yoga Flow',
+        description: 'Wake up with breath and movement.',
+        type: 'Recovery',
+        instructor: 'Alex',
+        dateTime: DateTime(2026, 3, 24, 10),
+        durationMinutes: 50,
+        location: 'Studio A',
+        capacity: 20,
+        filled: 6,
+        status: ClassStatus.open,
+      ),
+      GymClass(
+        id: 'b',
+        title: 'Pilates Reset',
+        description: 'Core stability and alignment.',
+        type: 'Recovery',
+        instructor: 'Jordan',
+        dateTime: DateTime(2026, 3, 24, 11),
+        durationMinutes: 45,
+        location: 'Studio B',
+        capacity: 18,
+        filled: 7,
+        status: ClassStatus.open,
+      ),
+      GymClass(
+        id: 'c',
+        title: 'Dance Cardio Party',
+        description: 'High-energy movement.',
+        type: 'Recovery',
+        instructor: 'Morgan',
+        dateTime: DateTime(2026, 3, 24, 12),
+        durationMinutes: 45,
+        location: 'Studio C',
+        capacity: 18,
+        filled: 10,
+        status: ClassStatus.open,
+      ),
+    ];
+
+    expect(homeFilterTypeKeys(smartClasses, now: now), [
+      'Yoga',
+      'Pilates',
+      'Cardio',
+      'Dance',
+    ]);
+
+    final pilatesOnly = filterHomeClasses(
+      classes: smartClasses,
+      searchQuery: '',
+      selectedFilterKey: 'Pilates',
+      now: now,
+    );
+
+    expect(pilatesOnly.map((gymClass) => gymClass.id), ['b']);
+  });
+
+  test('type filter and search query combine correctly', () {
     final filtered = filterHomeClasses(
       classes: classes,
       searchQuery: 'taylor',

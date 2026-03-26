@@ -220,8 +220,15 @@ class ProviderUserProfile extends ChangeNotifier {
   // This function clears all of the information stored in this
   // provider
   ////////////////////////////////////////////////////////////////////////
-  Future<void> wipeAndCancelDbStream({bool? deletingAccount}) async {
+  Future<void> wipeAndCancelDbStream({
+    bool? deletingAccount,
+    bool preserveTheme = true,
+  }) async {
+    final previousDarkModeEnabled = _userProfile.darkModeEnabled;
     _userProfile = UserProfile.empty();
+    if (preserveTheme) {
+      _userProfile.darkModeEnabled = previousDarkModeEnabled;
+    }
     _userImage = null;
     _dataLoaded = false;
     _imageLoaded = false;

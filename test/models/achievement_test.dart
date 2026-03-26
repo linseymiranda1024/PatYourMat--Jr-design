@@ -5,7 +5,7 @@ void main() {
   test('unlocks threshold, category, and time-based achievements', () {
     final unlocked = Achievement.evaluateUnlocks(
       totalAttended: 10,
-      categoryAttendance: {'Yoga': 5, 'Dance': 2, 'Bike': 5},
+      categoryAttendance: {'Yoga': 5, 'Dance': 2, 'Cardio': 5},
       classDateTime: DateTime(2026, 3, 25, 8, 30),
     );
 

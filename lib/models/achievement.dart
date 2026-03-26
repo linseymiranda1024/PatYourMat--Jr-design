@@ -66,7 +66,7 @@ class Achievement {
   static const Achievement roadWarrior = Achievement(
     id: 'road_warrior',
     title: 'Road Warrior',
-    description: 'Attend 5 Bike classes.',
+    description: 'Attend 5 Cardio classes.',
     iconData: Icons.directions_run,
     color: Color(0xFF2563EB),
   );
@@ -141,7 +141,7 @@ class Achievement {
     if ((categoryAttendance['Dance'] ?? 0) >= 5) {
       unlockedIds.add(grooveMachine.id);
     }
-    if ((categoryAttendance['Bike'] ?? 0) >= 5) {
+    if ((categoryAttendance['Cardio'] ?? 0) >= 5) {
       unlockedIds.add(roadWarrior.id);
     }
     if (classDateTime.hour < 9) {

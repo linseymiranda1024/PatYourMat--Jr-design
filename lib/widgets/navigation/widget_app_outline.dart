@@ -1,11 +1,14 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:go_router/go_router.dart';
 import '../../models/user_profile.dart';
+import '../../providers/provider_auth.dart';
 import '../../screens/home_screen.dart';
 import '../../screens/calendar_screen.dart';
 import '../../screens/friends_screen.dart';
 import '../../screens/notifications_screen.dart';
 import '../../screens/profile_screen.dart';
+import '../../screens/auth/screen_login_validation.dart';
 import '../../screens/staff/screen_staff_portal.dart';
 import '../../screens/staff/screen_staff_profile.dart';
 import '../../main.dart';
@@ -31,7 +34,17 @@ class _WidgetAppOutlineState extends ConsumerState<WidgetAppOutline> {
 
   @override
   Widget build(BuildContext context) {
+    final auth = ref.watch(providerAuth);
     final userProfile = ref.watch(providerUserProfile);
+
+    if (auth.authState == AuthState.UN_AUTHENTICATED) {
+      WidgetsBinding.instance.addPostFrameCallback((_) {
+        if (!mounted) return;
+        context.go(ScreenLoginValidation.routeName);
+      });
+      return const Scaffold(body: SizedBox.shrink());
+    }
+
     final isStaff = userProfile.role == UserRole.STAFF;
 
     final pages = <Widget>[

@@ -40,7 +40,8 @@ class ScreenLoginValidation extends ConsumerStatefulWidget {
   const ScreenLoginValidation({Key? key}) : super(key: key);
 
   @override
-  ConsumerState<ScreenLoginValidation> createState() => _ScreenLoginValidationState();
+  ConsumerState<ScreenLoginValidation> createState() =>
+      _ScreenLoginValidationState();
 }
 
 //////////////////////////////////////////////////////////////////
@@ -69,11 +70,8 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
   ////////////////////////////////////////////////////////////////
   _init() async {
     // Load providers
-    _providerUserProfile = ref.watch(providerUserProfile);
-    _providerAuth = ref.watch(providerAuth);
-
-    // Set splash screen flag and attempt authentication
-    _providerAuth.isShowingSplash = true;
+    _providerUserProfile = ref.read(providerUserProfile);
+    _providerAuth = ref.read(providerAuth);
     await _providerAuth.setupAuthListener(context);
   }
 
@@ -99,12 +97,11 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
     // if (true) return const ScreenProfileSetup();
     // const WidgetAnnotatedLoading(loadingText: "Loading...")
 
-    if (_providerAuth.isShowingSplash) {
-      return const ScreenSplash();
-    } else if (_providerAuth.authState == AuthState.UNKNOWN) {
-      return const WidgetAnnotatedLoading(loadingText: "Authenticating User...");
-    } else if (_providerAuth.authState == AuthState.UN_AUTHENTICATED) {
+    if (_providerAuth.authState == AuthState.UN_AUTHENTICATED) {
       return const ScreenAuth();
+    } else if (_providerAuth.authState == AuthState.UNKNOWN ||
+        _providerAuth.isShowingSplash) {
+      return const ScreenSplash();
     } else if (ENFORCE_EMAIL_VERIFICATION &&
         _providerAuth.authState == AuthState.AUTHENTICATED &&
         !_providerAuth.emailVerified &&
@@ -163,9 +160,15 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
           bool isLoggedIn =
               _providerAuth.authState == AuthState.AUTHENTICATED &&
               _providerUserProfile.dataLoaded &&
-              _providerUserProfile.accountCreationStep == AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
-          final bool isAuthScreen = _providerAuth.authState == AuthState.UN_AUTHENTICATED || _providerAuth.isShowingSplash;
-          return ScrollableBackground(child: _getWidgetToShow(), padding: (isLoggedIn || isAuthScreen) ? 0 : 20);
+              _providerUserProfile.accountCreationStep ==
+                  AccountCreationStep.ACC_STEP_ONBOARDING_COMPLETE;
+          final bool isAuthScreen =
+              _providerAuth.authState == AuthState.UN_AUTHENTICATED ||
+              _providerAuth.isShowingSplash;
+          return ScrollableBackground(
+            child: _getWidgetToShow(),
+            padding: (isLoggedIn || isAuthScreen) ? 0 : 20,
+          );
         },
       ),
     );

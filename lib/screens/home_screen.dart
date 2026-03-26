@@ -9,6 +9,19 @@ import 'class_detail_screen.dart';
 
 const String homeTodayFilterKey = '__today__';
 
+const Map<String, List<String>> _homeTypeKeywords = <String, List<String>>{
+  'Yoga': <String>['yoga', 'flow', 'vinyasa', 'yin'],
+  'Sport': <String>['sport', 'soccer', 'boxing', 'basketball', 'volleyball'],
+  'Pilates': <String>['pilates', 'reformer', 'core'],
+  'HIIT': <String>['hiit', 'interval', 'tabata'],
+  'Strength': <String>['strength', 'lift', 'lifting', 'barbell', 'dumbbell'],
+  'Cardio': <String>['cardio', 'cycle', 'cycling', 'spin', 'bike', 'run'],
+  'Dance': <String>['dance', 'hip hop', 'hip-hop', 'zumba', 'ballet'],
+  'Mobility': <String>['mobility', 'stretch', 'flexibility'],
+  'Meditation': <String>['meditation', 'mindful', 'breathwork', 'breath work'],
+  'Recovery': <String>['recovery', 'restore', 'restorative'],
+};
+
 List<model.GymClass> upcomingHomeClasses(
   List<model.GymClass> classes, {
   DateTime? now,
@@ -20,6 +33,41 @@ List<model.GymClass> upcomingHomeClasses(
           .toList()
         ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
   return upcoming;
+}
+
+List<String> homeFilterTagsForClass(model.GymClass gymClass) {
+  final inferredTags = <String>[];
+
+  void addTag(List<String> target, String value) {
+    if (!target.contains(value)) {
+      target.add(value);
+    }
+  }
+
+  final normalizedType = model.normalizeGymClassType(gymClass.type);
+
+  final normalizedText = '${gymClass.title} ${gymClass.description}'
+      .toLowerCase();
+  for (final type in model.gymClassTypes) {
+    final keywords = _homeTypeKeywords[type] ?? const <String>[];
+    if (keywords.any(normalizedText.contains)) {
+      addTag(inferredTags, type);
+    }
+  }
+
+  final tags = <String>[];
+  final shouldHideGenericRecovery =
+      normalizedType == 'Recovery' &&
+      inferredTags.any((tag) => tag != 'Recovery');
+
+  if (!shouldHideGenericRecovery) {
+    addTag(tags, normalizedType);
+  }
+  for (final tag in inferredTags) {
+    addTag(tags, tag);
+  }
+
+  return tags;
 }
 
 List<model.GymClass> filterHomeClasses({
@@ -53,22 +101,53 @@ List<model.GymClass> filterHomeClasses({
           classDate.day == currentDate.day;
     }
 
-    return model.normalizeGymClassCategory(gymClass.category) ==
-        selectedFilterKey;
+    return homeFilterTagsForClass(gymClass).contains(selectedFilterKey);
   }).toList();
 }
 
-List<String> homeFilterCategoryKeys(
+List<String> homeFilterTypeKeys(
   List<model.GymClass> classes, {
   DateTime? now,
+  int maxCount = 6,
 }) {
-  final availableCategories = upcomingHomeClasses(classes, now: now)
-      .map((gymClass) => model.normalizeGymClassCategory(gymClass.category))
-      .toSet();
+  final upcomingClasses = upcomingHomeClasses(classes, now: now);
+  final matchCounts = <String, int>{};
+  final firstSeenAt = <String, DateTime>{};
 
-  return model.gymClassCategories
-      .where((category) => availableCategories.contains(category))
-      .toList();
+  for (final gymClass in upcomingClasses) {
+    for (final tag in homeFilterTagsForClass(gymClass)) {
+      matchCounts[tag] = (matchCounts[tag] ?? 0) + 1;
+      final existingFirstSeen = firstSeenAt[tag];
+      if (existingFirstSeen == null ||
+          gymClass.dateTime.isBefore(existingFirstSeen)) {
+        firstSeenAt[tag] = gymClass.dateTime;
+      }
+    }
+  }
+
+  final sortedTypes = matchCounts.keys.toList()
+    ..sort((a, b) {
+      final countCompare = (matchCounts[b] ?? 0).compareTo(matchCounts[a] ?? 0);
+      if (countCompare != 0) {
+        return countCompare;
+      }
+
+      final firstSeenCompare = (firstSeenAt[a] ?? DateTime(9999)).compareTo(
+        firstSeenAt[b] ?? DateTime(9999),
+      );
+      if (firstSeenCompare != 0) {
+        return firstSeenCompare;
+      }
+
+      return model.gymClassTypes
+          .indexOf(a)
+          .compareTo(model.gymClassTypes.indexOf(b));
+    });
+
+  if (sortedTypes.length <= maxCount) {
+    return sortedTypes;
+  }
+  return sortedTypes.take(maxCount).toList();
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -95,7 +174,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
     final gymClassProvider = ref.watch(providerGymClass);
     final classes = gymClassProvider.classes;
     final upcomingClasses = upcomingHomeClasses(classes);
-    final categoryFilterKeys = homeFilterCategoryKeys(classes);
+    final typeFilterKeys = homeFilterTypeKeys(classes);
     final filteredClasses = filterHomeClasses(
       classes: classes,
       searchQuery: _searchQuery,
@@ -177,12 +256,12 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       label: 'Today',
                       onTap: () => _toggleFilter(homeTodayFilterKey),
                     ),
-                    for (final categoryKey in categoryFilterKeys) ...[
+                    for (final typeKey in typeFilterKeys) ...[
                       const SizedBox(width: 10),
                       _FilterChip(
-                        selected: _selectedFilterKey == categoryKey,
-                        label: categoryKey,
-                        onTap: () => _toggleFilter(categoryKey),
+                        selected: _selectedFilterKey == typeKey,
+                        label: typeKey,
+                        onTap: () => _toggleFilter(typeKey),
                       ),
                     ],
                     const SizedBox(width: 10),

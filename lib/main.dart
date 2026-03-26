@@ -18,6 +18,7 @@ import 'package:flutter_riverpod/legacy.dart';
 import 'package:go_router/go_router.dart';
 import 'package:flutter/material.dart';
 import 'package:pat_your_mat/screens/class_detail_screen.dart';
+import 'package:pat_your_mat/screens/mat_selection_screen.dart';
 import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
 import 'models/gym_class.dart';
 import 'models/reservation.dart';
@@ -30,6 +31,7 @@ import 'screens/auth/screen_login_validation.dart';
 import 'screens/settings/screen_profile_edit.dart';
 import 'providers/provider_user_profile.dart';
 import 'providers/provider_gym_class.dart';
+import 'providers/provider_reservations.dart';
 import 'screens/settings/screen_settings.dart';
 import 'screens/screen_member_previous_classes.dart';
 import 'screens/staff/screen_staff_profile.dart';
@@ -77,10 +79,13 @@ Future<void> main() async {
     providerUserProfile,
   );
   final ProviderAuth authProvider = providerContainer.read(providerAuth);
+  final ReservationsNotifier reservationsNotifier = providerContainer.read(
+    reservationsProvider,
+  );
 
   // Initialize providers
   await userProfileProvider.initProviders(authProvider);
-  authProvider.initProviders(userProfileProvider);
+  authProvider.initProviders(userProfileProvider, reservationsNotifier);
 
   // Run the app
   runApp(
@@ -166,6 +171,13 @@ class _MyAppState extends ConsumerState<MyApp> {
         },
       ),
       GoRoute(
+        path: MatSelectionScreen.routeName,
+        builder: (context, state) {
+          final gymClass = state.extra as GymClass;
+          return MatSelectionScreen(gymClass: gymClass);
+        },
+      ),
+      GoRoute(
         path: ReservationConfirmationScreen.routeName,
         name: ReservationConfirmationScreen.routeName,
         builder: (context, state) {
@@ -177,7 +189,7 @@ class _MyAppState extends ConsumerState<MyApp> {
                   id: '',
                   title: extra['className'] as String? ?? 'Class',
                   description: '',
-                  category: 'Other',
+                  type: 'Recovery',
                   instructor: extra['instructor'] as String? ?? 'Instructor',
                   dateTime: DateTime.now(),
                   durationMinutes: 0,

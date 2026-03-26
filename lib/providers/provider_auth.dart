@@ -16,7 +16,6 @@ import 'dart:async';
 import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:firebase_auth/firebase_auth.dart';
 import 'package:flutter/material.dart';
-import 'package:flutter_riverpod/flutter_riverpod.dart';
 
 // App relative file imports
 import '../util/message_display/popup_dialogue.dart';
@@ -40,7 +39,10 @@ enum AuthState { UNKNOWN, AUTHENTICATED, UN_AUTHENTICATED }
 class ProviderAuth extends ChangeNotifier {
   // The "instance variables" managed in provider
   late ProviderUserProfile _providerUserProfile;
-  late StreamSubscription<User?>? _authStateSubscription;
+  late ReservationsNotifier _reservationsNotifier;
+  StreamSubscription<User?>? _authStateSubscription;
+  int _authStateEventCounter = 0;
+  Future<void>? _loadAuthedUserDetailsFuture;
 
   AuthState _authState = AuthState.UNKNOWN;
   bool _authStateJustChanged = false;
@@ -56,8 +58,12 @@ class ProviderAuth extends ChangeNotifier {
   ///////////////////////////////////////////////////////////////////
   // Initialize needed providers
   ///////////////////////////////////////////////////////////////////
-  void initProviders(ProviderUserProfile providerUserProfile) {
+  void initProviders(
+    ProviderUserProfile providerUserProfile,
+    ReservationsNotifier reservationsNotifier,
+  ) {
     _providerUserProfile = providerUserProfile;
+    _reservationsNotifier = reservationsNotifier;
   }
 
   ///////////////////////////////////////////////////////////////////
@@ -65,6 +71,9 @@ class ProviderAuth extends ChangeNotifier {
   ///////////////////////////////////////////////////////////////////
   setupAuthListener(BuildContext context) async {
     _context = context;
+    if (_authStateSubscription != null) {
+      return;
+    }
     // Ensure the device preferences are loaded
     // await _devicePrefsProvider.initFromDeviceStorage();
 
@@ -77,6 +86,7 @@ class ProviderAuth extends ChangeNotifier {
     _authStateSubscription = FirebaseAuth.instance.authStateChanges().listen((
       user,
     ) async {
+      final eventId = ++_authStateEventCounter;
       _emailVerified =
           FirebaseAuth.instance.currentUser?.emailVerified ?? false;
       final currentUid = user?.uid;
@@ -85,10 +95,10 @@ class ProviderAuth extends ChangeNotifier {
       // Handle account switch without full app restart (A -> B).
       if (authUidChanged && _lastAuthedUid != null) {
         await _providerUserProfile.wipeAndCancelDbStream();
-        ProviderScope.containerOf(
-          _context,
-          listen: false,
-        ).read(reservationsProvider).updateUser();
+        _reservationsNotifier.updateUser();
+        if (_isStaleAuthEvent(eventId, currentUid)) {
+          return;
+        }
       }
 
       // If no real change in state (including same authenticated uid), return.
@@ -115,6 +125,9 @@ class ProviderAuth extends ChangeNotifier {
           ),
           () {},
         );
+        if (_isStaleAuthEvent(eventId, currentUid)) {
+          return;
+        }
       }
 
       // Otherwise, state is new...respond accordingly
@@ -123,15 +136,21 @@ class ProviderAuth extends ChangeNotifier {
 
         _authState = AuthState.UN_AUTHENTICATED;
         _isShowingSplash = false;
+        _isSigningIn = false;
+        _isSigningOut = false;
+        _loadAuthedUserDetailsFuture = null;
         _lastAuthedUid = null;
-        // loadAuthedUserDetailsUponSignin();
-        // _mobileProfileIsDoc = false;
+        await _clearAuthedUserDetails();
+        if (_isStaleAuthEvent(eventId, currentUid)) {
+          return;
+        }
       } else {
         AppLogger.print("Auth state changed: AUTHENTICATED");
 
         _authState = AuthState.AUTHENTICATED;
         _isShowingSplash = false;
         _isSigningIn = true;
+        _isSigningOut = false;
         _lastAuthedUid = user.uid;
       }
 
@@ -139,6 +158,11 @@ class ProviderAuth extends ChangeNotifier {
       _authStateJustChanged = true;
       notifyListeners();
     });
+  }
+
+  bool _isStaleAuthEvent(int eventId, String? expectedUid) {
+    final liveUid = FirebaseAuth.instance.currentUser?.uid;
+    return eventId != _authStateEventCounter || liveUid != expectedUid;
   }
 
   ///////////////////////////////////////////////////////////////////
@@ -297,9 +321,6 @@ class ProviderAuth extends ChangeNotifier {
       }
 
       // If we made it here, the user is authenticated and we can update the password
-      DateTime dateLastPasswordChange = DateTime.now().subtract(
-        const Duration(seconds: 5),
-      );
       await user.updatePassword(newPassword);
 
       // Re-auth with the new password (not completely necessary)
@@ -543,6 +564,10 @@ class ProviderAuth extends ChangeNotifier {
   // (in all the providers) and logs user out.
   ///////////////////////////////////////////////////////////////////
   promptAndClearAuthedUserDetailsAndSignout({BuildContext? context}) async {
+    if (_isSigningOut) {
+      return;
+    }
+
     final ctx = context ?? _context;
 
     // Prompt user to logout
@@ -562,21 +587,17 @@ class ProviderAuth extends ChangeNotifier {
   // and logs user out.
   ///////////////////////////////////////////////////////////////////
   clearAuthedUserDetailsAndSignout({BuildContext? context}) async {
-    // Clear all user details/data
-    await _clearAuthedUserDetails(context: context);
+    if (_isSigningOut) {
+      return;
+    }
 
-    // Wait 1 second before calling sign out to allow for listeners to be cancelled before
-    // firebase unauths
-    await Future.delayed(const Duration(seconds: 1));
+    _loadAuthedUserDetailsFuture = null;
+    isSigningOut = true;
     try {
       await FirebaseAuth.instance.signOut();
-      // await Firebase.app().delete();
       _emailVerified = false;
-      isSigningOut = false;
-      notifyListeners();
     } catch (e) {
       isSigningOut = false;
-      notifyListeners();
       rethrow;
     }
   }
@@ -584,19 +605,10 @@ class ProviderAuth extends ChangeNotifier {
   ///////////////////////////////////////////////////////////////////
   // Clears the authenticated user deatils (in all the providers)
   ///////////////////////////////////////////////////////////////////
-  _clearAuthedUserDetails({BuildContext? context}) async {
-    final ctx = context ?? _context;
-
-    // Set a flag to indicate that the user is logging out
-    isSigningOut = true;
-    // _context.router.popUntilRoot();
-
+  _clearAuthedUserDetails() async {
     // Wipe data stored in providers
     await _providerUserProfile.wipeAndCancelDbStream();
-    ProviderScope.containerOf(
-      ctx,
-      listen: false,
-    ).read(reservationsProvider).clearAndCancelForSignOut();
+    _reservationsNotifier.clearAndCancelForSignOut();
 
     // Terminate the current instance of Firestore and clear any persistant state (cache) being stored locally
     try {
@@ -612,15 +624,44 @@ class ProviderAuth extends ChangeNotifier {
   // authentication
   ///////////////////////////////////////////////////////////////////
   loadAuthedUserDetailsUponSignin() async {
-    // // Load provider data from DB if needed
-    await _providerUserProfile.fetchUserProfileIfNeeded();
-    await _providerUserProfile.fetchUserProfileImageIfNeeded();
+    final currentUser = FirebaseAuth.instance.currentUser;
+    if (currentUser == null ||
+        _authState != AuthState.AUTHENTICATED ||
+        _isSigningOut) {
+      return;
+    }
+    if (_loadAuthedUserDetailsFuture != null) {
+      return _loadAuthedUserDetailsFuture;
+    }
 
-    // Update reservations listener
-    ProviderScope.containerOf(
-      _context,
-      listen: false,
-    ).read(reservationsProvider).updateUser();
+    _loadAuthedUserDetailsFuture = _loadAuthedUserDetailsForCurrentUser(
+      currentUser.uid,
+    );
+    return _loadAuthedUserDetailsFuture;
+  }
+
+  Future<void> _loadAuthedUserDetailsForCurrentUser(String userId) async {
+    try {
+      _reservationsNotifier.updateUser();
+      await _providerUserProfile.fetchUserProfileIfNeeded();
+
+      if (FirebaseAuth.instance.currentUser?.uid != userId || _isSigningOut) {
+        return;
+      }
+
+      await _providerUserProfile.fetchUserProfileImageIfNeeded();
+
+      if (FirebaseAuth.instance.currentUser?.uid != userId || _isSigningOut) {
+        return;
+      }
+
+      if (_isSigningIn) {
+        _isSigningIn = false;
+        notifyListeners();
+      }
+    } finally {
+      _loadAuthedUserDetailsFuture = null;
+    }
   }
 
   //////////////////////////////////////////////////////////////
@@ -650,6 +691,9 @@ class ProviderAuth extends ChangeNotifier {
 
   bool get isShowingSplash => _isShowingSplash;
   set isShowingSplash(bool value) {
+    if (_isShowingSplash == value) {
+      return;
+    }
     _isShowingSplash = value;
 
     // If showing the splash screen, activate a new splash screen widget
@@ -659,7 +703,6 @@ class ProviderAuth extends ChangeNotifier {
       _splashStartTime = DateTime.now().millisecondsSinceEpoch;
     } else {
       AppLogger.debug("SPLASH ENDING...");
-      notifyListeners();
     }
   }
 
