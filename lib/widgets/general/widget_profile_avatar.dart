@@ -129,7 +129,7 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       return ClipRRect(
         borderRadius: BorderRadius.circular(widget.radius),
         child: Image(
-          image: widget.userImage!, //?? Image.asset("images/logo.png").image,
+          image: widget.userImage!,
           gaplessPlayback: true,
           height: widget.radius * 2,
           width: widget.radius * 2,

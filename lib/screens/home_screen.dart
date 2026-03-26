@@ -280,9 +280,11 @@ class _SearchBar extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.search,
+            size: 20,
             color: AppColors.headerOnBrand.withValues(alpha: 0.76),
           ),
           const SizedBox(width: 10),
@@ -290,25 +292,36 @@ class _SearchBar extends StatelessWidget {
             child: TextField(
               onChanged: onChanged,
               textAlignVertical: TextAlignVertical.center,
+              expands: false,
+              maxLines: 1,
+              minLines: 1,
+              strutStyle: const StrutStyle(
+                fontSize: 18,
+                height: 1.0,
+                leading: 0,
+                forceStrutHeight: true,
+              ),
               style: textTheme.titleMedium?.copyWith(
                 color: AppColors.headerOnBrand,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+                height: 1.0,
               ),
               cursorColor: AppColors.headerOnBrand,
               decoration: InputDecoration(
-                isDense: true,
+                isCollapsed: true,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 filled: false,
                 fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 hintText: hintText,
                 hintStyle: textTheme.titleMedium?.copyWith(
                   color: AppColors.headerOnBrand.withValues(alpha: 0.76),
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
+                  height: 1.0,
                 ),
               ),
             ),

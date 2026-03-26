@@ -23,6 +23,14 @@ class Achievement {
     color: Color(0xFFF59E0B),
   );
 
+  static const Achievement demoDay = Achievement(
+    id: 'demo_day',
+    title: 'Demo Day',
+    description: 'Attend any class.',
+    iconData: Icons.celebration,
+    color: Color(0xFFEF4444),
+  );
+
   static const Achievement regular = Achievement(
     id: 'regular',
     title: 'The Regular',
@@ -80,6 +88,7 @@ class Achievement {
   );
 
   static const List<Achievement> all = <Achievement>[
+    demoDay,
     starter,
     regular,
     dedicated,
@@ -114,6 +123,9 @@ class Achievement {
   }) {
     final unlockedIds = <String>{};
 
+    if (totalAttended >= 1) {
+      unlockedIds.add(demoDay.id);
+    }
     if (totalAttended >= 1) {
       unlockedIds.add(starter.id);
     }

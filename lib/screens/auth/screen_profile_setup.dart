@@ -262,6 +262,12 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
   @override
   Widget build(BuildContext context) {
     final isStaff = _providerUserProfile.role == UserRole.STAFF;
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final isDark = theme.brightness == Brightness.dark;
+    final headerGradient = isDark
+        ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
+        : const [AppColors.gradientStart, AppColors.gradientEnd];
 
     return Form(
       key: _formKey,
@@ -279,17 +285,6 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                     : MainAxisAlignment.start,
                 crossAxisAlignment: CrossAxisAlignment.stretch,
                 children: [
-                  ///////////////////////////////////////////////////////////////////////
-                  // Logo
-                  ///////////////////////////////////////////////////////////////////////
-                  // Padding(
-                  //   padding: const EdgeInsets.symmetric(vertical: 5),
-                  //   child: Image.asset(
-                  //     'images/logo.png',
-                  //     height: MediaQuery.of(context).size.width * .5,
-                  //   ),
-                  // ),
-                  ///////////////////////////////////////////////////////////////////////
                   // Profile Avatar
                   ///////////////////////////////////////////////////////////////////////
                   Center(
@@ -329,13 +324,10 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                       margin: const EdgeInsets.only(bottom: 18),
                       padding: const EdgeInsets.all(18),
                       decoration: BoxDecoration(
-                        gradient: const LinearGradient(
+                        gradient: LinearGradient(
                           begin: Alignment.topLeft,
                           end: Alignment.bottomRight,
-                          colors: [
-                            AppColors.gradientStart,
-                            AppColors.gradientEnd,
-                          ],
+                          colors: headerGradient,
                         ),
                         borderRadius: BorderRadius.circular(24),
                       ),
@@ -347,7 +339,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                             style: const TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.w800,
-                              color: Colors.white,
+                              color: AppColors.headerOnBrand,
                             ),
                           ),
                           const SizedBox(height: 6),
@@ -356,7 +348,7 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                                 ? 'Keep your instructor profile current.'
                                 : 'Keep your profile details current.',
                             style: const TextStyle(
-                              color: Colors.white70,
+                              color: AppColors.headerOnBrandMuted,
                               height: 1.4,
                             ),
                           ),
@@ -379,8 +371,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                               ),
-                              backgroundColor: CustomColors.statusInfo,
-                              foregroundColor: Colors.white,
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
@@ -401,8 +393,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                         ElevatedButton(
                           style: ElevatedButton.styleFrom(
                             padding: const EdgeInsets.symmetric(horizontal: 12),
-                            backgroundColor: CustomColors.statusInfo,
-                            foregroundColor: Colors.white,
+                            backgroundColor: colorScheme.primary,
+                            foregroundColor: colorScheme.onPrimary,
                           ),
                           child: const Row(
                             mainAxisSize: MainAxisSize.min,
@@ -428,8 +420,8 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 12,
                               ),
-                              backgroundColor: CustomColors.statusInfo,
-                              foregroundColor: Colors.white,
+                              backgroundColor: colorScheme.primary,
+                              foregroundColor: colorScheme.onPrimary,
                             ),
                             child: const Row(
                               mainAxisSize: MainAxisSize.min,
@@ -466,11 +458,20 @@ class _ScreenProfileSetupState extends ConsumerState<ScreenProfileSetup> {
                   Container(
                     padding: const EdgeInsets.all(20),
                     decoration: BoxDecoration(
-                      color: Colors.white,
+                      color: isDark
+                          ? colorScheme.surfaceContainer
+                          : colorScheme.surfaceContainerLowest,
                       borderRadius: BorderRadius.circular(24),
-                      boxShadow: const [
+                      border: Border.all(
+                        color: colorScheme.outlineVariant.withValues(
+                          alpha: isDark ? 0.45 : 0.7,
+                        ),
+                      ),
+                      boxShadow: [
                         BoxShadow(
-                          color: Color(0x0F0E1726),
+                          color: Colors.black.withValues(
+                            alpha: isDark ? 0.20 : 0.06,
+                          ),
                           blurRadius: 16,
                           offset: Offset(0, 6),
                         ),

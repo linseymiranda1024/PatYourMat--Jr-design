@@ -10,6 +10,7 @@ void main() {
     );
 
     expect(unlocked, [
+      'demo_day',
       'starter',
       'regular',
       'zen_master',
@@ -21,10 +22,11 @@ void main() {
   test('sortAchievementIds preserves catalog order', () {
     final sorted = Achievement.sortAchievementIds([
       'night_owl',
+      'demo_day',
       'starter',
       'dedicated',
     ]);
 
-    expect(sorted, ['starter', 'dedicated', 'night_owl']);
+    expect(sorted, ['demo_day', 'starter', 'dedicated', 'night_owl']);
   });
 }
