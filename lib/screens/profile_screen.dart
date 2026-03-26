@@ -65,9 +65,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       return reservation.date.month == now.month &&
           reservation.date.year == now.year;
     }).length;
-    final nextReservation = upcomingReservations.isEmpty
-        ? null
-        : upcomingReservations.first;
 
     return Scaffold(
       body: SafeArea(
@@ -82,7 +79,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 context: context,
                 reservations: reservations,
                 thisMonthCount: thisMonthCount,
-                nextReservation: nextReservation,
               ),
               const SizedBox(height: 20),
               _buildAchievementsSection(context, profile),
@@ -284,7 +280,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     required BuildContext context,
     required List<Reservation> reservations,
     required int thisMonthCount,
-    required Reservation? nextReservation,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -325,13 +320,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   value: '$thisMonthCount',
                   icon: Icons.calendar_month_outlined,
                   accent: AppColors.success,
-                ),
-                _buildStatCard(
-                  context: context,
-                  label: 'Next Mat Spot',
-                  value: nextReservation?.matNumber ?? 'None',
-                  icon: Icons.place_outlined,
-                  accent: AppColors.warning,
                 ),
               ],
             );
