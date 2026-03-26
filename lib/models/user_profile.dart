@@ -39,6 +39,8 @@ class UserProfile {
   String _email = "";
   String _phoneNumber = "";
   String _bio = "";
+  List<String> _achievements = [];
+  Map<String, int> _categoryAttendance = {};
   List<String> _specialties = [];
   int _yearsTeaching = 0;
   bool _isActiveInstructor = false;
@@ -66,6 +68,8 @@ class UserProfile {
     this._email,
     this._phoneNumber,
     this._bio,
+    this._achievements,
+    this._categoryAttendance,
     this._specialties,
     this._yearsTeaching,
     this._isActiveInstructor,
@@ -88,6 +92,8 @@ class UserProfile {
     _email = "";
     _phoneNumber = "";
     _bio = "";
+    _achievements = [];
+    _categoryAttendance = {};
     _specialties = [];
     _yearsTeaching = 0;
     _isActiveInstructor = false;
@@ -115,6 +121,10 @@ class UserProfile {
     email = jsonObject["email"] ?? "";
     phoneNumber = jsonObject["phone_number"] ?? "";
     bio = jsonObject["bio"] ?? "";
+    achievements = List<String>.from(jsonObject["achievements"] ?? const []);
+    categoryAttendance = _parseCategoryAttendance(
+      jsonObject["category_attendance"] ?? jsonObject["categoryAttendance"],
+    );
     specialties = List<String>.from(jsonObject["specialties"] ?? []);
     yearsTeaching = jsonObject["years_teaching"] ?? 0;
     isActiveInstructor = jsonObject["is_active_instructor"] ?? false;
@@ -130,6 +140,7 @@ class UserProfile {
       jsonObject["permission_level"] ??
           _getStringFromPermissionLevel(PermissionLevel.PRODUCTION),
     );
+    accountCreationTime = jsonObject["account_creation_time"] ?? 0;
     _dateLastPasswordChange =
         (jsonObject["date_last_password_change"] as Timestamp?)?.toDate() ??
         DateTime.now().add(const Duration(days: -365));
@@ -150,6 +161,8 @@ class UserProfile {
   set email(String value) => _email = value;
   set phoneNumber(String value) => _phoneNumber = value;
   set bio(String value) => _bio = value;
+  set achievements(List<String> value) => _achievements = value;
+  set categoryAttendance(Map<String, int> value) => _categoryAttendance = value;
   set specialties(List<String> value) => _specialties = value;
   set yearsTeaching(int value) => _yearsTeaching = value;
   set isActiveInstructor(bool value) => _isActiveInstructor = value;
@@ -174,6 +187,8 @@ class UserProfile {
   String get email => _email;
   String get phoneNumber => _phoneNumber;
   String get bio => _bio;
+  List<String> get achievements => _achievements;
+  Map<String, int> get categoryAttendance => _categoryAttendance;
   List<String> get specialties => _specialties;
   int get yearsTeaching => _yearsTeaching;
   bool get isActiveInstructor => _isActiveInstructor;
@@ -266,6 +281,21 @@ class UserProfile {
     return PermissionLevel.PRODUCTION;
   }
 
+  Map<String, int> _parseCategoryAttendance(dynamic rawMap) {
+    if (rawMap is! Map) {
+      return <String, int>{};
+    }
+
+    final parsedMap = <String, int>{};
+    rawMap.forEach((key, value) {
+      final parsedValue = value is num ? value.toInt() : int.tryParse('$value');
+      if (parsedValue != null) {
+        parsedMap[key] = parsedValue;
+      }
+    });
+    return parsedMap;
+  }
+
   ////////////////////////////////////////////////////////////////////////
   // Converts to JSON for saving to noSQL database
   ////////////////////////////////////////////////////////////////////////
@@ -282,6 +312,8 @@ class UserProfile {
         .toLowerCase(); // Added for bf_manage_share_request GCF
     jsonObject["phone_number"] = phoneNumber;
     jsonObject["bio"] = bio;
+    jsonObject["achievements"] = achievements;
+    jsonObject["category_attendance"] = categoryAttendance;
     jsonObject["specialties"] = specialties;
     jsonObject["years_teaching"] = yearsTeaching;
     jsonObject["is_active_instructor"] = isActiveInstructor;

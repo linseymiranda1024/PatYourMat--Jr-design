@@ -9,6 +9,19 @@ import 'class_detail_screen.dart';
 
 const String homeTodayFilterKey = '__today__';
 
+List<model.GymClass> upcomingHomeClasses(
+  List<model.GymClass> classes, {
+  DateTime? now,
+}) {
+  final currentDateTime = now ?? DateTime.now();
+  final upcoming =
+      classes
+          .where((gymClass) => !gymClass.dateTime.isBefore(currentDateTime))
+          .toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+  return upcoming;
+}
+
 List<model.GymClass> filterHomeClasses({
   required List<model.GymClass> classes,
   required String searchQuery,
@@ -17,8 +30,9 @@ List<model.GymClass> filterHomeClasses({
 }) {
   final normalizedQuery = searchQuery.trim().toLowerCase();
   final currentDate = now ?? DateTime.now();
+  final upcomingClasses = upcomingHomeClasses(classes, now: currentDate);
 
-  return classes.where((gymClass) {
+  return upcomingClasses.where((gymClass) {
     final matchesSearch =
         normalizedQuery.isEmpty ||
         gymClass.title.toLowerCase().contains(normalizedQuery) ||
@@ -39,96 +53,22 @@ List<model.GymClass> filterHomeClasses({
           classDate.day == currentDate.day;
     }
 
-    return homeCategoryKeyForClassTitle(gymClass.title) == selectedFilterKey;
+    return model.normalizeGymClassCategory(gymClass.category) ==
+        selectedFilterKey;
   }).toList();
-}
-
-String homeCategoryKeyForClassTitle(String title) {
-  final normalizedTitle = title.trim().toLowerCase();
-  const categoryKeywords = <String, String>{
-    'hip hop': 'hip-hop',
-    'yoga': 'yoga',
-    'cardio': 'cardio',
-    'pilates': 'pilates',
-    'soccer': 'soccer',
-    'boxing': 'boxing',
-    'dance': 'dance',
-    'strength': 'strength',
-    'cycle': 'cycling',
-    'spin': 'cycling',
-    'hiit': 'hiit',
-  };
-
-  for (final entry in categoryKeywords.entries) {
-    if (normalizedTitle.contains(entry.key)) {
-      return entry.value;
-    }
-  }
-
-  const ignoredWords = <String>{
-    'morning',
-    'evening',
-    'power',
-    'gentle',
-    'beginner',
-    'advanced',
-    'sunrise',
-    'sunset',
-    'lunchtime',
-    'all',
-    'levels',
-    'flow',
-    'blast',
-    'reset',
-    'session',
-    'class',
-  };
-  final words = normalizedTitle.split(RegExp(r'\s+'));
-  for (final word in words) {
-    if (word.isNotEmpty && !ignoredWords.contains(word)) {
-      return word;
-    }
-  }
-
-  return 'class';
-}
-
-String homeCategoryLabelForKey(String key) {
-  switch (key) {
-    case 'hip-hop':
-      return 'Hip Hop';
-    case 'hiit':
-      return 'HIIT';
-    default:
-      return key
-          .split('-')
-          .map(
-            (part) => part.isEmpty
-                ? part
-                : '${part[0].toUpperCase()}${part.substring(1)}',
-          )
-          .join(' ');
-  }
 }
 
 List<String> homeFilterCategoryKeys(
   List<model.GymClass> classes, {
-  int maxCount = 3,
+  DateTime? now,
 }) {
-  final categoryKeys = <String>[];
-  final seenKeys = <String>{};
+  final availableCategories = upcomingHomeClasses(classes, now: now)
+      .map((gymClass) => model.normalizeGymClassCategory(gymClass.category))
+      .toSet();
 
-  for (final gymClass in classes) {
-    final key = homeCategoryKeyForClassTitle(gymClass.title);
-    if (seenKeys.add(key)) {
-      categoryKeys.add(key);
-    }
-    if (categoryKeys.length >= maxCount) {
-      break;
-    }
-  }
-
-  return categoryKeys;
+  return model.gymClassCategories
+      .where((category) => availableCategories.contains(category))
+      .toList();
 }
 
 class HomeScreen extends ConsumerStatefulWidget {
@@ -154,6 +94,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   Widget build(BuildContext context) {
     final gymClassProvider = ref.watch(providerGymClass);
     final classes = gymClassProvider.classes;
+    final upcomingClasses = upcomingHomeClasses(classes);
     final categoryFilterKeys = homeFilterCategoryKeys(classes);
     final filteredClasses = filterHomeClasses(
       classes: classes,
@@ -240,7 +181,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       const SizedBox(width: 10),
                       _FilterChip(
                         selected: _selectedFilterKey == categoryKey,
-                        label: homeCategoryLabelForKey(categoryKey),
+                        label: categoryKey,
                         onTap: () => _toggleFilter(categoryKey),
                       ),
                     ],
@@ -260,8 +201,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
               padding: const EdgeInsets.symmetric(horizontal: 16),
               child: gymClassProvider.isLoading
                   ? const Center(child: CircularProgressIndicator())
-                  : classes.isEmpty
-                  ? const Center(child: Text('No classes available yet.'))
+                  : upcomingClasses.isEmpty
+                  ? const Center(child: Text('No upcoming classes available.'))
                   : filteredClasses.isEmpty
                   ? _HomeEmptyState(
                       title: 'No classes found',
@@ -339,9 +280,11 @@ class _SearchBar extends StatelessWidget {
         ),
       ),
       child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Icon(
             Icons.search,
+            size: 20,
             color: AppColors.headerOnBrand.withValues(alpha: 0.76),
           ),
           const SizedBox(width: 10),
@@ -349,25 +292,36 @@ class _SearchBar extends StatelessWidget {
             child: TextField(
               onChanged: onChanged,
               textAlignVertical: TextAlignVertical.center,
+              expands: false,
+              maxLines: 1,
+              minLines: 1,
+              strutStyle: const StrutStyle(
+                fontSize: 18,
+                height: 1.0,
+                leading: 0,
+                forceStrutHeight: true,
+              ),
               style: textTheme.titleMedium?.copyWith(
                 color: AppColors.headerOnBrand,
                 fontSize: 18,
                 fontWeight: FontWeight.w600,
+                height: 1.0,
               ),
               cursorColor: AppColors.headerOnBrand,
               decoration: InputDecoration(
-                isDense: true,
+                isCollapsed: true,
                 border: InputBorder.none,
                 enabledBorder: InputBorder.none,
                 focusedBorder: InputBorder.none,
                 filled: false,
                 fillColor: Colors.transparent,
-                contentPadding: EdgeInsets.zero,
+                contentPadding: const EdgeInsets.symmetric(vertical: 14),
                 hintText: hintText,
                 hintStyle: textTheme.titleMedium?.copyWith(
                   color: AppColors.headerOnBrand.withValues(alpha: 0.76),
                   fontSize: 18,
                   fontWeight: FontWeight.w500,
+                  height: 1.0,
                 ),
               ),
             ),

@@ -5,30 +5,69 @@ import 'package:intl/intl.dart';
 import 'package:pat_your_mat/main.dart';
 import 'package:pat_your_mat/theme/app_colors.dart';
 
+import '../models/achievement.dart';
 import '../models/reservation.dart';
 import '../providers/provider_auth.dart';
 import '../providers/provider_reservations.dart';
 import '../providers/provider_user_profile.dart';
 import '../widgets/general/widget_profile_avatar.dart';
+import 'screen_member_previous_classes.dart';
 import 'settings/screen_profile_edit.dart';
 import 'settings/screen_settings.dart';
 
-class ProfileScreen extends ConsumerWidget {
+List<Reservation> upcomingMemberReservations(
+  List<Reservation> reservations, {
+  DateTime? now,
+}) {
+  final currentDateTime = now ?? DateTime.now();
+  final upcoming =
+      reservations
+          .where((reservation) => !reservation.date.isBefore(currentDateTime))
+          .toList()
+        ..sort((a, b) => a.date.compareTo(b.date));
+  return upcoming;
+}
+
+List<Reservation> previousMemberReservations(
+  List<Reservation> reservations, {
+  DateTime? now,
+}) {
+  final currentDateTime = now ?? DateTime.now();
+  final previous =
+      reservations
+          .where((reservation) => reservation.date.isBefore(currentDateTime))
+          .toList()
+        ..sort((a, b) => b.date.compareTo(a.date));
+  return previous;
+}
+
+class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
   @override
-  Widget build(BuildContext context, WidgetRef ref) {
+  ConsumerState<ProfileScreen> createState() => _ProfileScreenState();
+}
+
+class _ProfileScreenState extends ConsumerState<ProfileScreen> {
+  static const int _reservationPreviewCount = 3;
+
+  @override
+  Widget build(BuildContext context) {
     final profile = ref.watch(providerUserProfile);
     final auth = ref.watch(providerAuth);
     final reservations = [...ref.watch(reservationsProvider).reservations]
       ..sort((a, b) => a.date.compareTo(b.date));
+    final upcomingReservations = upcomingMemberReservations(reservations);
+    final previousReservations = previousMemberReservations(reservations);
 
     final thisMonthCount = reservations.where((reservation) {
       final now = DateTime.now();
       return reservation.date.month == now.month &&
           reservation.date.year == now.year;
     }).length;
-    final nextReservation = reservations.isEmpty ? null : reservations.first;
+    final nextReservation = upcomingReservations.isEmpty
+        ? null
+        : upcomingReservations.first;
 
     return Scaffold(
       body: SafeArea(
@@ -38,10 +77,6 @@ class ProfileScreen extends ConsumerWidget {
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
               _buildHeader(context, profile),
-              if (profile.bio.trim().isNotEmpty) ...[
-                const SizedBox(height: 20),
-                _buildBioSection(context, profile.bio.trim()),
-              ],
               const SizedBox(height: 20),
               _buildStatsSection(
                 context: context,
@@ -50,7 +85,15 @@ class ProfileScreen extends ConsumerWidget {
                 nextReservation: nextReservation,
               ),
               const SizedBox(height: 20),
-              _buildUpcomingReservationsSection(context, ref, reservations),
+              _buildAchievementsSection(context, profile),
+              const SizedBox(height: 20),
+              _buildUpcomingReservationsSection(
+                context,
+                ref,
+                upcomingReservations,
+              ),
+              const SizedBox(height: 20),
+              _buildPreviousClassesSection(context, previousReservations),
               const SizedBox(height: 20),
               _buildAccountSection(context, profile, auth),
             ],
@@ -144,127 +187,96 @@ class ProfileScreen extends ConsumerWidget {
                   ),
                 ],
               ),
-              SizedBox(height: isCompact ? 16 : 20),
-              if (isCompact)
-                SizedBox(
+              if (profile.bio.trim().isNotEmpty) ...[
+                SizedBox(height: isCompact ? 16 : 18),
+                Container(
                   width: double.infinity,
+                  padding: EdgeInsets.all(isCompact ? 14 : 16),
+                  decoration: BoxDecoration(
+                    color: AppColors.headerOnBrand.withValues(alpha: 0.10),
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: AppColors.headerOnBrand.withValues(alpha: 0.16),
+                    ),
+                  ),
                   child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      SizedBox(
-                        width: double.infinity,
-                        child: OutlinedButton.icon(
-                          onPressed: () =>
-                              context.push(ScreenProfileEdit.routeName),
-                          style: OutlinedButton.styleFrom(
-                            foregroundColor: AppColors.headerOnBrand,
-                            side: BorderSide(
+                      Text(
+                        'About You',
+                        style: Theme.of(context).textTheme.labelMedium
+                            ?.copyWith(
+                              fontSize: 12,
+                              fontWeight: FontWeight.w700,
                               color: AppColors.headerOnBrand.withValues(
-                                alpha: 0.54,
+                                alpha: 0.80,
                               ),
                             ),
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          icon: const Icon(Icons.edit_outlined, size: 18),
-                          label: const Text(
-                            'Edit Profile',
-                            overflow: TextOverflow.ellipsis,
-                          ),
-                        ),
                       ),
-                      const SizedBox(height: 10),
-                      SizedBox(
-                        width: double.infinity,
-                        child: TextButton.icon(
-                          onPressed: () =>
-                              context.push(ScreenSettings.routeName),
-                          style: TextButton.styleFrom(
-                            foregroundColor: AppColors.headerOnBrand,
-                            backgroundColor: AppColors.headerOnBrand.withValues(
-                              alpha: 0.16,
-                            ),
-                            padding: const EdgeInsets.symmetric(vertical: 13),
-                            shape: RoundedRectangleBorder(
-                              borderRadius: BorderRadius.circular(16),
-                            ),
-                          ),
-                          icon: const Icon(Icons.tune, size: 18),
-                          label: const Text(
-                            'Settings',
-                            overflow: TextOverflow.ellipsis,
+                      const SizedBox(height: 8),
+                      Text(
+                        profile.bio.trim(),
+                        textAlign: isCompact
+                            ? TextAlign.center
+                            : TextAlign.start,
+                        style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                          fontSize: 14,
+                          height: 1.45,
+                          color: AppColors.headerOnBrand.withValues(
+                            alpha: 0.92,
                           ),
                         ),
                       ),
                     ],
                   ),
+                ),
+              ],
+              SizedBox(height: isCompact ? 16 : 20),
+              if (isCompact)
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(ScreenProfileEdit.routeName),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.headerOnBrand,
+                      side: BorderSide(
+                        color: AppColors.headerOnBrand.withValues(alpha: 0.54),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 13),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
+                      ),
+                    ),
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text(
+                      'Edit Profile',
+                      overflow: TextOverflow.ellipsis,
+                    ),
+                  ),
                 )
               else
-                Row(
-                  children: [
-                    Expanded(
-                      child: OutlinedButton.icon(
-                        onPressed: () =>
-                            context.push(ScreenProfileEdit.routeName),
-                        style: OutlinedButton.styleFrom(
-                          foregroundColor: AppColors.headerOnBrand,
-                          side: BorderSide(
-                            color: AppColors.headerOnBrand.withValues(
-                              alpha: 0.54,
-                            ),
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        icon: const Icon(Icons.edit_outlined, size: 18),
-                        label: const Text('Edit Profile'),
+                SizedBox(
+                  width: double.infinity,
+                  child: OutlinedButton.icon(
+                    onPressed: () => context.push(ScreenProfileEdit.routeName),
+                    style: OutlinedButton.styleFrom(
+                      foregroundColor: AppColors.headerOnBrand,
+                      side: BorderSide(
+                        color: AppColors.headerOnBrand.withValues(alpha: 0.54),
+                      ),
+                      padding: const EdgeInsets.symmetric(vertical: 14),
+                      shape: RoundedRectangleBorder(
+                        borderRadius: BorderRadius.circular(16),
                       ),
                     ),
-                    const SizedBox(width: 12),
-                    Expanded(
-                      child: TextButton.icon(
-                        onPressed: () => context.push(ScreenSettings.routeName),
-                        style: TextButton.styleFrom(
-                          foregroundColor: AppColors.headerOnBrand,
-                          backgroundColor: AppColors.headerOnBrand.withValues(
-                            alpha: 0.16,
-                          ),
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          shape: RoundedRectangleBorder(
-                            borderRadius: BorderRadius.circular(16),
-                          ),
-                        ),
-                        icon: const Icon(Icons.tune, size: 18),
-                        label: const Text('Settings'),
-                      ),
-                    ),
-                  ],
+                    icon: const Icon(Icons.edit_outlined, size: 18),
+                    label: const Text('Edit Profile'),
+                  ),
                 ),
             ],
           ),
         );
       },
-    );
-  }
-
-  Widget _buildBioSection(BuildContext context, String bio) {
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    return _buildSectionCard(
-      context: context,
-      title: 'About You',
-      subtitle: '',
-      child: Text(
-        bio,
-        style: textTheme.bodyMedium?.copyWith(
-          fontSize: 15,
-          height: 1.5,
-          color: colorScheme.onSurface,
-        ),
-      ),
     );
   }
 
@@ -303,7 +315,7 @@ class ProfileScreen extends ConsumerWidget {
                 _buildStatCard(
                   context: context,
                   label: 'Upcoming Classes',
-                  value: '${reservations.length}',
+                  value: '${upcomingMemberReservations(reservations).length}',
                   icon: Icons.event_available,
                   accent: AppColors.deepPurple,
                 ),
@@ -326,6 +338,252 @@ class ProfileScreen extends ConsumerWidget {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildAchievementsSection(
+    BuildContext context,
+    ProviderUserProfile profile,
+  ) {
+    final unlockedIds = profile.achievements.toSet();
+    final unlockedAchievements = Achievement.all
+        .where((achievement) => unlockedIds.contains(achievement.id))
+        .toList();
+    final previewAchievements = unlockedAchievements.take(4).toList();
+    final remainingCount =
+        unlockedAchievements.length - previewAchievements.length;
+
+    return _buildSectionCard(
+      context: context,
+      title: 'Achievements',
+      subtitle:
+          '${unlockedIds.length} of ${Achievement.all.length} badges unlocked.',
+      headerAction: TextButton(
+        onPressed: () => _showAchievementsSheet(context, unlockedIds),
+        style: TextButton.styleFrom(
+          padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+          minimumSize: Size.zero,
+          tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+        ),
+        child: Text(
+          'View All',
+          style: Theme.of(
+            context,
+          ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+        ),
+      ),
+      child: unlockedAchievements.isEmpty
+          ? _buildEmptyAchievementPreview(context)
+          : Row(
+              children: [
+                Expanded(
+                  child: Wrap(
+                    spacing: 10,
+                    runSpacing: 10,
+                    children: [
+                      for (final achievement in previewAchievements)
+                        _buildAchievementPreviewIcon(context, achievement),
+                      if (remainingCount > 0)
+                        _buildAchievementOverflowChip(context, remainingCount),
+                    ],
+                  ),
+                ),
+              ],
+            ),
+    );
+  }
+
+  Widget _buildAchievementPreviewIcon(
+    BuildContext context,
+    Achievement achievement,
+  ) {
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: achievement.color.withValues(alpha: 0.12),
+        shape: BoxShape.circle,
+        border: Border.all(color: achievement.color.withValues(alpha: 0.28)),
+      ),
+      child: Icon(achievement.iconData, color: achievement.color, size: 24),
+    );
+  }
+
+  Widget _buildAchievementOverflowChip(
+    BuildContext context,
+    int remainingCount,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: 54,
+      height: 54,
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        shape: BoxShape.circle,
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Center(
+        child: Text(
+          '+$remainingCount',
+          style: textTheme.labelLarge?.copyWith(
+            fontWeight: FontWeight.w800,
+            color: colorScheme.onSurface,
+          ),
+        ),
+      ),
+    );
+  }
+
+  Widget _buildEmptyAchievementPreview(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        children: [
+          Container(
+            width: 48,
+            height: 48,
+            decoration: BoxDecoration(
+              color: colorScheme.surfaceContainer,
+              shape: BoxShape.circle,
+            ),
+            child: Icon(
+              Icons.stars_outlined,
+              color: colorScheme.onSurfaceVariant,
+              size: 22,
+            ),
+          ),
+          const SizedBox(width: 14),
+          Expanded(
+            child: Text(
+              'Your badges will show up here as you build class history.',
+              style: textTheme.bodyMedium?.copyWith(
+                height: 1.4,
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Future<void> _showAchievementsSheet(
+    BuildContext context,
+    Set<String> unlockedIds,
+  ) async {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    await showModalBottomSheet<void>(
+      context: context,
+      isScrollControlled: true,
+      showDragHandle: true,
+      backgroundColor: colorScheme.surface,
+      builder: (context) {
+        return SafeArea(
+          child: FractionallySizedBox(
+            heightFactor: 0.82,
+            child: ListView.separated(
+              padding: const EdgeInsets.fromLTRB(20, 12, 20, 24),
+              itemBuilder: (context, index) {
+                if (index == 0) {
+                  return Padding(
+                    padding: const EdgeInsets.only(bottom: 8),
+                    child: Text(
+                      'All Achievements',
+                      style: Theme.of(context).textTheme.headlineSmall
+                          ?.copyWith(fontWeight: FontWeight.w800),
+                    ),
+                  );
+                }
+
+                final achievement = Achievement.all[index - 1];
+                return _buildAchievementBadge(
+                  context,
+                  achievement,
+                  isUnlocked: unlockedIds.contains(achievement.id),
+                );
+              },
+              separatorBuilder: (context, index) => const SizedBox(height: 12),
+              itemCount: Achievement.all.length + 1,
+            ),
+          ),
+        );
+      },
+    );
+  }
+
+  Widget _buildAchievementBadge(
+    BuildContext context,
+    Achievement achievement, {
+    required bool isUnlocked,
+  }) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final badgeColor = isUnlocked ? achievement.color : colorScheme.outline;
+    final backgroundColor = isUnlocked
+        ? achievement.color.withValues(alpha: 0.12)
+        : colorScheme.surface;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(
+          color: isUnlocked
+              ? achievement.color.withValues(alpha: 0.28)
+              : colorScheme.outlineVariant,
+        ),
+      ),
+      child: Column(
+        children: [
+          Container(
+            width: 58,
+            height: 58,
+            decoration: BoxDecoration(
+              color: backgroundColor,
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: badgeColor.withValues(alpha: isUnlocked ? 0.35 : 0.20),
+              ),
+            ),
+            child: Icon(
+              isUnlocked ? achievement.iconData : Icons.lock_outline,
+              color: badgeColor,
+              size: 26,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            achievement.title,
+            textAlign: TextAlign.center,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 4),
+          Text(
+            achievement.description,
+            textAlign: TextAlign.center,
+            style: textTheme.bodySmall?.copyWith(
+              height: 1.35,
+              color: isUnlocked
+                  ? colorScheme.onSurfaceVariant
+                  : colorScheme.onSurfaceVariant.withValues(alpha: 0.82),
+            ),
+          ),
+        ],
+      ),
     );
   }
 
@@ -399,10 +657,23 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
     List<Reservation> reservations,
   ) {
+    final shouldCollapse = reservations.length > _reservationPreviewCount;
+    final visibleReservations = _visibleReservationsForSection(
+      reservations,
+      sectionKey: 'upcoming',
+    );
+
     return _buildSectionCard(
       context: context,
       title: 'Upcoming Reservations',
       subtitle: 'Your next classes and assigned mat spots.',
+      headerAction: shouldCollapse
+          ? _buildShowAllButton(
+              context: context,
+              isExpanded: _isSectionExpanded('upcoming'),
+              onTap: () => _toggleSectionExpansion('upcoming'),
+            )
+          : null,
       child: reservations.isEmpty
           ? Container(
               width: double.infinity,
@@ -423,11 +694,16 @@ class ProfileScreen extends ConsumerWidget {
               ),
             )
           : Column(
-              children: reservations
+              children: visibleReservations
                   .map(
                     (reservation) => Padding(
                       padding: const EdgeInsets.only(bottom: 12),
-                      child: _buildReservationCard(context, ref, reservation),
+                      child: _buildReservationCard(
+                        context,
+                        ref,
+                        reservation,
+                        showCancelAction: true,
+                      ),
                     ),
                   )
                   .toList(),
@@ -435,15 +711,70 @@ class ProfileScreen extends ConsumerWidget {
     );
   }
 
+  Widget _buildPreviousClassesSection(
+    BuildContext context,
+    List<Reservation> reservations,
+  ) {
+    return _buildSectionCard(
+      context: context,
+      title: 'Previous Classes',
+      subtitle:
+          'Past reservations are treated as attended until check-in tracking is added.',
+      child: reservations.isEmpty
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Text(
+                'No previous classes yet.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.45,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : Center(
+              child: OutlinedButton.icon(
+                onPressed: () =>
+                    context.push(ScreenMemberPreviousClasses.routeName),
+                icon: const Icon(Icons.history),
+                label: const Text('Show Previous Classes'),
+                style: OutlinedButton.styleFrom(
+                  padding: const EdgeInsets.symmetric(
+                    horizontal: 18,
+                    vertical: 14,
+                  ),
+                  shape: RoundedRectangleBorder(
+                    borderRadius: BorderRadius.circular(16),
+                  ),
+                ),
+              ),
+            ),
+    );
+  }
+
   Widget _buildReservationCard(
     BuildContext context,
-    WidgetRef ref,
-    Reservation reservation,
-  ) {
-    final isConfirmed = reservation.status.toUpperCase() == 'CONFIRMED';
+    WidgetRef? ref,
+    Reservation reservation, {
+    required bool showCancelAction,
+    String? statusOverride,
+  }) {
+    final displayStatus = statusOverride ?? reservation.status;
+    final normalizedStatus = displayStatus.toUpperCase();
+    final isConfirmed = normalizedStatus == 'CONFIRMED';
+    final isAttended = normalizedStatus == 'ATTENDED';
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final statusAccent = isConfirmed ? AppColors.success : AppColors.warning;
+    final statusAccent = isAttended
+        ? AppColors.deepPurple
+        : (isConfirmed ? AppColors.success : AppColors.warning);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -495,7 +826,7 @@ class ProfileScreen extends ConsumerWidget {
                   borderRadius: BorderRadius.circular(999),
                 ),
                 child: Text(
-                  reservation.status,
+                  displayStatus,
                   style: textTheme.labelSmall?.copyWith(
                     fontSize: 12,
                     fontWeight: FontWeight.w700,
@@ -518,37 +849,39 @@ class ProfileScreen extends ConsumerWidget {
               ),
             ],
           ),
-          const SizedBox(height: 14),
-          Align(
-            alignment: Alignment.centerRight,
-            child: TextButton(
-              onPressed: () async {
-                try {
-                  await ref
-                      .read(reservationsProvider)
-                      .cancelReservation(reservation);
-                  if (!context.mounted) return;
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    const SnackBar(content: Text('Reservation cancelled')),
-                  );
-                } catch (error) {
-                  if (!context.mounted) return;
-                  var message = error.toString();
-                  if (message.startsWith('Exception: ')) {
-                    message = message.replaceFirst('Exception: ', '');
+          if (showCancelAction && ref != null) ...[
+            const SizedBox(height: 14),
+            Align(
+              alignment: Alignment.centerRight,
+              child: TextButton(
+                onPressed: () async {
+                  try {
+                    await ref
+                        .read(reservationsProvider)
+                        .cancelReservation(reservation);
+                    if (!context.mounted) return;
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      const SnackBar(content: Text('Reservation cancelled')),
+                    );
+                  } catch (error) {
+                    if (!context.mounted) return;
+                    var message = error.toString();
+                    if (message.startsWith('Exception: ')) {
+                      message = message.replaceFirst('Exception: ', '');
+                    }
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(content: Text('Cancel failed: $message')),
+                    );
                   }
-                  ScaffoldMessenger.of(context).showSnackBar(
-                    SnackBar(content: Text('Cancel failed: $message')),
-                  );
-                }
-              },
-              style: TextButton.styleFrom(foregroundColor: colorScheme.error),
-              child: const Text(
-                'Cancel Reservation',
-                style: TextStyle(fontWeight: FontWeight.w700),
+                },
+                style: TextButton.styleFrom(foregroundColor: colorScheme.error),
+                child: const Text(
+                  'Cancel Reservation',
+                  style: TextStyle(fontWeight: FontWeight.w700),
+                ),
               ),
             ),
-          ),
+          ],
         ],
       ),
     );
@@ -599,6 +932,14 @@ class ProfileScreen extends ConsumerWidget {
           const SizedBox(height: 18),
           _buildActionTile(
             context: context,
+            icon: Icons.tune,
+            label: 'Settings',
+            subtitle: 'Manage app preferences and account options.',
+            onTap: () => context.push(ScreenSettings.routeName),
+          ),
+          const SizedBox(height: 10),
+          _buildActionTile(
+            context: context,
             icon: Icons.logout,
             label: 'Log Out',
             subtitle: 'Sign out of your Pat Your Mat account.',
@@ -617,6 +958,7 @@ class ProfileScreen extends ConsumerWidget {
     required String title,
     required String subtitle,
     required Widget child,
+    Widget? headerAction,
   }) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
@@ -643,13 +985,24 @@ class ProfileScreen extends ConsumerWidget {
       child: Column(
         crossAxisAlignment: CrossAxisAlignment.start,
         children: [
-          Text(
-            title,
-            style: textTheme.titleLarge?.copyWith(
-              fontSize: 20,
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Expanded(
+                child: Text(
+                  title,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontSize: 20,
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+              ),
+              if (headerAction != null) ...[
+                const SizedBox(width: 12),
+                headerAction,
+              ],
+            ],
           ),
           if (hasSubtitle) ...[
             const SizedBox(height: 4),
@@ -667,6 +1020,58 @@ class ProfileScreen extends ConsumerWidget {
         ],
       ),
     );
+  }
+
+  bool _isSectionExpanded(String sectionKey) {
+    switch (sectionKey) {
+      case 'upcoming':
+        return _showAllUpcoming;
+      default:
+        return false;
+    }
+  }
+
+  List<Reservation> _visibleReservationsForSection(
+    List<Reservation> reservations, {
+    required String sectionKey,
+  }) {
+    if (_isSectionExpanded(sectionKey)) {
+      return reservations;
+    }
+    return reservations.take(_reservationPreviewCount).toList();
+  }
+
+  Widget _buildShowAllButton({
+    required BuildContext context,
+    required bool isExpanded,
+    required VoidCallback onTap,
+  }) {
+    return TextButton(
+      onPressed: onTap,
+      style: TextButton.styleFrom(
+        padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+        minimumSize: Size.zero,
+        tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+      ),
+      child: Text(
+        isExpanded ? 'Show Less' : 'Show All',
+        style: Theme.of(
+          context,
+        ).textTheme.labelLarge?.copyWith(fontWeight: FontWeight.w700),
+      ),
+    );
+  }
+
+  bool _showAllUpcoming = false;
+
+  void _toggleSectionExpansion(String sectionKey) {
+    setState(() {
+      switch (sectionKey) {
+        case 'upcoming':
+          _showAllUpcoming = !_showAllUpcoming;
+          break;
+      }
+    });
   }
 
   Widget _buildInfoPill(BuildContext context, IconData icon, String text) {

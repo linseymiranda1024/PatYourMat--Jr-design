@@ -89,6 +89,18 @@ class ProviderUserProfile extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<String> get achievements => _userProfile.achievements;
+  set achievements(List<String> value) {
+    _userProfile.achievements = value;
+    notifyListeners();
+  }
+
+  Map<String, int> get categoryAttendance => _userProfile.categoryAttendance;
+  set categoryAttendance(Map<String, int> value) {
+    _userProfile.categoryAttendance = value;
+    notifyListeners();
+  }
+
   List<String> get specialties => _userProfile.specialties;
   set specialties(List<String> value) {
     _userProfile.specialties = value;
@@ -324,6 +336,15 @@ class ProviderUserProfile extends ChangeNotifier {
     _dataLoaded = true;
     notifyListeners();
     return success;
+  }
+
+  void applyAchievementProgress({
+    required List<String> achievements,
+    required Map<String, int> categoryAttendance,
+  }) {
+    _userProfile.achievements = achievements;
+    _userProfile.categoryAttendance = categoryAttendance;
+    notifyListeners();
   }
 
   ////////////////////////////////////////////////////////////////////////////////

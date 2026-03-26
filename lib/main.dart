@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 import 'package:pat_your_mat/screens/class_detail_screen.dart';
 import 'package:pat_your_mat/screens/reservation_confirmation_screen.dart';
 import 'models/gym_class.dart';
+import 'models/reservation.dart';
 
 // App relative file imports
 import 'screens/general/screen_alternate.dart';
@@ -30,6 +31,7 @@ import 'screens/settings/screen_profile_edit.dart';
 import 'providers/provider_user_profile.dart';
 import 'providers/provider_gym_class.dart';
 import 'screens/settings/screen_settings.dart';
+import 'screens/screen_member_previous_classes.dart';
 import 'screens/staff/screen_staff_profile.dart';
 import 'screens/staff/screen_staff_class_list.dart';
 import 'screens/staff/screen_create_class.dart';
@@ -113,6 +115,10 @@ class _MyAppState extends ConsumerState<MyApp> {
         builder: (context, state) => ScreenSettings(),
       ),
       GoRoute(
+        path: ScreenMemberPreviousClasses.routeName,
+        builder: (context, state) => const ScreenMemberPreviousClasses(),
+      ),
+      GoRoute(
         path: ScreenProfileEdit.routeName,
         builder: (context, state) => const ScreenProfileEdit(),
       ),
@@ -165,10 +171,31 @@ class _MyAppState extends ConsumerState<MyApp> {
         builder: (context, state) {
           final extra = state.extra as Map<String, dynamic>? ?? {};
           return ReservationConfirmationScreen(
-            className: extra['className'] as String? ?? 'Class',
-            instructor: extra['instructor'] as String? ?? 'Instructor',
-            dateTime: extra['dateTime'] as String? ?? 'Date & Time',
-            matNumber: extra['matNumber'] as String? ?? 'Mat #?',
+            gymClass:
+                extra['gymClass'] as GymClass? ??
+                GymClass(
+                  id: '',
+                  title: extra['className'] as String? ?? 'Class',
+                  description: '',
+                  category: 'Other',
+                  instructor: extra['instructor'] as String? ?? 'Instructor',
+                  dateTime: DateTime.now(),
+                  durationMinutes: 0,
+                  location: '',
+                  capacity: 0,
+                  filled: 0,
+                  status: ClassStatus.open,
+                ),
+            reservation:
+                extra['reservation'] as Reservation? ??
+                Reservation(
+                  id: '',
+                  className: extra['className'] as String? ?? 'Class',
+                  instructor: extra['instructor'] as String? ?? 'Instructor',
+                  dateTime: extra['dateTime'] as String? ?? 'Date & Time',
+                  matNumber: extra['matNumber'] as String? ?? 'Mat #?',
+                  date: DateTime.now(),
+                ),
           );
         },
       ),
