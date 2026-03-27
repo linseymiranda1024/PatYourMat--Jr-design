@@ -86,6 +86,9 @@ class DBGymClass {
           .get();
       final activeReservationCount = snapshot.docs
           .where((doc) => _isUserProfileRegistrationDoc(doc.reference))
+          .map((doc) => (doc.data()['matNumber'] ?? '').toString().trim())
+          .where((matNumber) => matNumber.isNotEmpty)
+          .toSet()
           .length;
       return activeReservationCount.clamp(0, gymClass.capacity);
     } catch (_) {

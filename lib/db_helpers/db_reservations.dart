@@ -214,14 +214,14 @@ class DBReservations {
 
         final data = classSnap.data() as Map<String, dynamic>;
         final capacity = _asInt(data['capacity']);
-        final currentFilled = _asInt(data['filled'] ?? data['registeredCount']);
         final reservedMats = _parseReservedMats(data['reservedMats']);
-        final nextFilled = (currentFilled - 1).clamp(0, 1000000).toInt();
+        reservedMats.remove(matNumber);
+        final nextReservedMats = reservedMats.toList()..sort();
+        final nextFilled = nextReservedMats.length.clamp(0, capacity);
         final nextStatus = (capacity > 0 && nextFilled >= capacity)
             ? ClassStatus.full.name
             : ClassStatus.open.name;
 
-        reservedMats.remove(matNumber);
         transaction.delete(userRegistrationRef);
         transaction.delete(classRegistrationRef);
         if (matNumber.isNotEmpty) {
@@ -231,9 +231,10 @@ class DBReservations {
           'filled': nextFilled,
           'registeredCount': nextFilled,
           'status': nextStatus,
-          'reservedMats': reservedMats.toList(),
+          'reservedMats': nextReservedMats,
         });
       });
+      await _syncClassTrackingState(classId);
     } on FirebaseException catch (e) {
       if (e.code == 'permission-denied') {
         try {
@@ -366,16 +367,15 @@ class DBReservations {
     String checkInCode,
   ) async {
     final classRef = _db.collection(_classesCollection).doc(gymClass.id);
+    final classRegistrationsRef = classRef.collection(_registrationsCollection);
+    final initialClassRegistrationsSnap = await classRegistrationsRef.get();
     final userRegistrationRef = _db
         .collection(_userProfilesCollection)
         .doc(userId)
         .collection(_registrationsCollection)
         .doc(gymClass.id);
-    final classRegistrationRef = _db
-        .collection(_classesCollection)
-        .doc(gymClass.id)
-        .collection(_registrationsCollection)
-        .doc(userId);
+    final classRegistrationRef = classRegistrationsRef.doc(userId);
+    final matRegistrationRef = _legacyMatRegistrationRef(gymClass.id, matNumber);
 
     await _db.runTransaction((transaction) async {
       final classSnap = await transaction.get(classRef);
@@ -388,35 +388,44 @@ class DBReservations {
         throw Exception('You are already registered for this class.');
       }
       final classRegistrationSnap = await transaction.get(classRegistrationRef);
+      final matRegistrationSnap = await transaction.get(matRegistrationRef);
 
       final data = classSnap.data() as Map<String, dynamic>;
       final capacity = _asInt(data['capacity']);
-      final currentFilled = _asInt(data['filled'] ?? data['registeredCount']);
-      final reservedMats = _parseReservedMats(data['reservedMats']);
+      final trackedReservedMats = _extractTrackedReservedMats(
+        initialClassRegistrationsSnap.docs,
+      );
       final staleMatNumber = classRegistrationSnap.exists
           ? (classRegistrationSnap.data()?['matNumber'] ?? '').toString()
           : '';
       final hasStaleClassTracking =
           classRegistrationSnap.exists && !userRegistrationSnap.exists;
 
-      if (capacity <= 0 || currentFilled >= capacity) {
-        throw Exception('The class is already at full capacity.');
-      }
       if (hasStaleClassTracking && staleMatNumber.isNotEmpty) {
-        reservedMats.remove(staleMatNumber);
+        trackedReservedMats.remove(staleMatNumber);
         transaction.delete(
           _legacyMatRegistrationRef(gymClass.id, staleMatNumber),
         );
       } else if (classRegistrationSnap.exists) {
         throw Exception('You are already registered for this class.');
       }
-      if (reservedMats.contains(matNumber)) {
+      final trackedMatOwnerId = (matRegistrationSnap.data()?['userId'] ?? '')
+          .toString()
+          .trim();
+      if (trackedMatOwnerId.isNotEmpty && trackedMatOwnerId != userId) {
         throw Exception('That mat is already reserved.');
       }
 
-      final nextFilled = hasStaleClassTracking
-          ? (currentFilled > 0 ? currentFilled : 1)
-          : currentFilled + 1;
+      final currentFilled = trackedReservedMats.length.clamp(0, capacity);
+      if (capacity <= 0 || currentFilled >= capacity) {
+        throw Exception('The class is already at full capacity.');
+      }
+      if (trackedReservedMats.contains(matNumber)) {
+        throw Exception('That mat is already reserved.');
+      }
+
+      final nextReservedMats = [...trackedReservedMats, matNumber]..sort();
+      final nextFilled = nextReservedMats.length.clamp(0, capacity);
       final nextStatus = nextFilled >= capacity
           ? ClassStatus.full.name
           : ClassStatus.open.name;
@@ -433,11 +442,17 @@ class DBReservations {
         'matNumber': matNumber,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      transaction.set(matRegistrationRef, {
+        'userId': userId,
+        'classId': gymClass.id,
+        'matNumber': matNumber,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       transaction.update(classRef, {
         'filled': nextFilled,
         'registeredCount': nextFilled,
         'status': nextStatus,
-        'reservedMats': [...reservedMats, matNumber],
+        'reservedMats': nextReservedMats,
       });
     });
   }
@@ -449,11 +464,14 @@ class DBReservations {
     String checkInCode,
   ) async {
     final classRef = _db.collection(_classesCollection).doc(gymClass.id);
+    final classRegistrationsRef = classRef.collection(_registrationsCollection);
+    final initialClassRegistrationsSnap = await classRegistrationsRef.get();
     final userRegistrationRef = _db
         .collection(_userProfilesCollection)
         .doc(userId)
         .collection(_registrationsCollection)
         .doc(gymClass.id);
+    final matRegistrationRef = _legacyMatRegistrationRef(gymClass.id, matNumber);
 
     await _db.runTransaction((transaction) async {
       final classSnap = await transaction.get(classRef);
@@ -465,20 +483,29 @@ class DBReservations {
       if (userRegistrationSnap.exists) {
         throw Exception('You are already registered for this class.');
       }
+      final matRegistrationSnap = await transaction.get(matRegistrationRef);
 
       final data = classSnap.data() as Map<String, dynamic>;
       final capacity = _asInt(data['capacity']);
-      final reservedMats = _parseReservedMats(data['reservedMats']);
-      final currentFilled = _resolvedFilledFromClassData(data, reservedMats);
+      final trackedReservedMats = _extractTrackedReservedMats(
+        initialClassRegistrationsSnap.docs,
+      );
+      final currentFilled = trackedReservedMats.length.clamp(0, capacity);
+      final trackedMatOwnerId = (matRegistrationSnap.data()?['userId'] ?? '')
+          .toString()
+          .trim();
 
       if (capacity <= 0 || currentFilled >= capacity) {
         throw Exception('The class is already at full capacity.');
       }
-      if (reservedMats.contains(matNumber)) {
+      if (trackedMatOwnerId.isNotEmpty && trackedMatOwnerId != userId) {
+        throw Exception('That mat is already reserved.');
+      }
+      if (trackedReservedMats.contains(matNumber)) {
         throw Exception('That mat is already reserved.');
       }
 
-      final nextReservedMats = [...reservedMats, matNumber]..sort();
+      final nextReservedMats = [...trackedReservedMats, matNumber]..sort();
       final nextFilled = nextReservedMats.length.clamp(0, capacity);
       final nextStatus = nextFilled >= capacity
           ? ClassStatus.full.name
@@ -488,6 +515,12 @@ class DBReservations {
         userRegistrationRef,
         _buildRegistrationData(gymClass, matNumber, checkInCode),
       );
+      transaction.set(matRegistrationRef, {
+        'userId': userId,
+        'classId': gymClass.id,
+        'matNumber': matNumber,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       transaction.update(classRef, {
         'filled': nextFilled,
         'registeredCount': nextFilled,
@@ -504,16 +537,15 @@ class DBReservations {
     String checkInCode,
   ) async {
     final classRef = _db.collection(_classesCollection).doc(gymClass.id);
+    final classRegistrationsRef = classRef.collection(_registrationsCollection);
+    final initialClassRegistrationsSnap = await classRegistrationsRef.get();
     final userRegistrationRef = _db
         .collection(_userProfilesCollection)
         .doc(userId)
         .collection(_registrationsCollection)
         .doc(gymClass.id);
-    final classRegistrationRef = _db
-        .collection(_classesCollection)
-        .doc(gymClass.id)
-        .collection(_registrationsCollection)
-        .doc(userId);
+    final classRegistrationRef = classRegistrationsRef.doc(userId);
+    final matRegistrationRef = _legacyMatRegistrationRef(gymClass.id, matNumber);
 
     await _db.runTransaction((transaction) async {
       final classSnap = await transaction.get(classRef);
@@ -527,9 +559,12 @@ class DBReservations {
       }
 
       final classRegistrationSnap = await transaction.get(classRegistrationRef);
+      final matRegistrationSnap = await transaction.get(matRegistrationRef);
       final data = classSnap.data() as Map<String, dynamic>;
       final capacity = _asInt(data['capacity']);
-      final reservedMats = _parseReservedMats(data['reservedMats']);
+      final trackedReservedMats = _extractTrackedReservedMats(
+        initialClassRegistrationsSnap.docs,
+      );
       final staleMatNumber = classRegistrationSnap.exists
           ? (classRegistrationSnap.data()?['matNumber'] ?? '').toString()
           : '';
@@ -538,7 +573,7 @@ class DBReservations {
       }
       if (classRegistrationSnap.exists) {
         if (staleMatNumber.isNotEmpty) {
-          reservedMats.remove(staleMatNumber);
+          trackedReservedMats.remove(staleMatNumber);
           transaction.delete(
             _legacyMatRegistrationRef(gymClass.id, staleMatNumber),
           );
@@ -546,7 +581,13 @@ class DBReservations {
           throw Exception('You are already registered for this class.');
         }
       }
-      if (reservedMats.contains(matNumber)) {
+      final trackedMatOwnerId = (matRegistrationSnap.data()?['userId'] ?? '')
+          .toString()
+          .trim();
+      if (trackedMatOwnerId.isNotEmpty && trackedMatOwnerId != userId) {
+        throw Exception('That mat is already reserved.');
+      }
+      if (trackedReservedMats.contains(matNumber)) {
         throw Exception('That mat is already reserved.');
       }
 
@@ -560,8 +601,14 @@ class DBReservations {
         'matNumber': matNumber,
         'createdAt': FieldValue.serverTimestamp(),
       });
+      transaction.set(matRegistrationRef, {
+        'userId': userId,
+        'classId': gymClass.id,
+        'matNumber': matNumber,
+        'createdAt': FieldValue.serverTimestamp(),
+      });
       transaction.update(classRef, {
-        'reservedMats': [...reservedMats, matNumber]..sort(),
+        'reservedMats': [...trackedReservedMats, matNumber]..sort(),
       });
     });
   }
@@ -727,6 +774,19 @@ class DBReservations {
         .toSet();
   }
 
+  static Set<String> _extractTrackedReservedMats(
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+  ) {
+    return docs
+        .map((doc) => doc.data())
+        .where(
+          (data) => (data['userId'] ?? '').toString().trim().isNotEmpty,
+        )
+        .map((data) => (data['matNumber'] ?? '').toString().trim())
+        .where((matNumber) => matNumber.isNotEmpty)
+        .toSet();
+  }
+
   static Future<List<String>> _getReservedMatsFromUserReservations(
     String classId,
   ) async {
@@ -742,16 +802,6 @@ class DBReservations {
         .toSet()
         .toList()
       ..sort();
-  }
-
-  static int _resolvedFilledFromClassData(
-    Map<String, dynamic> data,
-    Set<String> reservedMats,
-  ) {
-    final storedFilled = _asInt(data['filled'] ?? data['registeredCount']);
-    return storedFilled > reservedMats.length
-        ? storedFilled
-        : reservedMats.length;
   }
 
   static bool _isUserProfileRegistrationDoc(DocumentReference ref) {

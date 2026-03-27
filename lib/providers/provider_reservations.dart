@@ -15,6 +15,7 @@ final reservationsProvider = ChangeNotifierProvider<ReservationsNotifier>((
 class ReservationsNotifier extends ChangeNotifier {
   List<Reservation> _reservations = [];
   StreamSubscription? _subscription;
+  String? _activeUserId;
 
   List<Reservation> get reservations => _reservations;
 
@@ -26,19 +27,34 @@ class ReservationsNotifier extends ChangeNotifier {
     _subscription?.cancel();
     _subscription = null;
     final user = FirebaseAuth.instance.currentUser;
+    final nextUserId = user?.uid;
+
+    if (_activeUserId != nextUserId || _reservations.isNotEmpty) {
+      _activeUserId = nextUserId;
+      _reservations = [];
+      notifyListeners();
+    }
+
     if (user != null) {
-      _subscription = DBReservations.getReservationsStream(user.uid).listen(
+      final userId = user.uid;
+      _subscription = DBReservations.getReservationsStream(userId).listen(
         (reservations) {
+          if (_activeUserId != userId) {
+            return;
+          }
           _reservations = reservations;
           notifyListeners();
           unawaited(
             DBReservations.ensureClassTrackingForUserReservations(
-              user.uid,
+              userId,
               reservations,
             ),
           );
         },
         onError: (error) {
+          if (_activeUserId != userId) {
+            return;
+          }
           _reservations = [];
           notifyListeners();
         },
@@ -58,6 +74,7 @@ class ReservationsNotifier extends ChangeNotifier {
   void clearAndCancelForSignOut() {
     _subscription?.cancel();
     _subscription = null;
+    _activeUserId = null;
     _reservations = [];
     notifyListeners();
   }

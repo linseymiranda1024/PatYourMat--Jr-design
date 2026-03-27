@@ -178,7 +178,9 @@ class ScreenStaffClassList extends ConsumerWidget {
                   context.push(ScreenCreateClass.routeName, extra: gymClass),
               icon: const Icon(Icons.edit_outlined),
               label: const Text('Edit'),
-              style: TextButton.styleFrom(foregroundColor: colorScheme.primary),
+              style: TextButton.styleFrom(
+                foregroundColor: colorScheme.primary,
+              ),
             ),
           ),
         ],
