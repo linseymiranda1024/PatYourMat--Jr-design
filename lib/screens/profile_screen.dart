@@ -112,6 +112,7 @@ class ProfileScreen extends ConsumerWidget {
     WidgetRef ref,
   ) {
     final bool isConfirmed = res.status == 'CONFIRMED';
+    final bool isStandby = res.status == 'STANDBY';
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -196,7 +197,7 @@ class ProfileScreen extends ConsumerWidget {
               const Icon(Icons.place_outlined, size: 16, color: Colors.purple),
               const SizedBox(width: 6),
               Text(
-                res.matNumber,
+                isStandby ? 'Standby Queue' : res.matNumber,
                 style: const TextStyle(
                   fontSize: 14,
                   color: Colors.purple,
@@ -210,25 +211,30 @@ class ProfileScreen extends ConsumerWidget {
             children: [
               Expanded(
                 child: ElevatedButton(
-                  onPressed: () {
-                    ScaffoldMessenger.of(context).showSnackBar(
-                      SnackBar(
-                        content: Text('Checked in for ${res.className}'),
-                      ),
-                    );
-                    // Later: real check-in logic
-                  },
+                  onPressed: isStandby
+                      ? null
+                      : () {
+                          ScaffoldMessenger.of(context).showSnackBar(
+                            SnackBar(
+                              content: Text('Checked in for ${res.className}'),
+                            ),
+                          );
+                          // Later: real check-in logic
+                        },
                   style: ElevatedButton.styleFrom(
-                    backgroundColor: Colors.green.shade600,
-                    foregroundColor: Colors.white,
+                    backgroundColor: isStandby
+                        ? Colors.grey.shade300
+                        : Colors.green.shade600,
+                    foregroundColor:
+                        isStandby ? Colors.grey.shade700 : Colors.white,
                     padding: const EdgeInsets.symmetric(vertical: 10),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Check In',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  child: Text(
+                    isStandby ? 'Waiting' : 'Check In',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),
@@ -242,7 +248,13 @@ class ProfileScreen extends ConsumerWidget {
                           .cancelReservation(res);
                       if (!context.mounted) return;
                       ScaffoldMessenger.of(context).showSnackBar(
-                        const SnackBar(content: Text('Reservation cancelled')),
+                        SnackBar(
+                          content: Text(
+                            isStandby
+                                ? 'Left the standby queue'
+                                : 'Reservation cancelled',
+                          ),
+                        ),
                       );
                     } catch (e) {
                       if (!context.mounted) return;
@@ -263,9 +275,9 @@ class ProfileScreen extends ConsumerWidget {
                       borderRadius: BorderRadius.circular(12),
                     ),
                   ),
-                  child: const Text(
-                    'Cancel',
-                    style: TextStyle(fontWeight: FontWeight.bold),
+                  child: Text(
+                    isStandby ? 'Leave Queue' : 'Cancel',
+                    style: const TextStyle(fontWeight: FontWeight.bold),
                   ),
                 ),
               ),

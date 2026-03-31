@@ -96,7 +96,7 @@ class ProviderGymClass extends ChangeNotifier {
     final existing = _classes[index];
     final nextFilled = (existing.filled + delta).clamp(0, existing.capacity);
     final nextStatus = nextFilled >= existing.capacity
-        ? ClassStatus.full
+        ? (existing.standbyCount > 0 ? ClassStatus.standby : ClassStatus.full)
         : ClassStatus.open;
 
     _classes[index] = GymClass(
@@ -108,6 +108,7 @@ class ProviderGymClass extends ChangeNotifier {
       location: existing.location,
       capacity: existing.capacity,
       filled: nextFilled,
+      standbyCount: existing.standbyCount,
       status: nextStatus,
     );
     notifyListeners();

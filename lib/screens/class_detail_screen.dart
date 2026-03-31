@@ -4,6 +4,7 @@ import 'package:go_router/go_router.dart';
 
 import '../main.dart';
 import '../models/gym_class.dart';
+import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
 import 'reservation_confirmation_screen.dart';
@@ -60,6 +61,37 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     }
   }
 
+  Future<void> _joinStandbyQueue(GymClass gClass) async {
+    setState(() => _isLoading = true);
+
+    try {
+      final position = await ref
+          .read(reservationsProvider)
+          .joinStandbyQueue(gClass);
+
+      if (!mounted) return;
+      final positionText = position == null ? '' : ' You are #$position in line.';
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Joined the standby queue.$positionText'),
+        ),
+      );
+    } catch (e) {
+      if (!mounted) return;
+      var message = e.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Standby queue failed: $message')),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<GymClass?>(
@@ -69,12 +101,50 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         final gClass = snapshot.data ?? widget.gymClass;
 
         final reservations = ref.watch(reservationsProvider).reservations;
-        final isRegistered = reservations.any((r) => r.id == gClass.id);
+        Reservation? matchingReservation;
+        for (final reservation in reservations) {
+          if (reservation.id == gClass.id) {
+            matchingReservation = reservation;
+            break;
+          }
+        }
+        final reservationStatus = matchingReservation?.status;
+        final isRegistered = reservationStatus == 'CONFIRMED';
+        final isOnStandby = reservationStatus == 'STANDBY';
 
-        final spotsLeft = gClass.capacity - gClass.filled;
+        final spotsLeft = (gClass.capacity - gClass.filled).clamp(0, gClass.capacity);
         final progress = gClass.capacity == 0
             ? 0.0
             : (gClass.filled / gClass.capacity).clamp(0.0, 1.0);
+        final canReserve = gClass.status == ClassStatus.open && !isRegistered && !isOnStandby;
+        final showStandbyButton =
+            !isRegistered && !isOnStandby && gClass.filled >= gClass.capacity;
+        final headlineText = isRegistered
+            ? 'You are registered'
+            : isOnStandby
+                ? 'You are on standby'
+                : spotsLeft > 0
+                    ? '$spotsLeft Spots Left'
+                    : 'Class is full';
+        final badgeText = isRegistered
+            ? 'REGISTERED'
+            : isOnStandby
+                ? 'STANDBY'
+                : gClass.status.name.toUpperCase();
+        final badgeBackground = isRegistered
+            ? Colors.blue.shade50
+            : isOnStandby
+                ? const Color(0xFFFFF3E0)
+                : (gClass.status == ClassStatus.open
+                    ? const Color(0xFFE8F5E9)
+                    : const Color(0xFFFBE2E2));
+        final badgeForeground = isRegistered
+            ? Colors.blue.shade700
+            : isOnStandby
+                ? const Color(0xFFE65100)
+                : (gClass.status == ClassStatus.open
+                    ? const Color(0xFF2E7D32)
+                    : const Color(0xFFB00020));
 
         return Scaffold(
           body: Stack(
@@ -154,9 +224,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     MainAxisAlignment.spaceBetween,
                                 children: [
                                   Text(
-                                    isRegistered
-                                        ? 'You are registered'
-                                        : '$spotsLeft Spots Left',
+                                    headlineText,
                                     style: const TextStyle(
                                       fontSize: 20,
                                       fontWeight: FontWeight.w600,
@@ -168,23 +236,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                       vertical: 6,
                                     ),
                                     decoration: BoxDecoration(
-                                      color: isRegistered
-                                          ? Colors.blue.shade50
-                                          : (gClass.status == ClassStatus.open
-                                                ? const Color(0xFFE8F5E9)
-                                                : const Color(0xFFFBE2E2)),
+                                      color: badgeBackground,
                                       borderRadius: BorderRadius.circular(20),
                                     ),
                                     child: Text(
-                                      isRegistered
-                                          ? 'REGISTERED'
-                                          : gClass.status.name.toUpperCase(),
+                                      badgeText,
                                       style: TextStyle(
-                                        color: isRegistered
-                                            ? Colors.blue.shade700
-                                            : (gClass.status == ClassStatus.open
-                                                  ? const Color(0xFF2E7D32)
-                                                  : const Color(0xFFB00020)),
+                                        color: badgeForeground,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -217,6 +275,49 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   fontSize: 14,
                                 ),
                               ),
+                              if (gClass.standbyCount > 0) ...[
+                                const SizedBox(height: 6),
+                                Text(
+                                  '${gClass.standbyCount} on standby',
+                                  style: const TextStyle(
+                                    color: Colors.grey,
+                                    fontSize: 14,
+                                  ),
+                                ),
+                              ],
+                              if (isOnStandby) ...[
+                                const SizedBox(height: 16),
+                                StreamBuilder<int?>(
+                                  stream: ref
+                                      .read(reservationsProvider)
+                                      .getStandbyPositionStream(gClass.id),
+                                  builder: (context, queueSnapshot) {
+                                    final position = queueSnapshot.data;
+                                    return Container(
+                                      width: double.infinity,
+                                      padding: const EdgeInsets.all(16),
+                                      decoration: BoxDecoration(
+                                        color: const Color(0xFFFFF8E8),
+                                        borderRadius: BorderRadius.circular(16),
+                                        border: Border.all(
+                                          color: const Color(0xFFFFD79A),
+                                        ),
+                                      ),
+                                      child: Text(
+                                        position == null
+                                            ? 'You are on the standby queue. We will promote you automatically when a spot opens.'
+                                            : 'You are #$position in the standby queue. We will promote you automatically when a spot opens.',
+                                        style: const TextStyle(
+                                          fontSize: 15,
+                                          height: 1.4,
+                                          fontWeight: FontWeight.w600,
+                                          color: Color(0xFF8A4B00),
+                                        ),
+                                      ),
+                                    );
+                                  },
+                                ),
+                              ],
 
                               const SizedBox(height: 32),
 
@@ -287,10 +388,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 width: double.infinity,
                                 height: 56,
                                 child: ElevatedButton(
-                                  onPressed:
-                                      (_isLoading ||
-                                          isRegistered ||
-                                          gClass.status != ClassStatus.open)
+                                  onPressed: (_isLoading || !canReserve)
                                       ? null
                                       : () => _registerForClass(gClass),
                                   style: ElevatedButton.styleFrom(
@@ -308,7 +406,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                       : Text(
                                           isRegistered
                                               ? 'Registered'
-                                              : 'Reserve Your Spot',
+                                              : isOnStandby
+                                                  ? 'On Standby'
+                                                  : 'Reserve Your Spot',
                                           style: const TextStyle(
                                             fontSize: 18,
                                             fontWeight: FontWeight.bold,
@@ -316,6 +416,34 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         ),
                                 ),
                               ),
+                              if (showStandbyButton) ...[
+                                const SizedBox(height: 14),
+                                SizedBox(
+                                  width: double.infinity,
+                                  height: 56,
+                                  child: OutlinedButton(
+                                    onPressed: _isLoading
+                                        ? null
+                                        : () => _joinStandbyQueue(gClass),
+                                    style: OutlinedButton.styleFrom(
+                                      foregroundColor: const Color(0xFFB85A00),
+                                      side: const BorderSide(
+                                        color: Color(0xFFB85A00),
+                                      ),
+                                      shape: RoundedRectangleBorder(
+                                        borderRadius: BorderRadius.circular(28),
+                                      ),
+                                    ),
+                                    child: const Text(
+                                      'Join Standby Queue',
+                                      style: TextStyle(
+                                        fontSize: 17,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                              ],
                             ],
                           ),
                         ),

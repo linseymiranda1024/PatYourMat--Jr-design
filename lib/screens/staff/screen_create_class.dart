@@ -77,6 +77,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       location: _locationController.text.trim(),
       capacity: int.tryParse(_capacityController.text.trim()) ?? 20,
       filled: 0,
+      standbyCount: 0,
       status: ClassStatus.open,
     );
 

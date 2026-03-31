@@ -274,6 +274,7 @@ class _ReservationTile extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     final isPast = reservation.date.isBefore(DateTime.now());
+    final isStandby = reservation.status == 'STANDBY';
     return Container(
       padding: const EdgeInsets.all(16),
       decoration: BoxDecoration(
@@ -316,7 +317,7 @@ class _ReservationTile extends StatelessWidget {
                 ),
                 const SizedBox(height: 4),
                 Text(
-                  '${DateFormat.jm().format(reservation.date)} • ${reservation.matNumber}',
+                  '${DateFormat.jm().format(reservation.date)} • ${isStandby ? 'Standby Queue' : reservation.matNumber}',
                   style: const TextStyle(
                     color: Color(0xFF475569),
                     fontWeight: FontWeight.w600,

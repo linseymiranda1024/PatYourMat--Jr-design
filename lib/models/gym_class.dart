@@ -11,6 +11,7 @@ class GymClass {
   final String location;
   final int capacity;
   final int filled;
+  final int standbyCount;
   final ClassStatus status;
 
   GymClass({
@@ -22,6 +23,7 @@ class GymClass {
     required this.location,
     required this.capacity,
     required this.filled,
+    required this.standbyCount,
     required this.status,
   });
 
@@ -39,7 +41,13 @@ class GymClass {
         location: data['location'] ?? 'No Location',
         capacity: (data['capacity'] ?? 0).toInt(),
         filled: (data['filled'] ?? data['registeredCount'] ?? 0).toInt(),
-        status: _parseStatus(data['status']),
+        standbyCount: (data['standbyCount'] ?? 0).toInt(),
+        status: _parseStatus(
+          data['status'],
+          filled: (data['filled'] ?? data['registeredCount'] ?? 0).toInt(),
+          capacity: (data['capacity'] ?? 0).toInt(),
+          standbyCount: (data['standbyCount'] ?? 0).toInt(),
+        ),
       );
     } catch (e) {
       print('ERROR parsing GymClass from Firestore: $e');
@@ -53,6 +61,7 @@ class GymClass {
         location: '',
         capacity: 0,
         filled: 0,
+        standbyCount: 0,
         status: ClassStatus.open,
       );
     }
@@ -68,11 +77,21 @@ class GymClass {
       'capacity': capacity,
       'filled': filled,
       'registeredCount': filled,
+      'standbyCount': standbyCount,
       'status': status.name,
     };
   }
 
-  static ClassStatus _parseStatus(String? status) {
+  static ClassStatus _parseStatus(
+    String? status, {
+    required int filled,
+    required int capacity,
+    required int standbyCount,
+  }) {
+    if (capacity > 0 && filled >= capacity && standbyCount > 0) {
+      return ClassStatus.standby;
+    }
+
     switch (status) {
       case 'full':
         return ClassStatus.full;
