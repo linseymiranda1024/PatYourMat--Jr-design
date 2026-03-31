@@ -480,7 +480,10 @@ class _ClassTile extends ConsumerWidget {
       child: InkWell(
         onTap: () => Navigator.of(context).push(
           MaterialPageRoute(
-            builder: (_) => ClassDetailScreen(gymClass: gymClass),
+            builder: (_) => ClassDetailScreen(
+              classId: gymClass.id,
+              initialGymClass: gymClass,
+            ),
           ),
         ),
         borderRadius: BorderRadius.circular(24),

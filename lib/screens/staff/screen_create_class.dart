@@ -159,11 +159,6 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     final filled = existingClass == null
         ? 0
         : existingClass.filled.clamp(0, capacity);
-    final status = filled >= capacity
-        ? ClassStatus.full
-        : (existingClass?.status == ClassStatus.standby
-              ? ClassStatus.standby
-              : ClassStatus.open);
 
     final classToSave = GymClass(
       id: existingClass?.id ?? '',
@@ -176,7 +171,6 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       location: _locationController.text.trim(),
       capacity: capacity,
       filled: filled,
-      status: status,
     );
 
     try {

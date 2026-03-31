@@ -2,7 +2,6 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
-import '../main.dart';
 import '../models/gym_class.dart';
 import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
@@ -13,9 +12,14 @@ import 'reservation_confirmation_screen.dart';
 
 class ClassDetailScreen extends ConsumerStatefulWidget {
   static const String routeName = '/class_detail';
-  final GymClass gymClass;
+  final String classId;
+  final GymClass? initialGymClass;
 
-  const ClassDetailScreen({super.key, required this.gymClass});
+  const ClassDetailScreen({
+    super.key,
+    required this.classId,
+    this.initialGymClass,
+  });
 
   @override
   ConsumerState<ClassDetailScreen> createState() => _ClassDetailScreenState();
@@ -33,7 +37,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           .registerForClass(gClass);
 
       if (matNumber != null) {
-        ref.read(providerGymClass).applyLocalRegistrationDelta(gClass.id, 1);
         if (mounted) {
           final reservation = Reservation(
             id: gClass.id,
@@ -70,10 +73,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<GymClass?>(
-      stream: DBGymClass.getClassStream(widget.gymClass.id),
-      initialData: widget.gymClass,
+      stream: DBGymClass.getClassStream(widget.classId),
+      initialData: widget.initialGymClass,
       builder: (context, snapshot) {
-        final gClass = snapshot.data ?? widget.gymClass;
+        final gClass = snapshot.data;
+        if (gClass == null) {
+          return Scaffold(
+            appBar: AppBar(),
+            body: const Center(
+              child: Text('This class is no longer available.'),
+            ),
+          );
+        }
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
@@ -81,7 +92,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         final reservations = ref.watch(reservationsProvider).reservations;
         final isRegistered = reservations.any((r) => r.id == gClass.id);
 
-        final spotsLeft = gClass.capacity - gClass.filled;
+        final isFull = gClass.filled >= gClass.capacity;
+        final spotsLeft = (gClass.capacity - gClass.filled).clamp(
+          0,
+          gClass.capacity,
+        );
         final progress = gClass.capacity == 0
             ? 0.0
             : (gClass.filled / gClass.capacity).clamp(0.0, 1.0);
@@ -310,9 +325,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 height: 56,
                                 child: ElevatedButton(
                                   onPressed:
-                                      (_isLoading ||
-                                          isRegistered ||
-                                          gClass.status != ClassStatus.open)
+                                      (_isLoading || isRegistered || isFull)
                                       ? null
                                       : () => _registerForClass(gClass),
                                   style: ElevatedButton.styleFrom(
@@ -344,14 +357,25 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 height: 54,
                                 child: OutlinedButton.icon(
                                   onPressed:
-                                      (_isLoading ||
-                                          isRegistered ||
-                                          gClass.status != ClassStatus.open)
+                                      (_isLoading || isRegistered || isFull)
                                       ? null
                                       : () {
+                                          if (gClass.filled >=
+                                              gClass.capacity) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Class just filled up',
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
                                           context.push(
                                             MatSelectionScreen.routeName,
-                                            extra: gClass,
+                                            extra: gClass.id,
                                           );
                                         },
                                   icon: const Icon(Icons.grid_view_rounded),

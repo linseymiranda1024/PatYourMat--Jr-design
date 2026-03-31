@@ -166,15 +166,15 @@ class _MyAppState extends ConsumerState<MyApp> {
       GoRoute(
         path: ClassDetailScreen.routeName,
         builder: (context, state) {
-          final gymClass = state.extra as GymClass;
-          return ClassDetailScreen(gymClass: gymClass);
+          final classId = state.extra as String;
+          return ClassDetailScreen(classId: classId);
         },
       ),
       GoRoute(
         path: MatSelectionScreen.routeName,
         builder: (context, state) {
-          final gymClass = state.extra as GymClass;
-          return MatSelectionScreen(gymClass: gymClass);
+          final classId = state.extra as String;
+          return MatSelectionScreen(classId: classId);
         },
       ),
       GoRoute(
@@ -196,7 +196,6 @@ class _MyAppState extends ConsumerState<MyApp> {
                   location: '',
                   capacity: 0,
                   filled: 0,
-                  status: ClassStatus.open,
                 ),
             reservation:
                 extra['reservation'] as Reservation? ??

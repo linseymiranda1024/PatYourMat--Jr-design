@@ -2,8 +2,8 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../db_helpers/db_gym_class.dart';
 import '../db_helpers/db_reservations.dart';
-import '../main.dart';
 import '../models/gym_class.dart';
 import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
@@ -12,9 +12,14 @@ import 'reservation_confirmation_screen.dart';
 
 class MatSelectionScreen extends ConsumerStatefulWidget {
   static const String routeName = '/mat_selection';
-  final GymClass gymClass;
+  final String classId;
+  final GymClass? initialGymClass;
 
-  const MatSelectionScreen({super.key, required this.gymClass});
+  const MatSelectionScreen({
+    super.key,
+    required this.classId,
+    this.initialGymClass,
+  });
 
   @override
   ConsumerState<MatSelectionScreen> createState() => _MatSelectionScreenState();
@@ -47,326 +52,375 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
-    final gClass = widget.gymClass;
-    final colorScheme = Theme.of(context).colorScheme;
-    final textTheme = Theme.of(context).textTheme;
-    final isDark = Theme.of(context).brightness == Brightness.dark;
-    final matRows = _buildMatRows(gClass.capacity);
-    final selectedLabel = _selectedMat == null
-        ? 'No mat selected'
-        : 'Mat ${_selectedMat! + 1} selected';
+    return StreamBuilder<GymClass?>(
+      stream: DBGymClass.getClassStream(widget.classId),
+      initialData: widget.initialGymClass,
+      builder: (context, classSnapshot) {
+        final gClass = classSnapshot.data;
+        if (gClass == null) {
+          return Scaffold(
+            appBar: AppBar(title: const Text('Choose Your Spot')),
+            body: const Center(
+              child: Text('This class is no longer available.'),
+            ),
+          );
+        }
 
-    return Scaffold(
-      appBar: AppBar(title: const Text('Choose Your Spot')),
-      body: Container(
-        color: colorScheme.surface,
-        child: SingleChildScrollView(
-          child: Column(
-            children: [
-              Container(
-                margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: isDark
-                        ? const [
-                            AppColors.gradientStartDark,
-                            AppColors.gradientEndDark,
-                          ]
-                        : const [
-                            AppColors.gradientStart,
-                            AppColors.gradientEnd,
-                          ],
-                  ),
-                  borderRadius: BorderRadius.circular(24),
-                  boxShadow: [
-                    BoxShadow(
-                      color: Colors.black.withValues(alpha: 0.14),
-                      blurRadius: 16,
-                      offset: const Offset(0, 8),
-                    ),
-                  ],
-                ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    Text(
-                      gClass.title,
-                      style: textTheme.headlineSmall?.copyWith(
-                        color: AppColors.headerOnBrand,
-                        fontWeight: FontWeight.w800,
+        final colorScheme = Theme.of(context).colorScheme;
+        final textTheme = Theme.of(context).textTheme;
+        final isDark = Theme.of(context).brightness == Brightness.dark;
+        final matRows = _buildMatRows(gClass.capacity);
+        final selectedLabel = _selectedMat == null
+            ? 'No mat selected'
+            : 'Mat ${_selectedMat! + 1} selected';
+        final isFull = gClass.filled >= gClass.capacity;
+
+        return Scaffold(
+          appBar: AppBar(title: const Text('Choose Your Spot')),
+          body: Container(
+            color: colorScheme.surface,
+            child: SingleChildScrollView(
+              child: Column(
+                children: [
+                  Container(
+                    margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: isDark
+                            ? const [
+                                AppColors.gradientStartDark,
+                                AppColors.gradientEndDark,
+                              ]
+                            : const [
+                                AppColors.gradientStart,
+                                AppColors.gradientEnd,
+                              ],
                       ),
-                    ),
-                    const SizedBox(height: 8),
-                    StreamBuilder<Set<int>>(
-                      stream: DBReservations.getReservedMatNumbersStream(
-                        gClass.id,
-                      ),
-                      initialData: const <int>{},
-                      builder: (context, snapshot) {
-                        final reservedCount =
-                            (snapshot.data ?? const <int>{}).length;
-                        return Text(
-                          'Choose the mat spot you want before confirming. '
-                          '$reservedCount/${gClass.capacity} are already taken.',
-                          style: textTheme.bodyMedium?.copyWith(
-                            color: AppColors.headerOnBrand.withValues(
-                              alpha: 0.88,
-                            ),
-                            height: 1.4,
-                          ),
-                        );
-                      },
-                    ),
-                    const SizedBox(height: 16),
-                    Wrap(
-                      spacing: 12,
-                      runSpacing: 12,
-                      children: [
-                        _LegendPill(
-                          label: 'Available',
-                          color: AppColors.success,
-                        ),
-                        _LegendPill(
-                          label: 'Selected',
-                          color: colorScheme.primary,
-                        ),
-                        _LegendPill(
-                          label: 'Reserved',
-                          color: colorScheme.outline,
+                      borderRadius: BorderRadius.circular(24),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.14),
+                          blurRadius: 16,
+                          offset: const Offset(0, 8),
                         ),
                       ],
                     ),
-                  ],
-                ),
-              ),
-              Padding(
-                padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                child: Container(
-                  width: double.infinity,
-                  padding: const EdgeInsets.symmetric(vertical: 14),
-                  decoration: BoxDecoration(
-                    color: colorScheme.surfaceContainerHigh,
-                    borderRadius: BorderRadius.circular(20),
-                    border: Border.all(color: colorScheme.outlineVariant),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.self_improvement, color: colorScheme.primary),
-                      const SizedBox(width: 10),
-                      Text(
-                        'INSTRUCTOR FRONT',
-                        style: textTheme.labelLarge?.copyWith(
-                          fontWeight: FontWeight.w800,
-                          color: colorScheme.primary,
-                          letterSpacing: 0.6,
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          gClass.title,
+                          style: textTheme.headlineSmall?.copyWith(
+                            color: AppColors.headerOnBrand,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
-                      ),
-                    ],
+                        const SizedBox(height: 8),
+                        StreamBuilder<Set<int>>(
+                          stream: DBReservations.getReservedMatNumbersStream(
+                            gClass.id,
+                          ),
+                          initialData: const <int>{},
+                          builder: (context, snapshot) {
+                            final reservedCount =
+                                (snapshot.data ?? const <int>{}).length;
+                            return Text(
+                              'Choose the mat spot you want before confirming. $reservedCount/${gClass.capacity} are already taken.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: AppColors.headerOnBrand.withValues(
+                                  alpha: 0.88,
+                                ),
+                                height: 1.4,
+                              ),
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 16),
+                        Wrap(
+                          spacing: 12,
+                          runSpacing: 12,
+                          children: [
+                            const _LegendPill(
+                              label: 'Available',
+                              color: AppColors.success,
+                            ),
+                            _LegendPill(
+                              label: 'Selected',
+                              color: colorScheme.primary,
+                            ),
+                            _LegendPill(
+                              label: 'Reserved',
+                              color: colorScheme.outline,
+                            ),
+                          ],
+                        ),
+                      ],
+                    ),
                   ),
-                ),
-              ),
-              StreamBuilder<Set<int>>(
-                stream: DBReservations.getReservedMatNumbersStream(gClass.id),
-                initialData: const <int>{},
-                builder: (context, snapshot) {
-                  final reservedMats = snapshot.data ?? <int>{};
-                  return Padding(
-                    padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                  Padding(
+                    padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
                     child: Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.symmetric(vertical: 14),
                       decoration: BoxDecoration(
-                        color: colorScheme.surfaceContainer,
-                        borderRadius: BorderRadius.circular(28),
+                        color: colorScheme.surfaceContainerHigh,
+                        borderRadius: BorderRadius.circular(20),
                         border: Border.all(color: colorScheme.outlineVariant),
                       ),
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                        children: matRows
-                            .asMap()
-                            .entries
-                            .map(
-                              (entry) => Padding(
-                                padding: EdgeInsets.symmetric(
-                                  horizontal: entry.key.isEven ? 16 : 28,
-                                  vertical: 10,
-                                ),
-                                child: LayoutBuilder(
-                                  builder: (context, constraints) {
-                                    final rowCount = entry.value.length;
-                                    const horizontalPaddingPerMat = 8.0;
-                                    final availableWidth =
-                                        constraints.maxWidth -
-                                        (rowCount * horizontalPaddingPerMat);
-                                    final maxTileWidth =
-                                        availableWidth / rowCount;
-                                    final tileWidth = maxTileWidth.clamp(
-                                      32.0,
-                                      54.0,
-                                    );
+                      child: Row(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        children: [
+                          Icon(
+                            Icons.self_improvement,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            'INSTRUCTOR FRONT',
+                            style: textTheme.labelLarge?.copyWith(
+                              fontWeight: FontWeight.w800,
+                              color: colorScheme.primary,
+                              letterSpacing: 0.6,
+                            ),
+                          ),
+                        ],
+                      ),
+                    ),
+                  ),
+                  StreamBuilder<Set<int>>(
+                    stream: DBReservations.getReservedMatNumbersStream(
+                      gClass.id,
+                    ),
+                    initialData: const <int>{},
+                    builder: (context, snapshot) {
+                      final reservedMats = snapshot.data ?? <int>{};
+                      return Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: matRows
+                                .asMap()
+                                .entries
+                                .map(
+                                  (entry) => Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: entry.key.isEven ? 16 : 28,
+                                      vertical: 10,
+                                    ),
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final rowCount = entry.value.length;
+                                        const horizontalPaddingPerMat = 8.0;
+                                        final availableWidth =
+                                            constraints.maxWidth -
+                                            (rowCount *
+                                                horizontalPaddingPerMat);
+                                        final maxTileWidth =
+                                            availableWidth / rowCount;
+                                        final tileWidth = maxTileWidth.clamp(
+                                          32.0,
+                                          54.0,
+                                        );
 
-                                    return Row(
-                                      mainAxisAlignment:
-                                          MainAxisAlignment.center,
-                                      children: entry.value.map((matNumber) {
-                                        final index = matNumber - 1;
-                                        final isReserved = reservedMats
-                                            .contains(matNumber);
-                                        final isSelected =
-                                            _selectedMat == index;
+                                        return Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: entry.value.map((
+                                            matNumber,
+                                          ) {
+                                            final index = matNumber - 1;
+                                            final isReserved = reservedMats
+                                                .contains(matNumber);
+                                            final isSelected =
+                                                _selectedMat == index;
 
-                                        return Padding(
-                                          padding: const EdgeInsets.symmetric(
-                                            horizontal: 4,
-                                          ),
-                                          child: SizedBox(
-                                            width: tileWidth,
-                                            child: AspectRatio(
-                                              aspectRatio: 0.52,
-                                              child: _YogaMatTile(
-                                                number: matNumber,
-                                                reserved: isReserved,
-                                                selected: isSelected,
-                                                onTap: isReserved
-                                                    ? null
-                                                    : () {
-                                                        setState(() {
-                                                          _selectedMat = index;
-                                                        });
-                                                      },
+                                            return Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
+                                                    horizontal: 4,
+                                                  ),
+                                              child: SizedBox(
+                                                width: tileWidth,
+                                                child: AspectRatio(
+                                                  aspectRatio: 0.52,
+                                                  child: _YogaMatTile(
+                                                    number: matNumber,
+                                                    reserved: isReserved,
+                                                    selected: isSelected,
+                                                    onTap: isReserved
+                                                        ? null
+                                                        : () {
+                                                            setState(() {
+                                                              _selectedMat =
+                                                                  index;
+                                                            });
+                                                          },
+                                                  ),
+                                                ),
                                               ),
+                                            );
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
+                      );
+                    },
+                  ),
+                  SafeArea(
+                    top: false,
+                    child: Padding(
+                      padding: const EdgeInsets.all(16),
+                      child: Column(
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Container(
+                            width: double.infinity,
+                            padding: const EdgeInsets.symmetric(
+                              horizontal: 16,
+                              vertical: 12,
+                            ),
+                            decoration: BoxDecoration(
+                              color: colorScheme.surfaceContainerHigh,
+                              borderRadius: BorderRadius.circular(18),
+                              border: Border.all(
+                                color: colorScheme.outlineVariant,
+                              ),
+                            ),
+                            child: Text(
+                              selectedLabel,
+                              textAlign: TextAlign.center,
+                              style: textTheme.bodyMedium?.copyWith(
+                                fontSize: 15,
+                                fontWeight: FontWeight.w700,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          const SizedBox(height: 12),
+                          SizedBox(
+                            width: double.infinity,
+                            height: 56,
+                            child: ElevatedButton(
+                              onPressed:
+                                  (_selectedMat == null ||
+                                      _isSubmitting ||
+                                      isFull)
+                                  ? null
+                                  : () async {
+                                      if (gClass.filled >= gClass.capacity) {
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          const SnackBar(
+                                            content: Text(
+                                              'Class just filled up',
                                             ),
                                           ),
                                         );
-                                      }).toList(),
-                                    );
-                                  },
-                                ),
-                              ),
-                            )
-                            .toList(),
+                                        return;
+                                      }
+
+                                      final matNumber =
+                                          'Mat #${_selectedMat! + 1}';
+                                      setState(() => _isSubmitting = true);
+                                      try {
+                                        final reservedMat = await ref
+                                            .read(reservationsProvider)
+                                            .registerForClass(
+                                              gClass,
+                                              matNumber: matNumber,
+                                            );
+                                        if (!mounted || reservedMat == null) {
+                                          return;
+                                        }
+
+                                        final reservation = Reservation(
+                                          id: gClass.id,
+                                          className: gClass.title,
+                                          instructor: gClass.instructor,
+                                          dateTime:
+                                              '${gClass.dateText} at ${gClass.timeText}',
+                                          matNumber: reservedMat,
+                                          status: 'CONFIRMED',
+                                          date: gClass.dateTime,
+                                        );
+
+                                        context.pushNamed(
+                                          ReservationConfirmationScreen
+                                              .routeName,
+                                          extra: {
+                                            'gymClass': gClass,
+                                            'reservation': reservation,
+                                          },
+                                        );
+                                      } catch (e) {
+                                        if (!mounted) return;
+                                        var message = e.toString();
+                                        if (message.startsWith('Exception: ')) {
+                                          message = message.replaceFirst(
+                                            'Exception: ',
+                                            '',
+                                          );
+                                        }
+                                        ScaffoldMessenger.of(
+                                          context,
+                                        ).showSnackBar(
+                                          SnackBar(content: Text(message)),
+                                        );
+                                      } finally {
+                                        if (mounted) {
+                                          setState(() => _isSubmitting = false);
+                                        }
+                                      }
+                                    },
+                              child: _isSubmitting
+                                  ? SizedBox(
+                                      width: 22,
+                                      height: 22,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: colorScheme.onPrimary,
+                                      ),
+                                    )
+                                  : Text(
+                                      isFull
+                                          ? 'Class Full'
+                                          : _selectedMat == null
+                                          ? 'Select a Mat'
+                                          : 'Reserve Mat ${_selectedMat! + 1}',
+                                      style: textTheme.titleMedium?.copyWith(
+                                        fontWeight: FontWeight.w800,
+                                        color: colorScheme.onPrimary,
+                                      ),
+                                    ),
+                            ),
+                          ),
+                        ],
                       ),
                     ),
-                  );
-                },
-              ),
-              SafeArea(
-                top: false,
-                child: Padding(
-                  padding: const EdgeInsets.all(16),
-                  child: Column(
-                    mainAxisSize: MainAxisSize.min,
-                    children: [
-                      Container(
-                        width: double.infinity,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 16,
-                          vertical: 12,
-                        ),
-                        decoration: BoxDecoration(
-                          color: colorScheme.surfaceContainerHigh,
-                          borderRadius: BorderRadius.circular(18),
-                          border: Border.all(color: colorScheme.outlineVariant),
-                        ),
-                        child: Text(
-                          selectedLabel,
-                          textAlign: TextAlign.center,
-                          style: textTheme.bodyMedium?.copyWith(
-                            fontSize: 15,
-                            fontWeight: FontWeight.w700,
-                            color: colorScheme.onSurface,
-                          ),
-                        ),
-                      ),
-                      const SizedBox(height: 12),
-                      SizedBox(
-                        width: double.infinity,
-                        height: 56,
-                        child: ElevatedButton(
-                          onPressed: (_selectedMat == null || _isSubmitting)
-                              ? null
-                              : () async {
-                                  final matNumber = 'Mat #${_selectedMat! + 1}';
-                                  setState(() => _isSubmitting = true);
-                                  try {
-                                    final reservedMat = await ref
-                                        .read(reservationsProvider)
-                                        .registerForClass(
-                                          gClass,
-                                          matNumber: matNumber,
-                                        );
-                                    if (!mounted || reservedMat == null) return;
-                                    ref
-                                        .read(providerGymClass)
-                                        .applyLocalRegistrationDelta(
-                                          gClass.id,
-                                          1,
-                                        );
-                                    final reservation = Reservation(
-                                      id: gClass.id,
-                                      className: gClass.title,
-                                      instructor: gClass.instructor,
-                                      dateTime:
-                                          '${gClass.dateText} at ${gClass.timeText}',
-                                      matNumber: reservedMat,
-                                      status: 'CONFIRMED',
-                                      date: gClass.dateTime,
-                                    );
-                                    context.pushNamed(
-                                      ReservationConfirmationScreen.routeName,
-                                      extra: {
-                                        'gymClass': gClass,
-                                        'reservation': reservation,
-                                      },
-                                    );
-                                  } catch (e) {
-                                    if (!mounted) return;
-                                    var message = e.toString();
-                                    if (message.startsWith('Exception: ')) {
-                                      message = message.replaceFirst(
-                                        'Exception: ',
-                                        '',
-                                      );
-                                    }
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text(message)),
-                                    );
-                                  } finally {
-                                    if (mounted) {
-                                      setState(() => _isSubmitting = false);
-                                    }
-                                  }
-                                },
-                          child: _isSubmitting
-                              ? SizedBox(
-                                  width: 22,
-                                  height: 22,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                    color: colorScheme.onPrimary,
-                                  ),
-                                )
-                              : Text(
-                                  _selectedMat == null
-                                      ? 'Select a Mat'
-                                      : 'Reserve Mat ${_selectedMat! + 1}',
-                                  style: textTheme.titleMedium?.copyWith(
-                                    fontWeight: FontWeight.w800,
-                                    color: colorScheme.onPrimary,
-                                  ),
-                                ),
-                        ),
-                      ),
-                    ],
                   ),
-                ),
+                ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 }

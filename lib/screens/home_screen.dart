@@ -305,7 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   capacity: c.capacity,
                                   onTap: () => context.push(
                                     ClassDetailScreen.routeName,
-                                    extra: c,
+                                    extra: c.id,
                                   ),
                                 ),
                                 const SizedBox(height: 16),

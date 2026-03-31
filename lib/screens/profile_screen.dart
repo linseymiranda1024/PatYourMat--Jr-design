@@ -847,9 +847,6 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                     await ref
                         .read(reservationsProvider)
                         .cancelReservation(reservation);
-                    ref
-                        .read(providerGymClass)
-                        .applyLocalRegistrationDelta(reservation.id ?? '', -1);
                     if (!context.mounted) return;
                     ScaffoldMessenger.of(context).showSnackBar(
                       const SnackBar(content: Text('Reservation cancelled')),

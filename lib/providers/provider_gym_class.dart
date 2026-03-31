@@ -89,32 +89,6 @@ class ProviderGymClass extends ChangeNotifier {
     await refreshClasses();
   }
 
-  void applyLocalRegistrationDelta(String classId, int delta) {
-    final index = _classes.indexWhere((c) => c.id == classId);
-    if (index == -1) return;
-
-    final existing = _classes[index];
-    final nextFilled = (existing.filled + delta).clamp(0, existing.capacity);
-    final nextStatus = nextFilled >= existing.capacity
-        ? ClassStatus.full
-        : ClassStatus.open;
-
-    _classes[index] = GymClass(
-      id: existing.id,
-      title: existing.title,
-      description: existing.description,
-      type: existing.type,
-      instructor: existing.instructor,
-      dateTime: existing.dateTime,
-      durationMinutes: existing.durationMinutes,
-      location: existing.location,
-      capacity: existing.capacity,
-      filled: nextFilled,
-      status: nextStatus,
-    );
-    notifyListeners();
-  }
-
   @override
   void dispose() {
     _isDisposed = true;

@@ -55,7 +55,6 @@ class GymClass {
   final String location;
   final int capacity;
   final int filled;
-  final ClassStatus status;
 
   GymClass({
     required this.id,
@@ -68,12 +67,12 @@ class GymClass {
     required this.location,
     required this.capacity,
     required this.filled,
-    required this.status,
+    ClassStatus? status,
   });
 
   factory GymClass.fromFirestore(DocumentSnapshot doc) {
     try {
-      Map<String, dynamic> data = doc.data() as Map<String, dynamic>;
+      final data = doc.data() as Map<String, dynamic>? ?? <String, dynamic>{};
       return GymClass(
         id: doc.id,
         title: data['title'] ?? 'Untitled Class',
@@ -85,11 +84,10 @@ class GymClass {
         dateTime: data['dateTime'] is Timestamp
             ? (data['dateTime'] as Timestamp).toDate()
             : DateTime.now(),
-        durationMinutes: (data['durationMinutes'] ?? 0).toInt(),
+        durationMinutes: _asInt(data['durationMinutes']),
         location: data['location'] ?? 'No Location',
-        capacity: (data['capacity'] ?? 0).toInt(),
-        filled: (data['filled'] ?? data['registeredCount'] ?? 0).toInt(),
-        status: _parseStatus(data['status']),
+        capacity: _asInt(data['capacity']),
+        filled: _resolvedFilledCount(data),
       );
     } catch (e) {
       print('ERROR parsing GymClass from Firestore: $e');
@@ -105,7 +103,6 @@ class GymClass {
         location: '',
         capacity: 0,
         filled: 0,
-        status: ClassStatus.open,
       );
     }
   }
@@ -126,16 +123,35 @@ class GymClass {
     };
   }
 
-  static ClassStatus _parseStatus(String? status) {
-    switch (status) {
-      case 'full':
-        return ClassStatus.full;
-      case 'standby':
-        return ClassStatus.standby;
-      case 'open':
-      default:
-        return ClassStatus.open;
+  ClassStatus get status {
+    return filled >= capacity ? ClassStatus.full : ClassStatus.open;
+  }
+
+  static int _asInt(dynamic value) {
+    if (value is int) return value;
+    if (value is num) return value.toInt();
+    return 0;
+  }
+
+  static int _resolvedFilledCount(Map<String, dynamic> data) {
+    final reservedMatCount = _reservedMatCount(data['reservedMats']);
+    if (reservedMatCount != null) {
+      return reservedMatCount;
     }
+
+    return _asInt(data['filled'] ?? data['registeredCount']);
+  }
+
+  static int? _reservedMatCount(dynamic rawValue) {
+    if (rawValue is! List) {
+      return null;
+    }
+
+    return rawValue
+        .map((value) => value.toString().trim())
+        .where((value) => value.isNotEmpty)
+        .toSet()
+        .length;
   }
 
   String get dateText {

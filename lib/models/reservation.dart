@@ -1,12 +1,11 @@
 class Reservation {
-  final String? id; // added id field
+  final String? id;
   final String className;
   final String instructor;
-  final String dateTime; // e.g. "Mon, Feb 3 6:00 AM"
-  final String matNumber; // "Mat #9"
-  final String status; // "CONFIRMED", "STANDBY", etc.
-  final DateTime date; // for sorting
-  final String? checkInCode; // optional QR-like string or future real code
+  final String dateTime;
+  final String matNumber;
+  final String status;
+  final DateTime date;
 
   Reservation({
     this.id,
@@ -14,8 +13,7 @@ class Reservation {
     required this.instructor,
     required this.dateTime,
     required this.matNumber,
-    this.status = "CONFIRMED",
+    this.status = 'CONFIRMED',
     required this.date,
-    this.checkInCode,
   });
 }
