@@ -706,8 +706,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     return _buildSectionCard(
       context: context,
       title: 'Previous Classes',
-      subtitle:
-          'Past reservations are treated as attended until check-in tracking is added.',
+      subtitle: 'Past reservations show your recorded attendance history.',
       child: reservations.isEmpty
           ? Container(
               width: double.infinity,

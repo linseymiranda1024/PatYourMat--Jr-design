@@ -23,6 +23,37 @@ class DBReservations {
   static const String _userProfilesCollection = 'user_profiles';
   static const String _classesCollection = 'classes';
   static const String _registrationsCollection = 'registrations';
+  static const String _rosterField = 'roster';
+
+  static DocumentReference<Map<String, dynamic>> _userRegistrationRef(
+    String userId,
+    String classId,
+  ) {
+    return _db
+        .collection(_userProfilesCollection)
+        .doc(userId)
+        .collection(_registrationsCollection)
+        .doc(classId);
+  }
+
+  static CollectionReference<Map<String, dynamic>>
+  _classRegistrationsCollection(String classId) {
+    return _db
+        .collection(_classesCollection)
+        .doc(classId)
+        .collection(_registrationsCollection);
+  }
+
+  static DocumentReference<Map<String, dynamic>> _classRegistrationRef(
+    String classId,
+    String userId,
+  ) {
+    return _classRegistrationsCollection(classId).doc(userId);
+  }
+
+  static DocumentReference<Map<String, dynamic>> _classRef(String classId) {
+    return _db.collection(_classesCollection).doc(classId);
+  }
 
   static Future<String?> registerForClass(
     String userId,
@@ -69,30 +100,57 @@ class DBReservations {
         .orderBy('date', descending: false)
         .snapshots()
         .map(
-          (snapshot) => snapshot.docs.map((doc) {
-            final data = doc.data();
-            return Reservation(
-              id: doc.id,
-              className: data['className'] ?? '',
-              instructor: data['instructor'] ?? '',
-              dateTime: data['dateTime'] ?? '',
-              matNumber: data['matNumber'] ?? '',
-              status: data['status'] ?? 'CONFIRMED',
-              date: data['date'] is Timestamp
-                  ? (data['date'] as Timestamp).toDate()
-                  : DateTime.now(),
-            );
-          }).toList(),
+          (snapshot) => snapshot.docs.map(_reservationFromDocument).toList(),
         );
   }
 
+  static Stream<List<Reservation>> getReservationsForClassStream(
+    String classId,
+  ) {
+    return _classRef(classId).snapshots().asyncMap((doc) async {
+      final classData = doc.data() ?? <String, dynamic>{};
+      final rosterReservations = _reservationsFromRoster(
+        classId,
+        classData[_rosterField],
+      );
+      if (rosterReservations.isNotEmpty) {
+        return _sortReservations(rosterReservations);
+      }
+
+      final legacyReservations = await _loadLegacyClassReservations(classId);
+      if (legacyReservations.isNotEmpty) {
+        return _sortReservations(legacyReservations);
+      }
+
+      return const <Reservation>[];
+    });
+  }
+
+  static Stream<int> getReservationCountForClassStream(String classId) {
+    return _classRef(classId).snapshots().map((doc) {
+      final classData = doc.data() ?? <String, dynamic>{};
+      final roster = classData[_rosterField];
+      if (roster is Map && roster.isNotEmpty) {
+        return roster.length;
+      }
+
+      final reservedMats = classData['reservedMats'];
+      if (reservedMats is List) {
+        return reservedMats
+            .map((value) => value.toString().trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .length;
+      }
+
+      return _asInt(classData['filled'] ?? classData['registeredCount']);
+    });
+  }
+
   static Future<void> cancelReservation(String userId, String classId) async {
-    final userRegistrationRef = _db
-        .collection(_userProfilesCollection)
-        .doc(userId)
-        .collection(_registrationsCollection)
-        .doc(classId);
-    final classRef = _db.collection(_classesCollection).doc(classId);
+    final userRegistrationRef = _userRegistrationRef(userId, classId);
+    final classRegistrationRef = _classRegistrationRef(classId, userId);
+    final classRef = _classRef(classId);
 
     try {
       await _db.runTransaction((transaction) async {
@@ -106,6 +164,7 @@ class DBReservations {
 
         final classSnap = await transaction.get(classRef);
         transaction.delete(userRegistrationRef);
+        transaction.delete(classRegistrationRef);
 
         if (!classSnap.exists) {
           return;
@@ -126,6 +185,7 @@ class DBReservations {
           'status': nextFilled >= capacity
               ? ClassStatus.full.name
               : ClassStatus.open.name,
+          _rosterEntryField(userId): FieldValue.delete(),
         };
         if (matNumber.isNotEmpty) {
           classUpdates['reservedMats'] = FieldValue.arrayRemove([matNumber]);
@@ -133,6 +193,29 @@ class DBReservations {
 
         transaction.update(classRef, classUpdates);
       });
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Future<void> markNoShow(String userId, String classId) async {
+    final reservationRef = _userRegistrationRef(userId, classId);
+    final classReservationRef = _classRegistrationRef(classId, userId);
+    final classRef = _classRef(classId);
+
+    try {
+      final updates = {
+        'status': ReservationStatus.noShow,
+        'noShowAt': FieldValue.serverTimestamp(),
+      };
+      await Future.wait([
+        reservationRef.set(updates, SetOptions(merge: true)),
+        classReservationRef.set(updates, SetOptions(merge: true)),
+        classRef.update({
+          _rosterStatusField(userId): ReservationStatus.noShow,
+          _rosterNoShowAtField(userId): FieldValue.serverTimestamp(),
+        }),
+      ]);
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
     }
@@ -149,9 +232,9 @@ class DBReservations {
     }
 
     final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
-    final reservationRef = userProfileRef
-        .collection(_registrationsCollection)
-        .doc(reservationId);
+    final reservationRef = _userRegistrationRef(userId, reservationId);
+    final classReservationRef = _classRegistrationRef(reservationId, userId);
+    final classRef = _classRef(reservationId);
 
     return _db.runTransaction((transaction) async {
       final reservationSnap = await transaction.get(reservationRef);
@@ -173,14 +256,22 @@ class DBReservations {
         profileData['category_attendance'],
       );
 
-      if (currentStatus != 'ATTENDED') {
+      if (currentStatus != ReservationStatus.attended) {
         final type = normalizeGymClassType(gymClass.type);
         nextCategoryAttendance[type] = (nextCategoryAttendance[type] ?? 0) + 1;
 
         transaction.set(reservationRef, {
-          'status': 'ATTENDED',
+          'status': ReservationStatus.attended,
           'attendedAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        transaction.set(classReservationRef, {
+          'status': ReservationStatus.attended,
+          'attendedAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+        transaction.update(classRef, {
+          _rosterStatusField(userId): ReservationStatus.attended,
+          _rosterAttendedAtField(userId): FieldValue.serverTimestamp(),
+        });
       }
 
       final totalAttended = nextCategoryAttendance.values.fold<int>(
@@ -218,12 +309,10 @@ class DBReservations {
     GymClass gymClass, {
     String? requestedMatNumber,
   }) {
-    final classRef = _db.collection(_classesCollection).doc(gymClass.id);
-    final userRegistrationRef = _db
-        .collection(_userProfilesCollection)
-        .doc(userId)
-        .collection(_registrationsCollection)
-        .doc(gymClass.id);
+    final classRef = _classRef(gymClass.id);
+    final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
+    final userRegistrationRef = _userRegistrationRef(userId, gymClass.id);
+    final classRegistrationRef = _classRegistrationRef(gymClass.id, userId);
 
     return _db.runTransaction<String>((transaction) async {
       final classSnap = await transaction.get(classRef);
@@ -237,6 +326,8 @@ class DBReservations {
       }
 
       final classData = classSnap.data() as Map<String, dynamic>;
+      final userProfileSnap = await transaction.get(userProfileRef);
+      final userProfileData = userProfileSnap.data() ?? <String, dynamic>{};
       final capacity = _asInt(classData['capacity']);
       final reservedMats = _parseReservedMats(classData['reservedMats']);
       final occupiedCount = reservedMats.length;
@@ -254,11 +345,16 @@ class DBReservations {
         throw Exception('That mat is already reserved.');
       }
 
-      final nextFilled = occupiedCount + 1;
-      transaction.set(
-        userRegistrationRef,
-        _buildRegistrationData(gymClass, selectedMatNumber),
+      final registrationData = _buildRegistrationData(
+        userId: userId,
+        userName: _buildUserName(userProfileData),
+        userEmail: userProfileData['email']?.toString() ?? '',
+        gymClass: gymClass,
+        matNumber: selectedMatNumber,
       );
+      final nextFilled = occupiedCount + 1;
+      transaction.set(userRegistrationRef, registrationData);
+      transaction.set(classRegistrationRef, registrationData);
       transaction.update(classRef, {
         'filled': nextFilled,
         'registeredCount': nextFilled,
@@ -266,16 +362,23 @@ class DBReservations {
             ? ClassStatus.full.name
             : ClassStatus.open.name,
         'reservedMats': FieldValue.arrayUnion([selectedMatNumber]),
+        _rosterEntryField(userId): registrationData,
       });
       return selectedMatNumber;
     });
   }
 
-  static Map<String, dynamic> _buildRegistrationData(
-    GymClass gymClass,
-    String matNumber,
-  ) {
+  static Map<String, dynamic> _buildRegistrationData({
+    required String userId,
+    required String userName,
+    required String userEmail,
+    required GymClass gymClass,
+    required String matNumber,
+  }) {
     return {
+      'userId': userId,
+      'userName': userName,
+      'userEmail': userEmail,
       'classId': gymClass.id,
       'className': gymClass.title,
       'instructor': gymClass.instructor,
@@ -283,9 +386,41 @@ class DBReservations {
       'date': Timestamp.fromDate(gymClass.dateTime),
       'type': normalizeGymClassType(gymClass.type),
       'matNumber': matNumber,
-      'status': 'CONFIRMED',
+      'status': ReservationStatus.confirmed,
       'createdAt': FieldValue.serverTimestamp(),
     };
+  }
+
+  static Reservation _reservationFromDocument(
+    DocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data() ?? <String, dynamic>{};
+    return Reservation.fromMap({
+      ...data,
+      'userId': data['userId'] ?? doc.reference.parent.parent?.id ?? '',
+      'date': data['date'] is Timestamp
+          ? (data['date'] as Timestamp).toDate()
+          : DateTime.now(),
+    }, id: doc.id);
+  }
+
+  static Future<List<Reservation>> _loadLegacyClassReservations(
+    String classId,
+  ) async {
+    try {
+      final classDocs = await _classRegistrationsCollection(classId).get();
+      if (classDocs.docs.isNotEmpty) {
+        return classDocs.docs.map(_reservationFromDocument).toList();
+      }
+
+      final userDocs = await _db
+          .collectionGroup(_registrationsCollection)
+          .where('classId', isEqualTo: classId)
+          .get();
+      return userDocs.docs.map(_reservationFromDocument).toList();
+    } on FirebaseException {
+      return const <Reservation>[];
+    }
   }
 
   static String _friendlyFirestoreError(FirebaseException e) {
@@ -329,6 +464,83 @@ class DBReservations {
     return parsed;
   }
 
+  static String _buildUserName(Map<String, dynamic> userProfileData) {
+    final firstName = userProfileData['first_name']?.toString().trim() ?? '';
+    final lastName = userProfileData['last_name']?.toString().trim() ?? '';
+    final fullName = [
+      firstName,
+      lastName,
+    ].where((value) => value.isNotEmpty).join(' ').trim();
+    if (fullName.isNotEmpty) {
+      return fullName;
+    }
+
+    return userProfileData['email']?.toString() ?? '';
+  }
+
+  static List<Reservation> _reservationsFromRoster(
+    String classId,
+    dynamic rawRoster,
+  ) {
+    if (rawRoster is! Map) {
+      return const <Reservation>[];
+    }
+
+    final reservations = <Reservation>[];
+    rawRoster.forEach((key, value) {
+      if (value is! Map) {
+        return;
+      }
+
+      final data = Map<String, dynamic>.from(
+        value.map((entryKey, entryValue) => MapEntry('$entryKey', entryValue)),
+      );
+      reservations.add(
+        Reservation.fromMap({
+          ...data,
+          'userId': data['userId'] ?? '$key',
+          'classId': data['classId'] ?? classId,
+          'date': data['date'] is Timestamp
+              ? (data['date'] as Timestamp).toDate()
+              : DateTime.now(),
+        }, id: data['classId']?.toString() ?? classId),
+      );
+    });
+    return reservations;
+  }
+
+  static List<Reservation> _sortReservations(List<Reservation> reservations) {
+    reservations.sort((a, b) {
+      final matCompare = _matSortValue(
+        a.matNumber,
+      ).compareTo(_matSortValue(b.matNumber));
+      if (matCompare != 0) {
+        return matCompare;
+      }
+
+      final nameCompare = a.userName.toLowerCase().compareTo(
+        b.userName.toLowerCase(),
+      );
+      if (nameCompare != 0) {
+        return nameCompare;
+      }
+
+      return a.userEmail.toLowerCase().compareTo(b.userEmail.toLowerCase());
+    });
+    return reservations;
+  }
+
+  static String _rosterEntryField(String userId) => '$_rosterField.$userId';
+
+  static String _rosterStatusField(String userId) =>
+      '${_rosterEntryField(userId)}.status';
+
+  static String _rosterAttendedAtField(String userId) =>
+      '${_rosterEntryField(userId)}.attendedAt';
+
+  static String _rosterNoShowAtField(String userId) =>
+      '${_rosterEntryField(userId)}.noShowAt';
+
   static String? _pickRandomAvailableMat(
     int capacity,
     Set<String> reservedMats,
@@ -351,5 +563,10 @@ class DBReservations {
       throw Exception('Invalid mat selection.');
     }
     return 'Mat #$matNumber';
+  }
+
+  static int _matSortValue(String matNumber) {
+    final match = RegExp(r'(\d+)').firstMatch(matNumber);
+    return int.tryParse(match?.group(1) ?? '') ?? 999999;
   }
 }

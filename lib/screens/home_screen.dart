@@ -2,6 +2,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 
+import '../db_helpers/db_reservations.dart';
 import '../main.dart';
 import '../models/gym_class.dart' as model;
 import '../theme/app_colors.dart';
@@ -295,6 +296,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                             (c) => Column(
                               children: [
                                 ClassCard(
+                                  classId: c.id,
                                   title: c.title,
                                   instructor: c.instructor,
                                   dateText: c.dateText,
@@ -533,6 +535,7 @@ class _HomeEmptyState extends StatelessWidget {
 }
 
 class ClassCard extends StatelessWidget {
+  final String classId;
   final String title;
   final String instructor;
   final String dateText;
@@ -545,6 +548,7 @@ class ClassCard extends StatelessWidget {
 
   const ClassCard({
     super.key,
+    required this.classId,
     required this.title,
     required this.instructor,
     required this.dateText,
@@ -561,132 +565,147 @@ class ClassCard extends StatelessWidget {
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
-    final statusUi = _statusUi(status);
-    final progress = capacity == 0 ? 0.0 : (filled / capacity).clamp(0.0, 1.0);
 
-    return Material(
-      color: Colors.transparent,
-      borderRadius: BorderRadius.circular(22),
-      child: InkWell(
-        onTap: onTap,
-        borderRadius: BorderRadius.circular(22),
-        child: Container(
-          padding: const EdgeInsets.all(18),
-          decoration: BoxDecoration(
-            color: colorScheme.surfaceContainer,
+    return StreamBuilder<int>(
+      stream: DBReservations.getReservationCountForClassStream(classId),
+      builder: (context, snapshot) {
+        final liveFilled = snapshot.data ?? filled;
+        final liveStatus = liveFilled >= capacity
+            ? model.ClassStatus.full
+            : status;
+        final statusUi = _statusUi(liveStatus);
+        final progress = capacity == 0
+            ? 0.0
+            : (liveFilled / capacity).clamp(0.0, 1.0);
+
+        return Material(
+          color: Colors.transparent,
+          borderRadius: BorderRadius.circular(22),
+          child: InkWell(
+            onTap: onTap,
             borderRadius: BorderRadius.circular(22),
-            boxShadow: [
-              BoxShadow(
-                blurRadius: 18,
-                offset: const Offset(0, 10),
-                color: Colors.black.withValues(alpha: 0.08),
-              ),
-            ],
-          ),
-          child: Column(
-            crossAxisAlignment: CrossAxisAlignment.start,
-            children: [
-              Row(
-                children: [
-                  Expanded(
-                    child: Text(
-                      title,
-                      style: textTheme.headlineSmall?.copyWith(
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                  ),
-                  _StatusPill(text: statusUi.label, accent: statusUi.accent),
-                ],
-              ),
-              const SizedBox(height: 8),
-              Text(
-                instructor,
-                style: textTheme.titleMedium?.copyWith(
-                  fontSize: 18,
-                  color: colorScheme.onSurfaceVariant,
-                  fontWeight: FontWeight.w500,
-                ),
-              ),
-              const SizedBox(height: 14),
-              Row(
-                children: [
-                  Icon(
-                    Icons.calendar_today_outlined,
-                    size: 20,
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                  const SizedBox(width: 10),
-                  Text(
-                    dateText,
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontSize: 16,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 16),
-                  Text(
-                    timeText,
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontSize: 16,
-                      color: colorScheme.onSurface,
-                      fontWeight: FontWeight.w600,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    '•',
-                    style: TextStyle(
-                      color: colorScheme.onSurfaceVariant,
-                      fontSize: 16,
-                    ),
-                  ),
-                  const SizedBox(width: 14),
-                  Text(
-                    durationText,
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontSize: 16,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w600,
-                    ),
+            child: Container(
+              padding: const EdgeInsets.all(18),
+              decoration: BoxDecoration(
+                color: colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(22),
+                boxShadow: [
+                  BoxShadow(
+                    blurRadius: 18,
+                    offset: const Offset(0, 10),
+                    color: Colors.black.withValues(alpha: 0.08),
                   ),
                 ],
               ),
-              const SizedBox(height: 18),
-              Row(
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  Expanded(
-                    child: ClipRRect(
-                      borderRadius: BorderRadius.circular(10),
-                      child: LinearProgressIndicator(
-                        value: progress,
-                        minHeight: 10,
-                        backgroundColor: colorScheme.outlineVariant,
-                        valueColor: AlwaysStoppedAnimation<Color>(
-                          status == model.ClassStatus.full
-                              ? colorScheme.error
-                              : colorScheme.primary,
+                  Row(
+                    children: [
+                      Expanded(
+                        child: Text(
+                          title,
+                          style: textTheme.headlineSmall?.copyWith(
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
                         ),
                       ),
+                      _StatusPill(
+                        text: statusUi.label,
+                        accent: statusUi.accent,
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 8),
+                  Text(
+                    instructor,
+                    style: textTheme.titleMedium?.copyWith(
+                      fontSize: 18,
+                      color: colorScheme.onSurfaceVariant,
+                      fontWeight: FontWeight.w500,
                     ),
                   ),
-                  const SizedBox(width: 14),
-                  Text(
-                    '$filled/$capacity',
-                    style: textTheme.bodyLarge?.copyWith(
-                      fontSize: 16,
-                      fontWeight: FontWeight.w700,
-                      color: colorScheme.onSurfaceVariant,
-                    ),
+                  const SizedBox(height: 14),
+                  Row(
+                    children: [
+                      Icon(
+                        Icons.calendar_today_outlined,
+                        size: 20,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                      const SizedBox(width: 10),
+                      Text(
+                        dateText,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 16),
+                      Text(
+                        timeText,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          color: colorScheme.onSurface,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        '•',
+                        style: TextStyle(
+                          color: colorScheme.onSurfaceVariant,
+                          fontSize: 16,
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        durationText,
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w600,
+                        ),
+                      ),
+                    ],
+                  ),
+                  const SizedBox(height: 18),
+                  Row(
+                    children: [
+                      Expanded(
+                        child: ClipRRect(
+                          borderRadius: BorderRadius.circular(10),
+                          child: LinearProgressIndicator(
+                            value: progress,
+                            minHeight: 10,
+                            backgroundColor: colorScheme.outlineVariant,
+                            valueColor: AlwaysStoppedAnimation<Color>(
+                              liveStatus == model.ClassStatus.full
+                                  ? colorScheme.error
+                                  : colorScheme.primary,
+                            ),
+                          ),
+                        ),
+                      ),
+                      const SizedBox(width: 14),
+                      Text(
+                        '$liveFilled/$capacity',
+                        style: textTheme.bodyLarge?.copyWith(
+                          fontSize: 16,
+                          fontWeight: FontWeight.w700,
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
                   ),
                 ],
               ),
-            ],
+            ),
           ),
-        ),
-      ),
+        );
+      },
     );
   }
 

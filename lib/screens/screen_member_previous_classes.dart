@@ -80,6 +80,7 @@ class _PreviousClassCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final statusStyle = _statusStyleForReservation(reservation, context);
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -117,28 +118,7 @@ class _PreviousClassCard extends StatelessWidget {
                   ],
                 ),
               ),
-              Container(
-                padding: const EdgeInsets.symmetric(
-                  horizontal: 10,
-                  vertical: 6,
-                ),
-                decoration: BoxDecoration(
-                  color: AppColors.deepPurple.withValues(
-                    alpha: Theme.of(context).brightness == Brightness.dark
-                        ? 0.24
-                        : 0.14,
-                  ),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-                child: Text(
-                  'ATTENDED',
-                  style: textTheme.labelSmall?.copyWith(
-                    fontSize: 12,
-                    fontWeight: FontWeight.w700,
-                    color: AppColors.deepPurple,
-                  ),
-                ),
-              ),
+              _AttendanceBadge(statusStyle: statusStyle),
             ],
           ),
           const SizedBox(height: 14),
@@ -152,6 +132,40 @@ class _PreviousClassCard extends StatelessWidget {
                 text: reservation.matNumber,
               ),
             ],
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _AttendanceBadge extends StatelessWidget {
+  final _AttendanceStatusStyle statusStyle;
+
+  const _AttendanceBadge({required this.statusStyle});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 6),
+      decoration: BoxDecoration(
+        color: statusStyle.backgroundColor,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Icon(statusStyle.icon, size: 14, color: statusStyle.color),
+          const SizedBox(width: 6),
+          Text(
+            statusStyle.label,
+            style: textTheme.labelSmall?.copyWith(
+              fontSize: 12,
+              fontWeight: FontWeight.w700,
+              color: statusStyle.color,
+            ),
           ),
         ],
       ),
@@ -185,4 +199,56 @@ class _InfoPill extends StatelessWidget {
       ],
     );
   }
+}
+
+class _AttendanceStatusStyle {
+  final String label;
+  final IconData icon;
+  final Color color;
+  final Color backgroundColor;
+
+  const _AttendanceStatusStyle({
+    required this.label,
+    required this.icon,
+    required this.color,
+    required this.backgroundColor,
+  });
+}
+
+_AttendanceStatusStyle _statusStyleForReservation(
+  Reservation reservation,
+  BuildContext context,
+) {
+  final colorScheme = Theme.of(context).colorScheme;
+  final isDark = Theme.of(context).brightness == Brightness.dark;
+  final normalizedStatus = normalizeReservationStatus(reservation.status);
+
+  if (normalizedStatus == ReservationStatus.attended) {
+    return _AttendanceStatusStyle(
+      label: 'Attended',
+      icon: Icons.check_circle,
+      color: AppColors.success,
+      backgroundColor: AppColors.success.withValues(
+        alpha: isDark ? 0.24 : 0.12,
+      ),
+    );
+  }
+
+  if (normalizedStatus == ReservationStatus.noShow) {
+    return _AttendanceStatusStyle(
+      label: 'No Show',
+      icon: Icons.cancel_outlined,
+      color: AppColors.error,
+      backgroundColor: colorScheme.outlineVariant,
+    );
+  }
+
+  return _AttendanceStatusStyle(
+    label: 'Completed',
+    icon: Icons.check_circle_outline,
+    color: AppColors.deepPurple,
+    backgroundColor: AppColors.deepPurple.withValues(
+      alpha: isDark ? 0.24 : 0.12,
+    ),
+  );
 }

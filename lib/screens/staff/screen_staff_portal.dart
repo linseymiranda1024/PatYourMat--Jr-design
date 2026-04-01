@@ -3,9 +3,11 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
 import 'package:pat_your_mat/theme/app_colors.dart';
 
+import '../../db_helpers/db_reservations.dart';
 import '../../models/gym_class.dart';
 import '../../widgets/navigation/widget_app_outline.dart';
 import 'screen_staff_class_list.dart';
+import 'screen_staff_attendance.dart';
 import 'screen_create_class.dart';
 import '../../main.dart';
 
@@ -673,139 +675,159 @@ class ScreenStaffPortal extends ConsumerWidget {
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final occupancy = gymClass.capacity == 0
-        ? 0.0
-        : gymClass.filled / gymClass.capacity;
+    final attendanceEnabled = isAttendanceWindowOpen(gymClass.dateTime);
+    return StreamBuilder<int>(
+      stream: DBReservations.getReservationCountForClassStream(gymClass.id),
+      builder: (context, snapshot) {
+        final filled = snapshot.data ?? gymClass.filled;
+        final occupancy = gymClass.capacity == 0
+            ? 0.0
+            : filled / gymClass.capacity;
 
-    return Container(
-      margin: const EdgeInsets.only(bottom: 12),
-      padding: const EdgeInsets.all(16),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
-        borderRadius: BorderRadius.circular(20),
-        border: Border.all(color: colorScheme.outlineVariant),
-      ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
-        children: [
-          Row(
+        return Container(
+          margin: const EdgeInsets.only(bottom: 12),
+          padding: const EdgeInsets.all(16),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(20),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Column(
             crossAxisAlignment: CrossAxisAlignment.start,
             children: [
-              Expanded(
-                child: Text(
-                  gymClass.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.titleMedium?.copyWith(
-                    color: colorScheme.onSurface,
-                    fontSize: 16,
-                    fontWeight: FontWeight.w800,
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Text(
+                      gymClass.title,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.titleMedium?.copyWith(
+                        color: colorScheme.onSurface,
+                        fontSize: 16,
+                        fontWeight: FontWeight.w800,
+                      ),
+                    ),
+                  ),
+                  const SizedBox(width: 12),
+                  Flexible(
+                    child: Text(
+                      gymClass.timeText,
+                      textAlign: TextAlign.end,
+                      maxLines: 2,
+                      overflow: TextOverflow.ellipsis,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w600,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 6),
+              Text(
+                '${gymClass.instructor} • ${gymClass.dateText} • ${gymClass.location}',
+                maxLines: 2,
+                overflow: TextOverflow.ellipsis,
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  height: 1.35,
+                ),
+              ),
+              const SizedBox(height: 12),
+              ClipRRect(
+                borderRadius: BorderRadius.circular(999),
+                child: LinearProgressIndicator(
+                  value: occupancy,
+                  minHeight: 8,
+                  backgroundColor: colorScheme.outlineVariant,
+                  valueColor: const AlwaysStoppedAnimation<Color>(
+                    AppColors.warning,
                   ),
                 ),
               ),
-              const SizedBox(width: 12),
-              Flexible(
-                child: Text(
-                  gymClass.timeText,
-                  textAlign: TextAlign.end,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w600,
-                  ),
+              const SizedBox(height: 8),
+              Text(
+                '$filled/${gymClass.capacity} seats filled',
+                style: textTheme.bodySmall?.copyWith(
+                  color: colorScheme.onSurfaceVariant,
+                  fontSize: 13,
+                  fontWeight: FontWeight.w500,
+                ),
+              ),
+              const SizedBox(height: 8),
+              Align(
+                alignment: Alignment.centerRight,
+                child: Wrap(
+                  spacing: 4,
+                  runSpacing: 4,
+                  alignment: WrapAlignment.end,
+                  children: [
+                    TextButton.icon(
+                      onPressed: attendanceEnabled
+                          ? () => context.push(
+                              ScreenStaffAttendance.routeName,
+                              extra: gymClass,
+                            )
+                          : null,
+                      icon: const Icon(Icons.how_to_reg_outlined),
+                      label: const Text('Attendance'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.success,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () => context.push(
+                        ScreenCreateClass.routeName,
+                        extra: gymClass,
+                      ),
+                      icon: const Icon(Icons.edit_outlined),
+                      label: const Text('Edit'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: colorScheme.primary,
+                      ),
+                    ),
+                    TextButton.icon(
+                      onPressed: () {
+                        showDialog(
+                          context: context,
+                          builder: (context) => AlertDialog(
+                            title: const Text('Delete Class'),
+                            content: const Text(
+                              'Are you sure you want to delete this class?',
+                            ),
+                            actions: [
+                              TextButton(
+                                onPressed: () => Navigator.pop(context),
+                                child: const Text('Cancel'),
+                              ),
+                              TextButton(
+                                onPressed: () {
+                                  ref
+                                      .read(providerGymClass)
+                                      .deleteClass(gymClass.id);
+                                  Navigator.pop(context);
+                                },
+                                child: const Text('Delete'),
+                              ),
+                            ],
+                          ),
+                        );
+                      },
+                      icon: const Icon(Icons.delete_outline),
+                      label: const Text('Delete'),
+                      style: TextButton.styleFrom(
+                        foregroundColor: AppColors.warning,
+                      ),
+                    ),
+                  ],
                 ),
               ),
             ],
           ),
-          const SizedBox(height: 6),
-          Text(
-            '${gymClass.instructor} • ${gymClass.dateText} • ${gymClass.location}',
-            maxLines: 2,
-            overflow: TextOverflow.ellipsis,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.35,
-            ),
-          ),
-          const SizedBox(height: 12),
-          ClipRRect(
-            borderRadius: BorderRadius.circular(999),
-            child: LinearProgressIndicator(
-              value: occupancy,
-              minHeight: 8,
-              backgroundColor: colorScheme.outlineVariant,
-              valueColor: const AlwaysStoppedAnimation<Color>(
-                AppColors.warning,
-              ),
-            ),
-          ),
-          const SizedBox(height: 8),
-          Text(
-            '${gymClass.filled}/${gymClass.capacity} seats filled',
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              fontSize: 13,
-              fontWeight: FontWeight.w500,
-            ),
-          ),
-          const SizedBox(height: 8),
-          Align(
-            alignment: Alignment.centerRight,
-            child: Wrap(
-              spacing: 4,
-              runSpacing: 4,
-              alignment: WrapAlignment.end,
-              children: [
-                TextButton.icon(
-                  onPressed: () => context.push(
-                    ScreenCreateClass.routeName,
-                    extra: gymClass,
-                  ),
-                  icon: const Icon(Icons.edit_outlined),
-                  label: const Text('Edit'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: colorScheme.primary,
-                  ),
-                ),
-                TextButton.icon(
-                  onPressed: () {
-                    showDialog(
-                      context: context,
-                      builder: (context) => AlertDialog(
-                        title: const Text('Delete Class'),
-                        content: const Text(
-                          'Are you sure you want to delete this class?',
-                        ),
-                        actions: [
-                          TextButton(
-                            onPressed: () => Navigator.pop(context),
-                            child: const Text('Cancel'),
-                          ),
-                          TextButton(
-                            onPressed: () {
-                              ref
-                                  .read(providerGymClass)
-                                  .deleteClass(gymClass.id);
-                              Navigator.pop(context);
-                            },
-                            child: const Text('Delete'),
-                          ),
-                        ],
-                      ),
-                    );
-                  },
-                  icon: const Icon(Icons.delete_outline),
-                  label: const Text('Delete'),
-                  style: TextButton.styleFrom(
-                    foregroundColor: AppColors.warning,
-                  ),
-                ),
-              ],
-            ),
-          ),
-        ],
-      ),
+        );
+      },
     );
   }
 

@@ -36,6 +36,7 @@ import 'screens/settings/screen_settings.dart';
 import 'screens/screen_member_previous_classes.dart';
 import 'screens/staff/screen_staff_profile.dart';
 import 'screens/staff/screen_staff_class_list.dart';
+import 'screens/staff/screen_staff_attendance.dart';
 import 'screens/staff/screen_create_class.dart';
 import 'providers/provider_auth.dart';
 import 'util/file/util_file.dart';
@@ -149,6 +150,13 @@ class _MyAppState extends ConsumerState<MyApp> {
           return ScreenStaffClassList(
             showPast: extra['showPast'] as bool? ?? false,
           );
+        },
+      ),
+      GoRoute(
+        path: ScreenStaffAttendance.routeName,
+        builder: (context, state) {
+          final gymClass = state.extra as GymClass;
+          return ScreenStaffAttendance(gymClass: gymClass);
         },
       ),
       GoRoute(
