@@ -407,19 +407,32 @@ class DBReservations {
   static Future<List<Reservation>> _loadLegacyClassReservations(
     String classId,
   ) async {
+    final classDocs = await _classRegistrationsCollection(classId).get();
+    if (classDocs.docs.isNotEmpty) {
+      return classDocs.docs.map(_reservationFromDocument).toList();
+    }
+
     try {
-      final classDocs = await _classRegistrationsCollection(classId).get();
-      if (classDocs.docs.isNotEmpty) {
-        return classDocs.docs.map(_reservationFromDocument).toList();
+      final userProfiles = await _db.collection(_userProfilesCollection).get();
+      if (userProfiles.docs.isEmpty) {
+        return const <Reservation>[];
       }
 
-      final userDocs = await _db
-          .collectionGroup(_registrationsCollection)
-          .where('classId', isEqualTo: classId)
-          .get();
-      return userDocs.docs.map(_reservationFromDocument).toList();
-    } on FirebaseException {
-      return const <Reservation>[];
+      final registrationDocs = await Future.wait(
+        userProfiles.docs.map(
+          (profileDoc) => profileDoc.reference
+              .collection(_registrationsCollection)
+              .doc(classId)
+              .get(),
+        ),
+      );
+
+      return registrationDocs
+          .where((doc) => doc.exists)
+          .map(_reservationFromDocument)
+          .toList();
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
     }
   }
 

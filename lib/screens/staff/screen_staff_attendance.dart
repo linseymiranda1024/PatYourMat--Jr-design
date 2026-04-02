@@ -14,6 +14,14 @@ bool isAttendanceWindowOpen(DateTime classStart, {DateTime? now}) {
       !currentTime.isAfter(classStart.add(_attendanceWindow));
 }
 
+String _displayErrorMessage(Object? error) {
+  var message = error?.toString() ?? 'Unable to load attendance right now.';
+  if (message.startsWith('Exception: ')) {
+    message = message.replaceFirst('Exception: ', '');
+  }
+  return message;
+}
+
 class ScreenStaffAttendance extends ConsumerWidget {
   static const routeName = '/staff/attendance';
 
@@ -72,6 +80,23 @@ class ScreenStaffAttendance extends ConsumerWidget {
                   if (snapshot.connectionState == ConnectionState.waiting &&
                       reservations.isEmpty)
                     const Center(child: CircularProgressIndicator())
+                  else if (snapshot.hasError)
+                    Container(
+                      width: double.infinity,
+                      padding: const EdgeInsets.all(20),
+                      decoration: BoxDecoration(
+                        color: colorScheme.surfaceContainer,
+                        borderRadius: BorderRadius.circular(20),
+                        border: Border.all(color: colorScheme.outlineVariant),
+                      ),
+                      child: Text(
+                        _displayErrorMessage(snapshot.error),
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.error,
+                          height: 1.4,
+                        ),
+                      ),
+                    )
                   else if (reservations.isEmpty)
                     Container(
                       width: double.infinity,
