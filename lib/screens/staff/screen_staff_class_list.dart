@@ -6,8 +6,9 @@ import '../../db_helpers/db_reservations.dart';
 import '../../main.dart';
 import '../../models/gym_class.dart';
 import '../../theme/app_colors.dart';
-import 'screen_staff_attendance.dart';
+import '../../util/date_time/util_attendance.dart';
 import 'screen_create_class.dart';
+import 'screen_staff_attendance.dart';
 
 class ScreenStaffClassList extends ConsumerWidget {
   static const routeName = '/staff/classes';
@@ -25,9 +26,11 @@ class ScreenStaffClassList extends ConsumerWidget {
     final classes = [...gymClassProvider.classes];
     final filteredClasses =
         classes.where((gymClass) {
-          return showPast
-              ? gymClass.dateTime.isBefore(now)
-              : !gymClass.dateTime.isBefore(now);
+          final classEnd = attendanceWindowCloses(
+            gymClass.dateTime,
+            durationMinutes: gymClass.durationMinutes,
+          );
+          return showPast ? classEnd.isBefore(now) : !classEnd.isBefore(now);
         }).toList()..sort(
           (a, b) => showPast
               ? b.dateTime.compareTo(a.dateTime)
@@ -97,7 +100,10 @@ class ScreenStaffClassList extends ConsumerWidget {
   Widget _buildClassCard(BuildContext context, GymClass gymClass) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final attendanceEnabled = isAttendanceWindowOpen(gymClass.dateTime);
+    final attendanceEnabled = isAttendanceWindowOpen(
+      gymClass.dateTime,
+      durationMinutes: gymClass.durationMinutes,
+    );
     return StreamBuilder<int>(
       stream: DBReservations.getReservationCountForClassStream(gymClass.id),
       builder: (context, snapshot) {

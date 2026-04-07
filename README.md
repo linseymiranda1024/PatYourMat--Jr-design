@@ -1,16 +1,39 @@
-# project_demo
+# Pat Your Mat
 
-A new Flutter project.
+Flutter app for browsing classes, reserving mats, and managing staff-side attendance and scheduling.
 
-## Getting Started
+## Current Features
+- Firebase Auth and profile onboarding
+- Member class browsing and reservation flow
+- Mat assignment and cancellation
+- Staff portal for class creation, editing, deletion, and attendance
+- Check-in flow that records attendance and updates achievement progress
+- Automatic no-show behavior after class end for unchecked reservations
 
-This project is a starting point for a Flutter application.
+## Firestore
+- Firestore rules are stored in [firestore.rules](firestore.rules)
+- Firebase config points to that rules file in [firebase.json](firebase.json)
+- If attendance or reservation writes change, deploy updated rules with:
 
-A few resources to get you started if this is your first Flutter project:
+```bash
+firebase deploy --only firestore:rules --project jr-design-project
+```
 
-- [Lab: Write your first Flutter app](https://docs.flutter.dev/get-started/codelab)
-- [Cookbook: Useful Flutter samples](https://docs.flutter.dev/cookbook)
+## Development
+Run the app:
 
-For help getting started with Flutter development, view the
-[online documentation](https://docs.flutter.dev/), which offers tutorials,
-samples, guidance on mobile development, and a full API reference.
+```bash
+flutter run
+```
+
+Run tests:
+
+```bash
+flutter test
+```
+
+Run static analysis:
+
+```bash
+flutter analyze
+```

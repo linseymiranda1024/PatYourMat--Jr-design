@@ -359,6 +359,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                           matNumber: reservedMat,
                                           status: 'CONFIRMED',
                                           date: gClass.dateTime,
+                                          durationMinutes:
+                                              gClass.durationMinutes,
                                         );
 
                                         context.pushNamed(

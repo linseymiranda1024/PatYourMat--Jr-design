@@ -1,0 +1,87 @@
+rules_version = '2';
+service cloud.firestore {
+  match /databases/{database}/documents {
+    function signedIn() {
+      return request.auth != null;
+    }
+
+    function isOwner(userId) {
+      return signedIn() && request.auth.uid == userId;
+    }
+
+    function currentUserProfile() {
+      return get(/databases/$(database)/documents/user_profiles/$(request.auth.uid));
+    }
+
+    function isStaff() {
+      return signedIn() && currentUserProfile().data.role == 'Staff';
+    }
+
+    function classReservationFieldsOnly() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'filled',
+        'registeredCount',
+        'status',
+        'reservedMats',
+        'standbyQueue',
+      ]);
+    }
+
+    function staffAttendanceProfileFieldsOnly() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'achievements',
+        'category_attendance',
+      ]);
+    }
+
+    function staffAttendanceRegistrationFieldsOnly() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'status',
+        'attendedAt',
+        'noShowAt',
+      ]);
+    }
+
+    match /user_profiles/{userId} {
+      allow read: if signedIn();
+      allow create, delete: if isOwner(userId);
+      allow update: if isOwner(userId) ||
+        (isStaff() && staffAttendanceProfileFieldsOnly());
+
+      match /friends/{friendId} {
+        allow read, create, update, delete: if isOwner(userId);
+      }
+
+      match /notifications/{notificationId} {
+        allow read: if isOwner(userId);
+        allow create: if signedIn();
+        allow update, delete: if isOwner(userId);
+      }
+
+      match /registrations/{classId} {
+        allow read: if isOwner(userId) || isStaff();
+        allow create, delete: if isOwner(userId);
+        allow update: if isOwner(userId) ||
+          (isStaff() && staffAttendanceRegistrationFieldsOnly());
+      }
+    }
+
+    match /classes/{classId} {
+      allow read: if signedIn();
+      allow create, delete: if isStaff();
+      allow update: if isStaff() || (signedIn() && classReservationFieldsOnly());
+
+      match /registrations/{userId} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(userId);
+        allow update: if isStaff() && staffAttendanceRegistrationFieldsOnly();
+      }
+
+      match /standby_queue/{userId} {
+        allow read: if signedIn();
+        allow create, delete: if isOwner(userId);
+        allow update: if false;
+      }
+    }
+  }
+}

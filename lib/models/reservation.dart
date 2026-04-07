@@ -32,6 +32,7 @@ class Reservation {
   final String matNumber;
   final String status;
   final DateTime date;
+  final int durationMinutes;
 
   Reservation({
     this.id,
@@ -44,6 +45,7 @@ class Reservation {
     required this.matNumber,
     this.status = ReservationStatus.confirmed,
     required this.date,
+    this.durationMinutes = 60,
   });
 
   factory Reservation.fromMap(Map<String, dynamic> data, {String? id}) {
@@ -60,6 +62,9 @@ class Reservation {
       date: data['date'] is DateTime
           ? data['date'] as DateTime
           : DateTime.now(),
+      durationMinutes: data['durationMinutes'] is num
+          ? (data['durationMinutes'] as num).toInt()
+          : 60,
     );
   }
 }

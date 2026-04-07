@@ -4,6 +4,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
 import '../theme/app_colors.dart';
+import '../util/date_time/util_attendance.dart';
 import 'profile_screen.dart';
 
 class ScreenMemberPreviousClasses extends ConsumerWidget {
@@ -221,7 +222,11 @@ _AttendanceStatusStyle _statusStyleForReservation(
 ) {
   final colorScheme = Theme.of(context).colorScheme;
   final isDark = Theme.of(context).brightness == Brightness.dark;
-  final normalizedStatus = normalizeReservationStatus(reservation.status);
+  final normalizedStatus = effectiveReservationStatus(
+    rawStatus: reservation.status,
+    classStart: reservation.date,
+    durationMinutes: reservation.durationMinutes,
+  );
 
   if (normalizedStatus == ReservationStatus.attended) {
     return _AttendanceStatusStyle(
@@ -244,7 +249,7 @@ _AttendanceStatusStyle _statusStyleForReservation(
   }
 
   return _AttendanceStatusStyle(
-    label: 'Completed',
+    label: 'Scheduled',
     icon: Icons.check_circle_outline,
     color: AppColors.deepPurple,
     backgroundColor: AppColors.deepPurple.withValues(

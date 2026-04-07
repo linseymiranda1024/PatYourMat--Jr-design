@@ -12,22 +12,34 @@ void main() {
       dateTime: 'Mon, Mar 24 at 8:00 AM',
       matNumber: 'Mat #1',
       date: DateTime(2026, 3, 24, 8),
+      durationMinutes: 60,
+    ),
+    Reservation(
+      id: 'in-progress-1',
+      className: 'Lunch Ride',
+      instructor: 'Jordan',
+      dateTime: 'Mon, Mar 24 at 11:30 AM',
+      matNumber: 'Mat #2',
+      date: DateTime(2026, 3, 24, 11, 30),
+      durationMinutes: 60,
     ),
     Reservation(
       id: 'future-1',
       className: 'Lunch Ride',
       instructor: 'Jordan',
       dateTime: 'Mon, Mar 24 at 1:00 PM',
-      matNumber: 'Mat #2',
+      matNumber: 'Mat #3',
       date: DateTime(2026, 3, 24, 13),
+      durationMinutes: 60,
     ),
     Reservation(
       id: 'future-2',
       className: 'Evening Dance',
       instructor: 'Morgan',
       dateTime: 'Tue, Mar 25 at 6:00 PM',
-      matNumber: 'Mat #3',
+      matNumber: 'Mat #4',
       date: DateTime(2026, 3, 25, 18),
+      durationMinutes: 60,
     ),
   ];
 
@@ -35,6 +47,7 @@ void main() {
     final upcoming = upcomingMemberReservations(reservations, now: now);
 
     expect(upcoming.map((reservation) => reservation.id), [
+      'in-progress-1',
       'future-1',
       'future-2',
     ]);

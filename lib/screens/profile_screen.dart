@@ -10,6 +10,7 @@ import '../models/reservation.dart';
 import '../providers/provider_auth.dart';
 import '../providers/provider_reservations.dart';
 import '../providers/provider_user_profile.dart';
+import '../util/date_time/util_attendance.dart';
 import '../widgets/general/widget_profile_avatar.dart';
 import 'screen_member_previous_classes.dart';
 import 'settings/screen_profile_edit.dart';
@@ -20,11 +21,13 @@ List<Reservation> upcomingMemberReservations(
   DateTime? now,
 }) {
   final currentDateTime = now ?? DateTime.now();
-  final upcoming =
-      reservations
-          .where((reservation) => !reservation.date.isBefore(currentDateTime))
-          .toList()
-        ..sort((a, b) => a.date.compareTo(b.date));
+  final upcoming = reservations.where((reservation) {
+    final classEnd = attendanceWindowCloses(
+      reservation.date,
+      durationMinutes: reservation.durationMinutes,
+    );
+    return !classEnd.isBefore(currentDateTime);
+  }).toList()..sort((a, b) => a.date.compareTo(b.date));
   return upcoming;
 }
 
@@ -33,11 +36,13 @@ List<Reservation> previousMemberReservations(
   DateTime? now,
 }) {
   final currentDateTime = now ?? DateTime.now();
-  final previous =
-      reservations
-          .where((reservation) => reservation.date.isBefore(currentDateTime))
-          .toList()
-        ..sort((a, b) => b.date.compareTo(a.date));
+  final previous = reservations.where((reservation) {
+    final classEnd = attendanceWindowCloses(
+      reservation.date,
+      durationMinutes: reservation.durationMinutes,
+    );
+    return classEnd.isBefore(currentDateTime);
+  }).toList()..sort((a, b) => b.date.compareTo(a.date));
   return previous;
 }
 

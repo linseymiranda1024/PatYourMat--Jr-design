@@ -8,6 +8,7 @@ import '../providers/provider_reservations.dart';
 import '../db_helpers/db_gym_class.dart';
 import '../models/reservation.dart';
 import '../theme/app_colors.dart';
+import '../util/date_time/util_attendance.dart';
 import 'mat_selection_screen.dart';
 import 'reservation_confirmation_screen.dart';
 
@@ -47,6 +48,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
             matNumber: matNumber,
             status: 'CONFIRMED',
             date: gClass.dateTime,
+            durationMinutes: gClass.durationMinutes,
           );
           context.pushNamed(
             ReservationConfirmationScreen.routeName,
@@ -521,7 +523,11 @@ _ReservationStatusPresentation _statusPresentationForReservation(
     );
   }
 
-  final status = normalizeReservationStatus(reservation.status);
+  final status = effectiveReservationStatus(
+    rawStatus: reservation.status,
+    classStart: gymClass.dateTime,
+    durationMinutes: gymClass.durationMinutes,
+  );
   if (status == ReservationStatus.attended) {
     return _ReservationStatusPresentation(
       headline: 'You checked in',
@@ -539,17 +545,6 @@ _ReservationStatusPresentation _statusPresentationForReservation(
       label: 'NO-SHOW',
       color: AppColors.error,
       backgroundColor: colorScheme.outlineVariant,
-    );
-  }
-
-  if (gymClass.dateTime.isBefore(DateTime.now())) {
-    return _ReservationStatusPresentation(
-      headline: 'Class completed',
-      label: 'COMPLETED',
-      color: AppColors.deepPurple,
-      backgroundColor: AppColors.deepPurple.withValues(
-        alpha: isDark ? 0.24 : 0.14,
-      ),
     );
   }
 

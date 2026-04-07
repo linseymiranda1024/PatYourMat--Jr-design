@@ -5,14 +5,7 @@ import '../../db_helpers/db_reservations.dart';
 import '../../models/gym_class.dart';
 import '../../models/reservation.dart';
 import '../../theme/app_colors.dart';
-
-const Duration _attendanceWindow = Duration(minutes: 30);
-
-bool isAttendanceWindowOpen(DateTime classStart, {DateTime? now}) {
-  final currentTime = now ?? DateTime.now();
-  return !currentTime.isBefore(classStart.subtract(_attendanceWindow)) &&
-      !currentTime.isAfter(classStart.add(_attendanceWindow));
-}
+import '../../util/date_time/util_attendance.dart';
 
 String _displayErrorMessage(Object? error) {
   var message = error?.toString() ?? 'Unable to load attendance right now.';
@@ -148,7 +141,11 @@ class _AttendeeCard extends ConsumerWidget {
   Widget build(BuildContext context, WidgetRef ref) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final status = normalizeReservationStatus(reservation.status);
+    final status = effectiveReservationStatus(
+      rawStatus: reservation.status,
+      classStart: gymClass.dateTime,
+      durationMinutes: gymClass.durationMinutes,
+    );
 
     return Container(
       padding: const EdgeInsets.all(16),
@@ -223,36 +220,16 @@ class _AttendeeCard extends ConsumerWidget {
               backgroundColor: colorScheme.outlineVariant,
             )
           else
-            Row(
-              children: [
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: reservation.userId.isEmpty
-                        ? null
-                        : () => _checkInUser(context, reservation),
-                    icon: const Icon(Icons.check_circle_outline),
-                    label: const Text('Check In'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.success,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-                const SizedBox(width: 12),
-                Expanded(
-                  child: FilledButton.icon(
-                    onPressed: reservation.userId.isEmpty
-                        ? null
-                        : () => _markNoShow(context),
-                    icon: const Icon(Icons.close),
-                    label: const Text('No Show'),
-                    style: FilledButton.styleFrom(
-                      backgroundColor: AppColors.error,
-                      foregroundColor: Colors.white,
-                    ),
-                  ),
-                ),
-              ],
+            FilledButton.icon(
+              onPressed: reservation.userId.isEmpty
+                  ? null
+                  : () => _checkInUser(context, reservation),
+              icon: const Icon(Icons.check_circle_outline),
+              label: const Text('Check In'),
+              style: FilledButton.styleFrom(
+                backgroundColor: AppColors.success,
+                foregroundColor: Colors.white,
+              ),
             ),
         ],
       ),
@@ -272,23 +249,6 @@ class _AttendeeCard extends ConsumerWidget {
       if (!context.mounted) return;
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('${_displayName(reservation)} checked in')),
-      );
-    } catch (error) {
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(
-        context,
-      ).showSnackBar(SnackBar(content: Text(_errorMessage(error))));
-    }
-  }
-
-  Future<void> _markNoShow(BuildContext context) async {
-    try {
-      await DBReservations.markNoShow(reservation.userId, gymClass.id);
-      if (!context.mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('${_displayName(reservation)} marked as No Show'),
-        ),
       );
     } catch (error) {
       if (!context.mounted) return;

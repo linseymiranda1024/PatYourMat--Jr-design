@@ -5,6 +5,7 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import '../models/achievement.dart';
 import '../models/gym_class.dart';
 import '../models/reservation.dart';
+import '../util/date_time/util_attendance.dart';
 
 class CheckInResult {
   final List<String> achievements;
@@ -198,29 +199,6 @@ class DBReservations {
     }
   }
 
-  static Future<void> markNoShow(String userId, String classId) async {
-    final reservationRef = _userRegistrationRef(userId, classId);
-    final classReservationRef = _classRegistrationRef(classId, userId);
-    final classRef = _classRef(classId);
-
-    try {
-      final updates = {
-        'status': ReservationStatus.noShow,
-        'noShowAt': FieldValue.serverTimestamp(),
-      };
-      await Future.wait([
-        reservationRef.set(updates, SetOptions(merge: true)),
-        classReservationRef.set(updates, SetOptions(merge: true)),
-        classRef.update({
-          _rosterStatusField(userId): ReservationStatus.noShow,
-          _rosterNoShowAtField(userId): FieldValue.serverTimestamp(),
-        }),
-      ]);
-    } on FirebaseException catch (e) {
-      throw Exception(_friendlyFirestoreError(e));
-    }
-  }
-
   static Future<CheckInResult> checkInUser(
     String userId,
     Reservation reservation,
@@ -229,6 +207,14 @@ class DBReservations {
     final reservationId = reservation.id ?? gymClass.id;
     if (reservationId.isEmpty) {
       throw Exception('Reservation is missing an id.');
+    }
+    if (!isAttendanceWindowOpen(
+      gymClass.dateTime,
+      durationMinutes: gymClass.durationMinutes,
+    )) {
+      throw Exception(
+        'Attendance is only available from 30 minutes before class until class ends.',
+      );
     }
 
     final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
@@ -384,6 +370,7 @@ class DBReservations {
       'instructor': gymClass.instructor,
       'dateTime': '${gymClass.dateText} at ${gymClass.timeText}',
       'date': Timestamp.fromDate(gymClass.dateTime),
+      'durationMinutes': resolveClassDurationMinutes(gymClass.durationMinutes),
       'type': normalizeGymClassType(gymClass.type),
       'matNumber': matNumber,
       'status': ReservationStatus.confirmed,
@@ -550,9 +537,6 @@ class DBReservations {
 
   static String _rosterAttendedAtField(String userId) =>
       '${_rosterEntryField(userId)}.attendedAt';
-
-  static String _rosterNoShowAtField(String userId) =>
-      '${_rosterEntryField(userId)}.noShowAt';
 
   static String? _pickRandomAvailableMat(
     int capacity,

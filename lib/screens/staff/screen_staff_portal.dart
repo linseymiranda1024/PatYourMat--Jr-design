@@ -5,6 +5,7 @@ import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../../db_helpers/db_reservations.dart';
 import '../../models/gym_class.dart';
+import '../../util/date_time/util_attendance.dart';
 import '../../widgets/navigation/widget_app_outline.dart';
 import 'screen_staff_class_list.dart';
 import 'screen_staff_attendance.dart';
@@ -24,10 +25,22 @@ class ScreenStaffPortal extends ConsumerWidget {
     final classes = [...gymClassProvider.classes]
       ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
     final upcomingClasses = classes
-        .where((gymClass) => !gymClass.dateTime.isBefore(now))
+        .where(
+          (gymClass) => !attendanceWindowCloses(
+            gymClass.dateTime,
+            durationMinutes: gymClass.durationMinutes,
+          ).isBefore(now),
+        )
         .toList();
     final previousClasses =
-        classes.where((gymClass) => gymClass.dateTime.isBefore(now)).toList()
+        classes
+            .where(
+              (gymClass) => attendanceWindowCloses(
+                gymClass.dateTime,
+                durationMinutes: gymClass.durationMinutes,
+              ).isBefore(now),
+            )
+            .toList()
           ..sort((a, b) => b.dateTime.compareTo(a.dateTime));
     final todayClasses = upcomingClasses
         .where((gymClass) => _isSameDay(gymClass.dateTime, now))
@@ -675,7 +688,10 @@ class ScreenStaffPortal extends ConsumerWidget {
   ) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final attendanceEnabled = isAttendanceWindowOpen(gymClass.dateTime);
+    final attendanceEnabled = isAttendanceWindowOpen(
+      gymClass.dateTime,
+      durationMinutes: gymClass.durationMinutes,
+    );
     return StreamBuilder<int>(
       stream: DBReservations.getReservationCountForClassStream(gymClass.id),
       builder: (context, snapshot) {
