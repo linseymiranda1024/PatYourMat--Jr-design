@@ -144,10 +144,32 @@ class DBReservations {
       final classDurationMinutes = resolveClassDurationMinutes(
         _asInt(classData['durationMinutes']),
       );
+      final classTitle = classData['title']?.toString() ?? '';
+      final classInstructor = classData['instructor']?.toString() ?? '';
+      final classType = normalizeGymClassType(classData['type']?.toString() ?? '');
+      final classDateTime = classData['dateTime'] is Timestamp
+          ? (classData['dateTime'] as Timestamp).toDate()
+          : DateTime.now();
+
+      // Calculate formatted date and time strings
+      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+      final classDateText = '${weekdays[classDateTime.weekday - 1]}, ${months[classDateTime.month - 1]} ${classDateTime.day}';
+      final hour = classDateTime.hour > 12 ? classDateTime.hour - 12 : (classDateTime.hour == 0 ? 12 : classDateTime.hour);
+      final amPm = classDateTime.hour >= 12 ? 'PM' : 'AM';
+      final minute = classDateTime.minute.toString().padLeft(2, '0');
+      final classTimeText = '$hour:$minute $amPm';
+
       final rosterReservations = _reservationsFromRoster(
         classId,
         classData[_rosterField],
         classDurationMinutes: classDurationMinutes,
+        classTitle: classTitle,
+        classInstructor: classInstructor,
+        classType: classType,
+        classDateTime: classDateTime,
+        classDateText: classDateText,
+        classTimeText: classTimeText,
       );
       if (rosterReservations.isNotEmpty) {
         return _sortReservations(rosterReservations);
@@ -373,6 +395,12 @@ class DBReservations {
         gymClass: gymClass,
         matNumber: selectedMatNumber,
       );
+      final rosterData = _buildRosterData(
+        userId: userId,
+        userName: _buildUserName(userProfileData),
+        userEmail: userProfileData['email']?.toString() ?? '',
+        matNumber: selectedMatNumber,
+      );
       final nextFilled = occupiedCount + 1;
       transaction.set(userRegistrationRef, registrationData);
       transaction.set(classRegistrationRef, registrationData);
@@ -383,7 +411,7 @@ class DBReservations {
             ? ClassStatus.full.name
             : ClassStatus.open.name,
         'reservedMats': FieldValue.arrayUnion([selectedMatNumber]),
-        _rosterEntryField(userId): registrationData,
+        _rosterEntryField(userId): rosterData,
       });
       return selectedMatNumber;
     });
@@ -406,6 +434,22 @@ class DBReservations {
       'dateTime': '${gymClass.dateText} at ${gymClass.timeText}',
       'date': Timestamp.fromDate(gymClass.dateTime),
       'type': normalizeGymClassType(gymClass.type),
+      'matNumber': matNumber,
+      'status': ReservationStatus.confirmed,
+      'createdAt': FieldValue.serverTimestamp(),
+    };
+  }
+
+  static Map<String, dynamic> _buildRosterData({
+    required String userId,
+    required String userName,
+    required String userEmail,
+    required String matNumber,
+  }) {
+    return {
+      'userId': userId,
+      'userName': userName,
+      'userEmail': userEmail,
       'matNumber': matNumber,
       'status': ReservationStatus.confirmed,
       'createdAt': FieldValue.serverTimestamp(),
@@ -516,6 +560,12 @@ class DBReservations {
     String classId,
     dynamic rawRoster, {
     int classDurationMinutes = 60,
+    String classTitle = '',
+    String classInstructor = '',
+    String classType = '',
+    DateTime? classDateTime,
+    String classDateText = '',
+    String classTimeText = '',
   }) {
     if (rawRoster is! Map) {
       return const <Reservation>[];
@@ -530,16 +580,39 @@ class DBReservations {
       final data = Map<String, dynamic>.from(
         value.map((entryKey, entryValue) => MapEntry('$entryKey', entryValue)),
       );
+
+      // Handle both old (full data) and new (minimal data) roster formats
+      final userId = data['userId'] ?? '$key';
+      final userName = data['userName']?.toString() ?? '';
+      final userEmail = data['userEmail']?.toString() ?? '';
+      final matNumber = data['matNumber']?.toString() ?? '';
+      final status = data['status']?.toString() ?? ReservationStatus.confirmed;
+
+      // Use class data for fields that were previously duplicated
+      final resolvedClassName = data['className'] ?? classTitle;
+      final resolvedInstructor = data['instructor'] ?? classInstructor;
+      final resolvedType = data['type'] ?? classType;
+      final resolvedDateTime = data['dateTime'] ?? '${classDateText} at ${classTimeText}';
+      final resolvedDate = data['date'] is Timestamp
+          ? (data['date'] as Timestamp).toDate()
+          : (classDateTime ?? DateTime.now());
+
       reservations.add(
         Reservation.fromMap({
           ...data,
-          'userId': data['userId'] ?? '$key',
-          'classId': data['classId'] ?? classId,
+          'userId': userId,
+          'userName': userName,
+          'userEmail': userEmail,
+          'classId': classId,
+          'className': resolvedClassName,
+          'instructor': resolvedInstructor,
+          'dateTime': resolvedDateTime,
+          'date': Timestamp.fromDate(resolvedDate),
+          'type': resolvedType,
+          'matNumber': matNumber,
+          'status': status,
           'durationMinutes': classDurationMinutes,
-          'date': data['date'] is Timestamp
-              ? (data['date'] as Timestamp).toDate()
-              : DateTime.now(),
-        }, id: data['classId']?.toString() ?? classId),
+        }, id: classId),
       );
     });
     return reservations;
