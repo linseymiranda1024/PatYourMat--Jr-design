@@ -100,9 +100,40 @@ class DBReservations {
         .collection(_registrationsCollection)
         .orderBy('date', descending: false)
         .snapshots()
-        .map(
-          (snapshot) => snapshot.docs.map(_reservationFromDocument).toList(),
-        );
+        .asyncMap((snapshot) async {
+          final reservations = <Reservation>[];
+          for (final doc in snapshot.docs) {
+            final data = doc.data();
+            final classId = data['classId'] as String?;
+            int durationMinutes = 60;
+            
+            if (classId != null && classId.isNotEmpty) {
+              try {
+                final classSnap = await _classRef(classId).get();
+                final classData = classSnap.data();
+                if (classData != null) {
+                  durationMinutes = resolveClassDurationMinutes(
+                    _asInt(classData['durationMinutes']),
+                  );
+                }
+              } catch (_) {
+                // Fall back to default duration if class not found
+              }
+            }
+            
+            reservations.add(
+              Reservation.fromMap({
+                ...data,
+                'userId': data['userId'] ?? userId,
+                'durationMinutes': durationMinutes,
+                'date': data['date'] is Timestamp
+                    ? (data['date'] as Timestamp).toDate()
+                    : DateTime.now(),
+              }, id: doc.id),
+            );
+          }
+          return reservations;
+        });
   }
 
   static Stream<List<Reservation>> getReservationsForClassStream(
@@ -110,9 +141,13 @@ class DBReservations {
   ) {
     return _classRef(classId).snapshots().asyncMap((doc) async {
       final classData = doc.data() ?? <String, dynamic>{};
+      final classDurationMinutes = resolveClassDurationMinutes(
+        _asInt(classData['durationMinutes']),
+      );
       final rosterReservations = _reservationsFromRoster(
         classId,
         classData[_rosterField],
+        classDurationMinutes: classDurationMinutes,
       );
       if (rosterReservations.isNotEmpty) {
         return _sortReservations(rosterReservations);
@@ -370,7 +405,6 @@ class DBReservations {
       'instructor': gymClass.instructor,
       'dateTime': '${gymClass.dateText} at ${gymClass.timeText}',
       'date': Timestamp.fromDate(gymClass.dateTime),
-      'durationMinutes': resolveClassDurationMinutes(gymClass.durationMinutes),
       'type': normalizeGymClassType(gymClass.type),
       'matNumber': matNumber,
       'status': ReservationStatus.confirmed,
@@ -480,8 +514,9 @@ class DBReservations {
 
   static List<Reservation> _reservationsFromRoster(
     String classId,
-    dynamic rawRoster,
-  ) {
+    dynamic rawRoster, {
+    int classDurationMinutes = 60,
+  }) {
     if (rawRoster is! Map) {
       return const <Reservation>[];
     }
@@ -500,6 +535,7 @@ class DBReservations {
           ...data,
           'userId': data['userId'] ?? '$key',
           'classId': data['classId'] ?? classId,
+          'durationMinutes': classDurationMinutes,
           'date': data['date'] is Timestamp
               ? (data['date'] as Timestamp).toDate()
               : DateTime.now(),
