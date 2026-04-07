@@ -24,6 +24,7 @@ service cloud.firestore {
         'status',
         'reservedMats',
         'standbyQueue',
+        'roster',
       ]);
     }
 
