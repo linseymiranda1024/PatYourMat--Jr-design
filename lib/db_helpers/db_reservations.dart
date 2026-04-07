@@ -592,10 +592,9 @@ class DBReservations {
       final resolvedClassName = data['className'] ?? classTitle;
       final resolvedInstructor = data['instructor'] ?? classInstructor;
       final resolvedType = data['type'] ?? classType;
-      final resolvedDateTime = data['dateTime'] ?? '${classDateText} at ${classTimeText}';
-      final resolvedDate = data['date'] is Timestamp
-          ? (data['date'] as Timestamp).toDate()
-          : (classDateTime ?? DateTime.now());
+      // Always use class document's dateTime for consistency
+      final resolvedDateTime = '${classDateText} at ${classTimeText}';
+      final resolvedDate = classDateTime ?? DateTime.now();
 
       reservations.add(
         Reservation.fromMap({
