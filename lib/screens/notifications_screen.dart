@@ -3,6 +3,7 @@ import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:intl/intl.dart';
 
+import '../db_helpers/db_friends.dart';
 import '../db_helpers/db_reservations.dart';
 import '../main.dart';
 import '../models/reservation.dart';
@@ -129,7 +130,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                     notification.id,
                                   ),
                                   onAccept: notification.canAccept
-                                      ? () => _handleInviteResponse(
+                                      ? () => _handleNotificationAction(
                                             notification,
                                             accept: true,
                                             currentUid: currentUid,
@@ -137,7 +138,7 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                                           )
                                       : null,
                                   onDecline: notification.canDecline
-                                      ? () => _handleInviteResponse(
+                                      ? () => _handleNotificationAction(
                                             notification,
                                             accept: false,
                                             currentUid: currentUid,
@@ -156,41 +157,78 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
     );
   }
 
-  Future<void> _handleInviteResponse(
+  Future<void> _handleNotificationAction(
     _NotificationItem notification, {
     required bool accept,
     required String currentUid,
     required String currentName,
   }) async {
     final notificationId = notification.id;
-    if (notificationId == null || _busyNotificationIds.contains(notificationId)) {
+    if (notificationId == null || notification.fromUid == null || _busyNotificationIds.contains(notificationId)) {
       return;
     }
 
     setState(() => _busyNotificationIds.add(notificationId));
     try {
-      if (accept) {
-        final matNumber = await DBReservations.acceptGroupInvite(
-          userId: currentUid,
-          notificationId: notificationId,
-        );
-        if (!mounted) {
-          return;
-        }
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text(
-              matNumber == null
-                  ? 'Invite accepted.'
-                  : 'Invite accepted. You are booked on $matNumber.',
+      if (notification.type == 'group_invite') {
+        if (accept) {
+          final matNumber = await DBReservations.acceptGroupInvite(
+            userId: currentUid,
+            notificationId: notificationId,
+          );
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text(
+                matNumber == null
+                    ? 'Invite accepted.'
+                    : 'Invite accepted. You are booked on $matNumber.',
+              ),
             ),
-          ),
-        );
+          );
+        } else {
+          await DBReservations.declineGroupInvite(
+            userId: currentUid,
+            notificationId: notificationId,
+          );
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            const SnackBar(content: Text('Invite declined.')),
+          );
+        }
+      } else if (notification.type == 'friend_request') {
+        if (accept) {
+          await DBFriends.acceptFriendRequest(
+            currentUid: currentUid,
+            targetUid: notification.fromUid!, // fromUid is the sender of the request
+            notificationId: notificationId,
+          );
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('${notification.fromName} is now your friend!')),
+          );
+        } else {
+          await DBFriends.declineFriendRequest(
+            currentUid: currentUid,
+            targetUid: notification.fromUid!, // fromUid is the sender of the request
+            notificationId: notificationId,
+          );
+          if (!mounted) {
+            return;
+          }
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('Friend request from ${notification.fromName} declined.')),
+          );
+        }
       } else {
-        await DBReservations.declineGroupInvite(
-          userId: currentUid,
-          notificationId: notificationId,
-        );
+        // Handle other notification types or do nothing
+        // For now, if it's not a group_invite or friend_request, we don't have an action.
         if (!mounted) {
           return;
         }
@@ -436,6 +474,8 @@ class _NotificationItem {
   final bool canAccept;
   final bool canDecline;
   final String? inviteStatusBadge;
+  final String? fromUid; // Added for friend requests
+  final String? fromName; // Added for friend requests
 
   const _NotificationItem({
     this.id,
@@ -450,6 +490,8 @@ class _NotificationItem {
     this.canAccept = false,
     this.canDecline = false,
     this.inviteStatusBadge,
+    this.fromUid,
+    this.fromName,
   });
 
   factory _NotificationItem.fromFirestoreDoc(
@@ -463,7 +505,7 @@ class _NotificationItem {
     final hostMatNumber = (data['host_mat_number'] ?? '').toString().trim();
     final reservedMatNumber =
         (data['reserved_mat_number'] ?? '').toString().trim();
-    final baseTitle = (data['title'] ?? 'Notification').toString();
+    final baseTitle = (data['title'] ?? 'Update').toString();
     final baseMessage = (data['message'] ?? '').toString();
     final fromName = (data['from_name'] ?? 'Someone').toString();
     if (type == 'group_invite') {
@@ -491,21 +533,33 @@ class _NotificationItem {
                 ? 'Accepted'
                 : 'Declined',
       );
-    }
-
-    if (type == 'group_invite_response') {
+    } else if (type == 'friend_request') {
       return _NotificationItem(
         id: doc.id,
         type: type,
         title: baseTitle,
-        message: baseMessage,
+        message: baseMessage.isEmpty ? '$fromName wants to be friends with you.' : baseMessage,
         timeLabel: _relativeLabel(createdAt),
-        icon: Icons.reply_all_rounded,
-        color: const Color(0xFF16A34A),
+        icon: Icons.person_add_alt_1,
+        color: const Color(0xFF2563EB), // A blue color for friend requests
+        sortDate: createdAt,
+        canAccept: true,
+        canDecline: true,
+        fromUid: (data['from_uid'] ?? '').toString(),
+        fromName: fromName,
+      );
+    } else if (type == 'friend_request_response') {
+      return _NotificationItem(
+        id: doc.id,
+        type: type,
+        title: baseTitle,
+        message: baseMessage.isEmpty ? '$fromName responded to your friend request.' : baseMessage,
+        timeLabel: _relativeLabel(createdAt),
+        icon: Icons.person_add_alt_1,
+        color: const Color(0xFF16A34A), // Green for accepted, or a neutral color
         sortDate: createdAt,
       );
     }
-
     if (type == 'friend') {
       return _NotificationItem(
         id: doc.id,
