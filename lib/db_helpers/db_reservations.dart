@@ -24,6 +24,7 @@ class DBReservations {
   static const String _userProfilesCollection = 'user_profiles';
   static const String _classesCollection = 'classes';
   static const String _registrationsCollection = 'registrations';
+  static const String _standbyQueueCollection = 'standby_queue';
   static const String _rosterField = 'roster';
 
   static DocumentReference<Map<String, dynamic>> _userRegistrationRef(
@@ -70,6 +71,77 @@ class DBReservations {
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
     }
+  }
+
+  static CollectionReference<Map<String, dynamic>>
+  _getStandbyQueueCollection(String classId) {
+    return _db
+        .collection(_classesCollection)
+        .doc(classId)
+        .collection(_standbyQueueCollection);
+  }
+
+  static DocumentReference<Map<String, dynamic>> _standbyQueueRef(
+    String classId,
+    String userId,
+  ) {
+    return _getStandbyQueueCollection(classId).doc(userId);
+  }
+
+  static Future<void> joinStandbyQueue(
+    String userId,
+    GymClass gymClass,
+  ) async {
+    try {
+      final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
+      final userProfileSnap = await userProfileRef.get();
+      final userProfileData = userProfileSnap.data() ?? <String, dynamic>{};
+
+      final standbyRef = _standbyQueueRef(gymClass.id, userId);
+      final classRef = _classRef(gymClass.id);
+
+      await _db.runTransaction((transaction) async {
+        final standbySnap = await transaction.get(standbyRef);
+        if (standbySnap.exists) {
+          throw Exception('You are already in the standby queue for this class.');
+        }
+
+        final userRegistrationSnap = await transaction.get(_userRegistrationRef(userId, gymClass.id));
+        if (userRegistrationSnap.exists) {
+          throw Exception('You are already registered for this class.');
+        }
+
+        final classSnap = await transaction.get(classRef);
+        if (!classSnap.exists) {
+          throw Exception('This class no longer exists.');
+        }
+
+        final classData = classSnap.data() as Map<String, dynamic>;
+        final capacity = _asInt(classData['capacity']);
+        final reservedMats = _parseReservedMats(classData['reservedMats']);
+        if (capacity > 0 && reservedMats.length < capacity) {
+          throw Exception('This class still has open spots.');
+        }
+        final currentStandbyCount = _asInt(classData['standbyCount']);
+
+        transaction.set(standbyRef, {
+          'userId': userId,
+          'userName': _buildUserName(userProfileData),
+          'userEmail': userProfileData['email']?.toString() ?? '',
+          'createdAt': FieldValue.serverTimestamp(),
+        });
+
+        transaction.update(classRef, {
+          'standbyCount': currentStandbyCount + 1,
+        });
+      });
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Stream<bool> isUserInStandby(String userId, String classId) {
+    return _standbyQueueRef(classId, userId).snapshots().map((doc) => doc.exists);
   }
 
   static Stream<Set<int>> getReservedMatNumbersStream(String classId) {
@@ -203,6 +275,33 @@ class DBReservations {
 
       return _asInt(classData['filled'] ?? classData['registeredCount']);
     });
+  }
+
+  static Future<void> leaveStandbyQueue(String userId, String classId) async {
+    try {
+      final standbyRef = _standbyQueueRef(classId, userId);
+      final classRef = _classRef(classId);
+
+      await _db.runTransaction((transaction) async {
+        final standbySnap = await transaction.get(standbyRef);
+        if (!standbySnap.exists) {
+          return; // Already not in queue
+        }
+
+        final classSnap = await transaction.get(classRef);
+        if (classSnap.exists) {
+          final classData = classSnap.data() as Map<String, dynamic>;
+          final currentStandbyCount = _asInt(classData['standbyCount']);
+          transaction.update(classRef, {
+            'standbyCount': (currentStandbyCount - 1).clamp(0, double.infinity).toInt(),
+          });
+        }
+
+        transaction.delete(standbyRef);
+      });
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
   }
 
   static Future<void> cancelReservation(String userId, String classId) async {

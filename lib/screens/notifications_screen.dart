@@ -1,5 +1,7 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:intl/intl.dart';
 
 import '../models/reservation.dart';
@@ -12,79 +14,180 @@ class NotificationsScreen extends ConsumerWidget {
   @override
   Widget build(BuildContext context, WidgetRef ref) {
     final reservations = ref.watch(reservationsProvider).reservations;
-    final notifications = _buildNotifications(reservations);
     final colorScheme = Theme.of(context).colorScheme;
     final heroGradient = Theme.of(context).brightness == Brightness.dark
         ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
         : const [Color(0xFFF97316), Color(0xFFFB7185)];
+    final userId = FirebaseAuth.instance.currentUser?.uid;
+
+    if (userId == null) {
+      return SafeArea(
+        child: Container(
+          color: colorScheme.surface,
+          child: const Center(
+            child: Padding(
+              padding: EdgeInsets.all(24),
+              child: _NotificationEmptyState(),
+            ),
+          ),
+        ),
+      );
+    }
+
+    final notificationStream = FirebaseFirestore.instance
+        .collection('user_profiles')
+        .doc(userId)
+        .collection('notifications')
+        .snapshots();
 
     return SafeArea(
-      child: Container(
-        color: colorScheme.surface,
-        child: Column(
-          children: [
-            Padding(
-              padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-              child: Container(
-                width: double.infinity,
-                padding: const EdgeInsets.all(20),
-                decoration: BoxDecoration(
-                  borderRadius: BorderRadius.circular(28),
-                  gradient: LinearGradient(
-                    begin: Alignment.topLeft,
-                    end: Alignment.bottomRight,
-                    colors: heroGradient,
+      child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+        stream: notificationStream,
+        builder: (context, notificationSnapshot) {
+          final firestoreNotifications = _buildFirestoreNotifications(
+            notificationSnapshot.data?.docs ?? const [],
+          );
+          final notifications = _buildNotifications(
+            reservations,
+            firestoreNotifications: firestoreNotifications,
+          );
+
+          return Container(
+            color: colorScheme.surface,
+            child: Column(
+              children: [
+                Padding(
+                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                  child: Container(
+                    width: double.infinity,
+                    padding: const EdgeInsets.all(20),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(28),
+                      gradient: LinearGradient(
+                        begin: Alignment.topLeft,
+                        end: Alignment.bottomRight,
+                        colors: heroGradient,
+                      ),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        const Text(
+                          'Notifications',
+                          style: TextStyle(
+                            color: AppColors.headerOnBrand,
+                            fontSize: 28,
+                            fontWeight: FontWeight.w800,
+                          ),
+                        ),
+                        const SizedBox(height: 8),
+                        Text(
+                          notifications.isEmpty
+                              ? 'You are all caught up.'
+                              : '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your schedule.',
+                          style: const TextStyle(
+                            color: AppColors.headerOnBrandMuted,
+                            fontSize: 15,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ),
-                child: Column(
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    const Text(
-                      'Notifications',
-                      style: TextStyle(
-                        color: AppColors.headerOnBrand,
-                        fontSize: 28,
-                        fontWeight: FontWeight.w800,
-                      ),
-                    ),
-                    const SizedBox(height: 8),
-                    Text(
-                      notifications.isEmpty
-                          ? 'You are all caught up.'
-                          : '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your schedule.',
-                      style: const TextStyle(
-                        color: AppColors.headerOnBrandMuted,
-                        fontSize: 15,
-                        fontWeight: FontWeight.w500,
-                      ),
-                    ),
-                  ],
+                Expanded(
+                  child: notifications.isEmpty
+                      ? const Center(
+                          child: Padding(
+                            padding: EdgeInsets.all(24),
+                            child: _NotificationEmptyState(),
+                          ),
+                        )
+                      : ListView.separated(
+                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
+                          itemCount: notifications.length,
+                          separatorBuilder: (_, __) => const SizedBox(height: 12),
+                          itemBuilder: (context, index) {
+                            final notification = notifications[index];
+                            return _NotificationCard(notification: notification);
+                          },
+                        ),
                 ),
-              ),
+              ],
             ),
-            Expanded(
-              child: notifications.isEmpty
-                  ? const Center(
-                      child: Padding(
-                        padding: EdgeInsets.all(24),
-                        child: _NotificationEmptyState(),
-                      ),
-                    )
-                  : ListView.separated(
-                      padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                      itemCount: notifications.length,
-                      separatorBuilder: (_, __) => const SizedBox(height: 12),
-                      itemBuilder: (context, index) {
-                        final notification = notifications[index];
-                        return _NotificationCard(notification: notification);
-                      },
-                    ),
-            ),
-          ],
-        ),
+          );
+        },
       ),
     );
   }
+}
+
+List<_NotificationItem> _buildFirestoreNotifications(
+  List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
+) {
+  final items = <_NotificationItem>[];
+
+  for (final doc in docs) {
+    final data = doc.data();
+    final createdAt = data['created_at'] is Timestamp
+        ? (data['created_at'] as Timestamp).toDate()
+        : DateTime.fromMillisecondsSinceEpoch(0);
+    final type = data['type']?.toString() ?? '';
+
+    items.add(
+      _NotificationItem(
+        title: data['title']?.toString() ?? 'Notification',
+        message: data['message']?.toString() ?? '',
+        timeLabel: _formatRelativeTime(createdAt),
+        icon: _iconForNotificationType(type),
+        color: _colorForNotificationType(type),
+        sortDate: createdAt,
+      ),
+    );
+  }
+
+  return items;
+}
+
+IconData _iconForNotificationType(String type) {
+  switch (type) {
+    case 'friend':
+      return Icons.person_add_alt_1;
+    case 'standby_promoted':
+      return Icons.event_available;
+    default:
+      return Icons.notifications;
+  }
+}
+
+Color _colorForNotificationType(String type) {
+  switch (type) {
+    case 'friend':
+      return const Color(0xFF2563EB);
+    case 'standby_promoted':
+      return const Color(0xFF16A34A);
+    default:
+      return const Color(0xFFF97316);
+  }
+}
+
+String _formatRelativeTime(DateTime timestamp) {
+  final now = DateTime.now();
+  final difference = now.difference(timestamp);
+
+  if (difference.inMinutes < 1) {
+    return 'Now';
+  }
+  if (difference.inHours < 1) {
+    return '${difference.inMinutes}m';
+  }
+  if (difference.inDays < 1) {
+    return '${difference.inHours}h';
+  }
+  if (difference.inDays == 1) {
+    return 'Yesterday';
+  }
+  return DateFormat.MMMd().format(timestamp);
 }
 
 class _NotificationCard extends StatelessWidget {
@@ -217,6 +320,7 @@ class _NotificationItem {
   final String timeLabel;
   final IconData icon;
   final Color color;
+  final DateTime sortDate;
 
   const _NotificationItem({
     required this.title,
@@ -224,12 +328,16 @@ class _NotificationItem {
     required this.timeLabel,
     required this.icon,
     required this.color,
+    required this.sortDate,
   });
 }
 
-List<_NotificationItem> _buildNotifications(List<Reservation> reservations) {
+List<_NotificationItem> _buildNotifications(
+  List<Reservation> reservations, {
+  List<_NotificationItem> firestoreNotifications = const <_NotificationItem>[],
+}) {
   final now = DateTime.now();
-  final items = <_NotificationItem>[];
+  final items = <_NotificationItem>[...firestoreNotifications];
   final sorted = [...reservations]..sort((a, b) => a.date.compareTo(b.date));
 
   for (final reservation in sorted) {
@@ -243,6 +351,7 @@ List<_NotificationItem> _buildNotifications(List<Reservation> reservations) {
           timeLabel: 'Soon',
           icon: Icons.alarm,
           color: const Color(0xFFDC2626),
+          sortDate: reservation.date,
         ),
       );
       continue;
@@ -257,6 +366,7 @@ List<_NotificationItem> _buildNotifications(List<Reservation> reservations) {
           timeLabel: 'Tomorrow',
           icon: Icons.event_available,
           color: const Color(0xFF2563EB),
+          sortDate: reservation.date,
         ),
       );
       continue;
@@ -271,6 +381,7 @@ List<_NotificationItem> _buildNotifications(List<Reservation> reservations) {
           timeLabel: DateFormat.MMMd().format(reservation.date),
           icon: Icons.check_circle,
           color: const Color(0xFF16A34A),
+          sortDate: reservation.date,
         ),
       );
       continue;
@@ -285,12 +396,14 @@ List<_NotificationItem> _buildNotifications(List<Reservation> reservations) {
           timeLabel: 'Recent',
           icon: Icons.history,
           color: const Color(0xFF7C3AED),
+          sortDate: reservation.date,
         ),
       );
     }
   }
 
-  return items.reversed.toList();
+  items.sort((a, b) => b.sortDate.compareTo(a.sortDate));
+  return items;
 }
 
 bool _isTomorrow(DateTime date, DateTime now) {

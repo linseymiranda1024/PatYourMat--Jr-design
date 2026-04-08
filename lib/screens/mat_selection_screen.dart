@@ -50,6 +50,38 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
     return rows;
   }
 
+  Future<void> _joinStandbyQueue(GymClass gClass) async {
+    setState(() => _isSubmitting = true);
+
+    try {
+      await DBReservations.joinStandbyQueue(
+        ref.read(reservationsProvider).userId ?? '',
+        gClass,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Joined standby queue successfully!')),
+        );
+        // Maybe pop back to class detail
+        Navigator.pop(context);
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = e.toString();
+        if (message.startsWith('Exception: ')) {
+          message = message.replaceFirst('Exception: ', '');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to join standby: $message')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isSubmitting = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<GymClass?>(
@@ -75,7 +107,15 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
             : 'Mat ${_selectedMat! + 1} selected';
         final isFull = gClass.filled >= gClass.capacity;
 
-        return Scaffold(
+        return StreamBuilder<bool>(
+          stream: DBReservations.isUserInStandby(
+            ref.read(reservationsProvider).userId ?? '',
+            gClass.id,
+          ),
+          builder: (context, standbySnapshot) {
+            final isInStandby = standbySnapshot.data ?? false;
+
+            return Scaffold(
           appBar: AppBar(title: const Text('Choose Your Spot')),
           body: Container(
             color: colorScheme.surface,
@@ -317,12 +357,13 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                             width: double.infinity,
                             height: 56,
                             child: ElevatedButton(
-                              onPressed:
-                                  (_selectedMat == null ||
-                                      _isSubmitting ||
-                                      isFull)
-                                  ? null
-                                  : () async {
+                              onPressed: isFull
+                                  ? (_isSubmitting || isInStandby
+                                      ? null
+                                      : () => _joinStandbyQueue(gClass))
+                                  : (_selectedMat == null || _isSubmitting)
+                                      ? null
+                                      : () async {
                                       if (gClass.filled >= gClass.capacity) {
                                         ScaffoldMessenger.of(
                                           context,
@@ -402,7 +443,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                     )
                                   : Text(
                                       isFull
-                                          ? 'Class Full'
+                                          ? (isInStandby
+                                              ? "You're on Standby"
+                                              : 'Join Standby Queue')
                                           : _selectedMat == null
                                           ? 'Select a Mat'
                                           : 'Reserve Mat ${_selectedMat! + 1}',
@@ -421,6 +464,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
               ),
             ),
           ),
+            );
+          },
         );
       },
     );

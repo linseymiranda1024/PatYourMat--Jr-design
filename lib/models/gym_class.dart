@@ -55,6 +55,7 @@ class GymClass {
   final String location;
   final int capacity;
   final int filled;
+  final int standbyCount;
 
   GymClass({
     required this.id,
@@ -67,6 +68,7 @@ class GymClass {
     required this.location,
     required this.capacity,
     required this.filled,
+    this.standbyCount = 0,
     ClassStatus? status,
   });
 
@@ -88,6 +90,7 @@ class GymClass {
         location: data['location'] ?? 'No Location',
         capacity: _asInt(data['capacity']),
         filled: _resolvedFilledCount(data),
+        standbyCount: _asInt(data['standbyCount']),
       );
     } catch (e) {
       print('ERROR parsing GymClass from Firestore: $e');
@@ -119,6 +122,7 @@ class GymClass {
       'capacity': capacity,
       'filled': filled,
       'registeredCount': filled,
+      'standbyCount': standbyCount,
       'status': status.name,
     };
   }
