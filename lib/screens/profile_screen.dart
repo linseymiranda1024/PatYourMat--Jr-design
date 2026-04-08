@@ -758,11 +758,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     final normalizedStatus = displayStatus.toUpperCase();
     final isConfirmed = normalizedStatus == 'CONFIRMED';
     final isAttended = normalizedStatus == 'ATTENDED';
+    final isStandby = normalizedStatus == 'STANDBY';
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final statusAccent = isAttended
         ? AppColors.deepPurple
         : (isConfirmed ? AppColors.success : AppColors.warning);
+    final locationLabel = isStandby ? 'Queue Status' : reservation.matNumber;
 
     return Container(
       padding: const EdgeInsets.all(18),
@@ -832,8 +834,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               _buildInfoPill(context, Icons.schedule, reservation.dateTime),
               _buildInfoPill(
                 context,
-                Icons.place_outlined,
-                reservation.matNumber,
+                isStandby ? Icons.hourglass_top_rounded : Icons.place_outlined,
+                locationLabel,
               ),
             ],
           ),
@@ -863,8 +865,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                   }
                 },
                 style: TextButton.styleFrom(foregroundColor: colorScheme.error),
-                child: const Text(
-                  'Cancel Reservation',
+                child: Text(
+                  isStandby ? 'Leave Standby Queue' : 'Cancel Reservation',
                   style: TextStyle(fontWeight: FontWeight.w700),
                 ),
               ),

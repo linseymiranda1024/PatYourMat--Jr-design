@@ -6,7 +6,10 @@ class DBGymClass {
   static const String _collection = 'classes';
 
   static Future<void> createClass(GymClass gymClass) async {
-    await _db.collection(_collection).add(gymClass.toFirestore());
+    await _db.collection(_collection).add({
+      ...gymClass.toFirestore(),
+      'reservedMats': const <String>[],
+    });
   }
 
   static Stream<List<GymClass>> getClassesStream() {
@@ -33,10 +36,16 @@ class DBGymClass {
   }
 
   static Future<void> updateClass(GymClass gymClass) async {
-    await _db
-        .collection(_collection)
-        .doc(gymClass.id)
-        .update(gymClass.toFirestore());
+    final docRef = _db.collection(_collection).doc(gymClass.id);
+    final snapshot = await docRef.get();
+    final updates = <String, dynamic>{...gymClass.toFirestore()};
+    final currentData = snapshot.data();
+
+    if (currentData == null || !currentData.containsKey('reservedMats')) {
+      updates['reservedMats'] = const <String>[];
+    }
+
+    await docRef.set(updates, SetOptions(merge: true));
   }
 
   static Future<void> deleteClass(String id) async {

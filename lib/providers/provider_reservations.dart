@@ -62,7 +62,10 @@ class ReservationsNotifier extends ChangeNotifier {
     super.dispose();
   }
 
-  Future<String?> registerForClass(GymClass gymClass, {String? matNumber}) async {
+  Future<String?> registerForClass(
+    GymClass gymClass, {
+    String? matNumber,
+  }) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null) return null;
 
@@ -71,6 +74,29 @@ class ReservationsNotifier extends ChangeNotifier {
       gymClass,
       matNumber: matNumber,
     );
+  }
+
+  Stream<int?> standbyQueuePositionStream(String classId) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Stream<int?>.value(null);
+    }
+
+    return DBReservations.getStandbyQueuePositionStream(classId, user.uid);
+  }
+
+  Future<StandbyQueueResult?> joinStandbyQueue(GymClass gymClass) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return null;
+
+    return await DBReservations.joinStandbyQueue(user.uid, gymClass);
+  }
+
+  Future<void> leaveStandbyQueue(String classId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await DBReservations.leaveStandbyQueue(user.uid, classId);
   }
 
   Future<void> cancelReservation(Reservation reservation) async {

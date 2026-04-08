@@ -2,6 +2,26 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ClassStatus { open, full, standby }
 
+class StandbyQueueEntry {
+  final String userId;
+  final DateTime joinedAt;
+
+  const StandbyQueueEntry({required this.userId, required this.joinedAt});
+
+  factory StandbyQueueEntry.fromMap(Map<String, dynamic> data) {
+    return StandbyQueueEntry(
+      userId: (data['userId'] ?? '').toString(),
+      joinedAt: data['joinedAt'] is Timestamp
+          ? (data['joinedAt'] as Timestamp).toDate()
+          : DateTime.now(),
+    );
+  }
+
+  Map<String, dynamic> toMap() {
+    return {'userId': userId, 'joinedAt': Timestamp.fromDate(joinedAt)};
+  }
+}
+
 const List<String> gymClassTypes = <String>[
   'Yoga',
   'Sport',
@@ -55,6 +75,7 @@ class GymClass {
   final String location;
   final int capacity;
   final int filled;
+  final List<StandbyQueueEntry> standbyQueue;
 
   GymClass({
     required this.id,
@@ -67,6 +88,7 @@ class GymClass {
     required this.location,
     required this.capacity,
     required this.filled,
+    this.standbyQueue = const <StandbyQueueEntry>[],
     ClassStatus? status,
   });
 
@@ -88,6 +110,7 @@ class GymClass {
         location: data['location'] ?? 'No Location',
         capacity: _asInt(data['capacity']),
         filled: _resolvedFilledCount(data),
+        standbyQueue: _parseStandbyQueue(data['standbyQueue']),
       );
     } catch (e) {
       print('ERROR parsing GymClass from Firestore: $e');
@@ -103,6 +126,7 @@ class GymClass {
         location: '',
         capacity: 0,
         filled: 0,
+        standbyQueue: const <StandbyQueueEntry>[],
       );
     }
   }
@@ -119,12 +143,16 @@ class GymClass {
       'capacity': capacity,
       'filled': filled,
       'registeredCount': filled,
+      'standbyQueue': standbyQueue.map((entry) => entry.toMap()).toList(),
       'status': status.name,
     };
   }
 
   ClassStatus get status {
-    return filled >= capacity ? ClassStatus.full : ClassStatus.open;
+    if (filled >= capacity) {
+      return ClassStatus.standby;
+    }
+    return ClassStatus.open;
   }
 
   static int _asInt(dynamic value) {
@@ -152,6 +180,21 @@ class GymClass {
         .where((value) => value.isNotEmpty)
         .toSet()
         .length;
+  }
+
+  static List<StandbyQueueEntry> _parseStandbyQueue(dynamic rawValue) {
+    if (rawValue is! List) {
+      return const <StandbyQueueEntry>[];
+    }
+
+    return rawValue
+        .whereType<Map>()
+        .map(
+          (value) =>
+              StandbyQueueEntry.fromMap(Map<String, dynamic>.from(value)),
+        )
+        .where((entry) => entry.userId.isNotEmpty)
+        .toList();
   }
 
   String get dateText {
