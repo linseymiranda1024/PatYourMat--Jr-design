@@ -51,7 +51,11 @@ service cloud.firestore {
         (isStaff() && staffAttendanceProfileFieldsOnly());
 
       match /friends/{friendId} {
-        allow read, create, update, delete: if isOwner(userId);
+        allow read, update, delete: if isOwner(userId);
+        allow create: if isOwner(userId) ||
+          (signedIn() &&
+            request.resource.data.uid is string &&
+            request.resource.data.uid == request.auth.uid);
       }
 
       match /notifications/{notificationId} {

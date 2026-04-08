@@ -19,6 +19,20 @@ class CheckInResult {
   });
 }
 
+class GroupReservationResult {
+  final String hostMatNumber;
+  final List<String> reservedMatNumbers;
+  final int invitesSent;
+  final List<String> skippedInviteeUids;
+
+  const GroupReservationResult({
+    required this.hostMatNumber,
+    required this.reservedMatNumbers,
+    required this.invitesSent,
+    this.skippedInviteeUids = const <String>[],
+  });
+}
+
 class DBReservations {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _userProfilesCollection = 'user_profiles';
@@ -67,6 +81,272 @@ class DBReservations {
         userId,
         gymClass,
         requestedMatNumber: matNumber,
+      );
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Future<GroupReservationResult> registerForClassWithGroupInvites({
+    required String hostUserId,
+    required String hostName,
+    required GymClass gymClass,
+    required List<String> selectedMatNumbers,
+    required List<String> inviteeUids,
+  }) async {
+    try {
+      return await _db.runTransaction<GroupReservationResult>((transaction) async {
+        final classRef = _classRef(gymClass.id);
+        final hostProfileRef = _db.collection(_userProfilesCollection).doc(hostUserId);
+        final hostRegistrationRef = _userRegistrationRef(hostUserId, gymClass.id);
+        final hostClassRegistrationRef = _classRegistrationRef(
+          gymClass.id,
+          hostUserId,
+        );
+
+        final classSnap = await transaction.get(classRef);
+        if (!classSnap.exists) {
+          throw Exception('This class no longer exists.');
+        }
+
+        final hostRegistrationSnap = await transaction.get(hostRegistrationRef);
+        if (hostRegistrationSnap.exists) {
+          throw Exception('You are already registered for this class.');
+        }
+
+        final hostProfileSnap = await transaction.get(hostProfileRef);
+        final hostProfileData = hostProfileSnap.data() ?? <String, dynamic>{};
+        final classData = classSnap.data() as Map<String, dynamic>;
+        final capacity = _asInt(classData['capacity']);
+        final reservedMats = _parseReservedMats(classData['reservedMats']);
+        final occupiedCount = reservedMats.length;
+        final uniqueInvitees = inviteeUids
+            .where((uid) => uid.trim().isNotEmpty && uid != hostUserId)
+            .toSet()
+            .toList();
+
+        final eligibleInvitees = <String>[];
+        final skippedInvitees = <String>[];
+        for (final inviteeUid in uniqueInvitees) {
+          final inviteeRegistrationSnap = await transaction.get(
+            _userRegistrationRef(inviteeUid, gymClass.id),
+          );
+          if (inviteeRegistrationSnap.exists) {
+            skippedInvitees.add(inviteeUid);
+          } else {
+            eligibleInvitees.add(inviteeUid);
+          }
+        }
+
+        final assignedMats = _normalizeGroupMatNumbers(
+          selectedMatNumbers: selectedMatNumbers,
+          expectedCount: eligibleInvitees.length + 1,
+          capacity: capacity,
+          reservedMats: reservedMats,
+        );
+        final normalizedHostMat = assignedMats.first;
+
+        final hostRegistrationData = _buildRegistrationData(
+          userId: hostUserId,
+          userName: _buildUserName(hostProfileData),
+          userEmail: hostProfileData['email']?.toString() ?? '',
+          gymClass: gymClass,
+          matNumber: normalizedHostMat,
+        );
+        final hostRosterData = _buildRosterData(
+          userId: hostUserId,
+          userName: _buildUserName(hostProfileData),
+          userEmail: hostProfileData['email']?.toString() ?? '',
+          matNumber: normalizedHostMat,
+        );
+
+        transaction.set(hostRegistrationRef, hostRegistrationData);
+        transaction.set(hostClassRegistrationRef, hostRegistrationData);
+
+        for (var i = 0; i < eligibleInvitees.length; i++) {
+          final inviteeUid = eligibleInvitees[i];
+          final inviteeMatNumber = assignedMats[i + 1];
+          final notificationRef = _db
+              .collection(_userProfilesCollection)
+              .doc(inviteeUid)
+              .collection('notifications')
+              .doc();
+
+          transaction.set(notificationRef, <String, dynamic>{
+            'title': 'Group class invite',
+            'message':
+                '$hostName invited you to join ${gymClass.title} on ${gymClass.dateText} at ${gymClass.timeText}.',
+            'type': 'group_invite',
+            'is_read': false,
+            'from_uid': hostUserId,
+            'from_name': hostName,
+            'class_id': gymClass.id,
+            'class_name': gymClass.title,
+            'instructor': gymClass.instructor,
+            'class_time': Timestamp.fromDate(gymClass.dateTime),
+            'host_mat_number': normalizedHostMat,
+            'reserved_mat_number': inviteeMatNumber,
+            'invite_status': 'pending',
+            'created_at': FieldValue.serverTimestamp(),
+          });
+        }
+
+        final nextFilled = occupiedCount + assignedMats.length;
+        transaction.update(classRef, <String, dynamic>{
+          'filled': nextFilled,
+          'registeredCount': nextFilled,
+          'status': nextFilled >= capacity
+              ? ClassStatus.full.name
+              : ClassStatus.open.name,
+          'reservedMats': FieldValue.arrayUnion(assignedMats),
+          _rosterEntryField(hostUserId): hostRosterData,
+        });
+
+        return GroupReservationResult(
+          hostMatNumber: normalizedHostMat,
+          reservedMatNumbers: assignedMats,
+          invitesSent: eligibleInvitees.length,
+          skippedInviteeUids: skippedInvitees,
+        );
+      });
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Future<String?> acceptGroupInvite({
+    required String userId,
+    required String notificationId,
+  }) async {
+    final notificationRef = _db
+        .collection(_userProfilesCollection)
+        .doc(userId)
+        .collection('notifications')
+        .doc(notificationId);
+
+    try {
+      final notificationSnap = await notificationRef.get();
+      if (!notificationSnap.exists) {
+        throw Exception('Invite not found.');
+      }
+
+      final notificationData = notificationSnap.data() ?? <String, dynamic>{};
+      final inviteStatus =
+          notificationData['invite_status']?.toString() ?? 'pending';
+      if (inviteStatus != 'pending') {
+        throw Exception('This invite has already been answered.');
+      }
+
+      final classId = notificationData['class_id']?.toString() ?? '';
+      if (classId.isEmpty) {
+        throw Exception('This invite is missing class details.');
+      }
+      final reservedMatNumber =
+          notificationData['reserved_mat_number']?.toString() ?? '';
+
+      final existingRegistration = await _userRegistrationRef(userId, classId).get();
+      if (existingRegistration.exists) {
+        await _releaseHeldInviteSpot(
+          classId: classId,
+          reservedMatNumber: reservedMatNumber,
+        );
+        await notificationRef.set(<String, dynamic>{
+          'invite_status': 'accepted',
+          'is_read': true,
+          'responded_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        await _sendGroupInviteResponseNotification(
+          inviterUid: notificationData['from_uid']?.toString() ?? '',
+          inviteeUid: userId,
+          className: notificationData['class_name']?.toString() ?? 'the class',
+          accepted: true,
+        );
+
+        final existingData =
+            existingRegistration.data() as Map<String, dynamic>? ??
+            <String, dynamic>{};
+        return existingData['matNumber']?.toString();
+      }
+
+      final classSnap = await _classRef(classId).get();
+      if (!classSnap.exists) {
+        throw Exception('This class is no longer available.');
+      }
+
+      final gymClass = GymClass.fromFirestore(classSnap);
+      final reservedMat = reservedMatNumber.trim().isEmpty
+          ? await _registerForClassTransaction(userId, gymClass)
+          : await _claimHeldInviteSpot(
+              userId: userId,
+              gymClass: gymClass,
+              reservedMatNumber: reservedMatNumber,
+            );
+
+      await notificationRef.set(<String, dynamic>{
+        'invite_status': 'accepted',
+        'is_read': true,
+        'responded_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _sendGroupInviteResponseNotification(
+        inviterUid: notificationData['from_uid']?.toString() ?? '',
+        inviteeUid: userId,
+        className: notificationData['class_name']?.toString() ?? gymClass.title,
+        accepted: true,
+      );
+
+      return reservedMat;
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Future<void> declineGroupInvite({
+    required String userId,
+    required String notificationId,
+  }) async {
+    final notificationRef = _db
+        .collection(_userProfilesCollection)
+        .doc(userId)
+        .collection('notifications')
+        .doc(notificationId);
+
+    try {
+      final notificationSnap = await notificationRef.get();
+      if (!notificationSnap.exists) {
+        throw Exception('Invite not found.');
+      }
+
+      final notificationData = notificationSnap.data() ?? <String, dynamic>{};
+      final inviteStatus =
+          notificationData['invite_status']?.toString() ?? 'pending';
+      if (inviteStatus != 'pending') {
+        throw Exception('This invite has already been answered.');
+      }
+
+      final classId = notificationData['class_id']?.toString() ?? '';
+      final reservedMatNumber =
+          notificationData['reserved_mat_number']?.toString() ?? '';
+
+      if (classId.isNotEmpty && reservedMatNumber.trim().isNotEmpty) {
+        await _releaseHeldInviteSpot(
+          classId: classId,
+          reservedMatNumber: reservedMatNumber,
+        );
+      }
+
+      await notificationRef.set(<String, dynamic>{
+        'invite_status': 'declined',
+        'is_read': true,
+        'responded_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      await _sendGroupInviteResponseNotification(
+        inviterUid: notificationData['from_uid']?.toString() ?? '',
+        inviteeUid: userId,
+        className: notificationData['class_name']?.toString() ?? 'the class',
+        accepted: false,
       );
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
@@ -598,6 +878,166 @@ class DBReservations {
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
     }
+  }
+
+  static Future<void> _sendGroupInviteResponseNotification({
+    required String inviterUid,
+    required String inviteeUid,
+    required String className,
+    required bool accepted,
+  }) async {
+    if (inviterUid.isEmpty) {
+      return;
+    }
+
+    final inviteeProfile = await _db
+        .collection(_userProfilesCollection)
+        .doc(inviteeUid)
+        .get();
+    final inviteeData = inviteeProfile.data() ?? <String, dynamic>{};
+    final inviteeName = _buildUserName(inviteeData).trim().isEmpty
+        ? 'A friend'
+        : _buildUserName(inviteeData).trim();
+
+    await _db
+        .collection(_userProfilesCollection)
+        .doc(inviterUid)
+        .collection('notifications')
+        .add(<String, dynamic>{
+          'title': accepted ? 'Invite accepted' : 'Invite declined',
+          'message': accepted
+              ? '$inviteeName joined $className.'
+              : '$inviteeName declined your invite to $className.',
+          'type': 'group_invite_response',
+          'is_read': false,
+          'from_uid': inviteeUid,
+          'from_name': inviteeName,
+          'class_name': className,
+          'created_at': FieldValue.serverTimestamp(),
+        });
+  }
+
+  static Future<String> _claimHeldInviteSpot({
+    required String userId,
+    required GymClass gymClass,
+    required String reservedMatNumber,
+  }) {
+    final classRef = _classRef(gymClass.id);
+    final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
+    final userRegistrationRef = _userRegistrationRef(userId, gymClass.id);
+    final classRegistrationRef = _classRegistrationRef(gymClass.id, userId);
+
+    return _db.runTransaction<String>((transaction) async {
+      final classSnap = await transaction.get(classRef);
+      if (!classSnap.exists) {
+        throw Exception('This class no longer exists.');
+      }
+
+      final userRegistrationSnap = await transaction.get(userRegistrationRef);
+      if (userRegistrationSnap.exists) {
+        final existingData =
+            userRegistrationSnap.data() as Map<String, dynamic>? ??
+            <String, dynamic>{};
+        return existingData['matNumber']?.toString() ?? reservedMatNumber;
+      }
+
+      final classData = classSnap.data() as Map<String, dynamic>;
+      final reservedMats = _parseReservedMats(classData['reservedMats']);
+      if (!reservedMats.contains(reservedMatNumber)) {
+        throw Exception('Your reserved group mat is no longer available.');
+      }
+
+      final userProfileSnap = await transaction.get(userProfileRef);
+      final userProfileData = userProfileSnap.data() ?? <String, dynamic>{};
+
+      final registrationData = _buildRegistrationData(
+        userId: userId,
+        userName: _buildUserName(userProfileData),
+        userEmail: userProfileData['email']?.toString() ?? '',
+        gymClass: gymClass,
+        matNumber: reservedMatNumber,
+      );
+      final rosterData = _buildRosterData(
+        userId: userId,
+        userName: _buildUserName(userProfileData),
+        userEmail: userProfileData['email']?.toString() ?? '',
+        matNumber: reservedMatNumber,
+      );
+
+      transaction.set(userRegistrationRef, registrationData);
+      transaction.set(classRegistrationRef, registrationData);
+      transaction.update(classRef, <String, dynamic>{
+        _rosterEntryField(userId): rosterData,
+      });
+
+      return reservedMatNumber;
+    });
+  }
+
+  static Future<void> _releaseHeldInviteSpot({
+    required String classId,
+    required String reservedMatNumber,
+  }) async {
+    if (reservedMatNumber.trim().isEmpty) {
+      return;
+    }
+
+    final classRef = _classRef(classId);
+    await _db.runTransaction((transaction) async {
+      final classSnap = await transaction.get(classRef);
+      if (!classSnap.exists) {
+        return;
+      }
+
+      final classData = classSnap.data() as Map<String, dynamic>;
+      final reservedMats = _parseReservedMats(classData['reservedMats']);
+      if (!reservedMats.contains(reservedMatNumber)) {
+        return;
+      }
+
+      reservedMats.remove(reservedMatNumber);
+      final capacity = _asInt(classData['capacity']);
+      final nextFilled = reservedMats.length.clamp(0, capacity);
+      transaction.update(classRef, <String, dynamic>{
+        'filled': nextFilled,
+        'registeredCount': nextFilled,
+        'status': nextFilled >= capacity
+            ? ClassStatus.full.name
+            : ClassStatus.open.name,
+        'reservedMats': FieldValue.arrayRemove([reservedMatNumber]),
+      });
+    });
+  }
+
+  static List<String> _normalizeGroupMatNumbers({
+    required List<String> selectedMatNumbers,
+    required int expectedCount,
+    required int capacity,
+    required Set<String> reservedMats,
+  }) {
+    final normalized = selectedMatNumbers
+        .map((matNumber) => _normalizeMatNumber(matNumber, capacity))
+        .toList();
+
+    if (normalized.length != expectedCount) {
+      throw Exception(
+        'Select exactly $expectedCount mat${expectedCount == 1 ? '' : 's'} for your group.',
+      );
+    }
+
+    final unique = normalized.toSet().toList()
+      ..sort((a, b) => _matSortValue(a).compareTo(_matSortValue(b)));
+    if (unique.length != normalized.length) {
+      throw Exception('Choose different mats for each person in your group.');
+    }
+
+    for (final matNumber in unique) {
+      if (reservedMats.contains(matNumber)) {
+        throw Exception('$matNumber is already reserved.');
+      }
+    }
+
+    return normalized;
   }
 
   static String _friendlyFirestoreError(FirebaseException e) {

@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 
+import '../db_helpers/db_friends.dart';
 import '../main.dart';
+import '../models/achievement.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -15,6 +17,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   final Set<String> _pendingFollowUids = <String>{};
+  final Set<String> _optimisticFriendUids = <String>{};
 
   @override
   void dispose() {
@@ -56,7 +59,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                     ),
                   ),
                   const Spacer(),
-                  _Pill(label: 'Members'),
+                  const _Pill(label: 'Members'),
                 ],
               ),
             ),
@@ -103,31 +106,24 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final friendIdsFromProfile = _extractFriendIdsFromProfileDoc(
-                    snapshot.data?.data(),
-                  );
-
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('user_profiles')
                         .doc(currentUid)
                         .collection('friends')
                         .snapshots(),
-                    builder: (context, friendLinkSnapshot) {
-                      if (friendLinkSnapshot.hasError) {
-                        final err = friendLinkSnapshot.error;
+                    builder: (context, friendsSnapshot) {
+                      if (friendsSnapshot.hasError) {
+                        final err = friendsSnapshot.error;
                         return _CenteredMessage(
                           err == null
                               ? 'Unable to load friends right now.'
                               : 'Unable to load friends right now.\n$err',
                         );
                       }
-                      final friendIds = <String>{
-                        ...friendIdsFromProfile,
-                        ..._extractFriendIdsFromSubcollection(
-                          friendLinkSnapshot.data?.docs ?? const [],
-                        ),
-                      };
+                      final friendIds = _extractFriendIdsFromSubcollection(
+                        friendsSnapshot.data?.docs ?? const [],
+                      );
 
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: FirebaseFirestore.instance
@@ -163,15 +159,21 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                         .toLowerCase();
                                 return name.contains(_query) ||
                                     user.email.toLowerCase().contains(_query);
-                              }).toList()..sort(
-                                (a, b) => a.sortKey.compareTo(b.sortKey),
-                              );
+                              }).toList()
+                                ..sort(
+                                  (a, b) => a.sortKey.compareTo(b.sortKey),
+                                );
+
+                          final combinedFriendIds = <String>{
+                            ...friendIds,
+                            ..._optimisticFriendUids,
+                          };
 
                           final friendUsers = filteredUsers
-                              .where((user) => friendIds.contains(user.uid))
+                              .where((user) => combinedFriendIds.contains(user.uid))
                               .toList();
                           final otherUsers = filteredUsers
-                              .where((user) => !friendIds.contains(user.uid))
+                              .where((user) => !combinedFriendIds.contains(user.uid))
                               .toList();
 
                           if (filteredUsers.isEmpty) {
@@ -195,6 +197,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                     child: _FriendCard(
                                       user: user,
                                       isFriend: true,
+                                      onTap: () => _openFriendProfile(user),
                                     ),
                                   ),
                                 ),
@@ -216,16 +219,20 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                     padding: const EdgeInsets.only(bottom: 10),
                                     child: _FriendCard(
                                       user: user,
-                                      onFollow:
-                                          _pendingFollowUids.contains(user.uid)
+                                      onTap: () => _openFriendProfile(user),
+                                      actionLabel: 'Add',
+                                      onFollow: _pendingFollowUids.contains(
+                                        user.uid,
+                                      )
                                           ? null
                                           : () => _handleFollowTap(
                                               currentUid: currentUid,
                                               currentName: currentName,
                                               targetUser: user,
                                             ),
-                                      followPending: _pendingFollowUids
-                                          .contains(user.uid),
+                                      followPending: _pendingFollowUids.contains(
+                                        user.uid,
+                                      ),
                                     ),
                                   ),
                                 ),
@@ -242,36 +249,6 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
         ),
       ),
     );
-  }
-
-  Set<String> _extractFriendIdsFromProfileDoc(Map<String, dynamic>? data) {
-    if (data == null) return <String>{};
-    final ids = <String>{};
-
-    void addFromDynamic(dynamic value) {
-      if (value is String && value.trim().isNotEmpty) {
-        ids.add(value.trim());
-      } else if (value is Iterable) {
-        for (final item in value) {
-          addFromDynamic(item);
-        }
-      } else if (value is Map) {
-        final candidates = [
-          value['uid'],
-          value['user_id'],
-          value['friend_uid'],
-          value['id'],
-        ];
-        for (final candidate in candidates) {
-          addFromDynamic(candidate);
-        }
-      }
-    }
-
-    addFromDynamic(data['friend_uids']);
-    addFromDynamic(data['friend_ids']);
-    addFromDynamic(data['friends']);
-    return ids;
   }
 
   Set<String> _extractFriendIdsFromSubcollection(
@@ -307,19 +284,26 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
 
     setState(() => _pendingFollowUids.add(targetUser.uid));
     try {
-      await _followUser(
+      await _addFriend(
         currentUid: currentUid,
         currentName: currentName,
         targetUser: targetUser,
       );
       if (!mounted) return;
+      setState(() => _optimisticFriendUids.add(targetUser.uid));
       ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Now following ${targetUser.firstName}.')),
+        SnackBar(
+          content: Text('${targetUser.firstName} added to friends.'),
+        ),
       );
-    } catch (_) {
+    } catch (error) {
       if (!mounted) return;
+      var message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
       ScaffoldMessenger.of(context).showSnackBar(
-        const SnackBar(content: Text('Unable to follow user right now.')),
+        SnackBar(content: Text(message)),
       );
     } finally {
       if (mounted) {
@@ -328,42 +312,24 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     }
   }
 
-  Future<void> _followUser({
+  Future<void> _addFriend({
     required String currentUid,
     required String currentName,
     required _FriendEntry targetUser,
   }) async {
-    final db = FirebaseFirestore.instance;
-    final timestamp = FieldValue.serverTimestamp();
-    final batch = db.batch();
+    await DBFriends.addFriend(
+      fromUid: currentUid,
+      fromName: currentName,
+      toUid: targetUser.uid,
+    );
+  }
 
-    final friendRef = db
-        .collection('user_profiles')
-        .doc(currentUid)
-        .collection('friends')
-        .doc(targetUser.uid);
-    batch.set(friendRef, <String, dynamic>{
-      'uid': targetUser.uid,
-      'created_at': timestamp,
-      'display_name': '${targetUser.firstName} ${targetUser.lastName}'.trim(),
-      'email': targetUser.email,
-    }, SetOptions(merge: true));
-
-    final notificationRef = db
-        .collection('user_profiles')
-        .doc(targetUser.uid)
-        .collection('notifications')
-        .doc();
-    batch.set(notificationRef, <String, dynamic>{
-      'title': 'New follower',
-      'message': '$currentName started following you.',
-      'type': 'friend',
-      'is_read': false,
-      'from_uid': currentUid,
-      'created_at': timestamp,
-    });
-
-    await batch.commit();
+  void _openFriendProfile(_FriendEntry user) {
+    Navigator.of(context).push(
+      MaterialPageRoute<void>(
+        builder: (_) => _FriendProfileScreen(user: user),
+      ),
+    );
   }
 }
 
@@ -374,6 +340,7 @@ class _FriendEntry {
   final String email;
   final String role;
   final String bio;
+  final List<String> achievements;
 
   _FriendEntry({
     required this.uid,
@@ -382,6 +349,7 @@ class _FriendEntry {
     required this.email,
     required this.role,
     required this.bio,
+    required this.achievements,
   });
 
   String get sortKey => '${firstName.toLowerCase()} ${lastName.toLowerCase()}';
@@ -395,19 +363,26 @@ class _FriendEntry {
       email: (data['email'] ?? '').toString(),
       role: (data['role'] ?? 'Member').toString(),
       bio: (data['bio'] ?? '').toString(),
+      achievements: List<String>.from(data['achievements'] ?? const []),
     );
   }
+
+  String get wholeName => '${firstName.trim()} ${lastName.trim()}'.trim();
 }
 
 class _FriendCard extends StatelessWidget {
   final _FriendEntry user;
   final bool isFriend;
+  final String actionLabel;
+  final VoidCallback? onTap;
   final VoidCallback? onFollow;
   final bool followPending;
 
   const _FriendCard({
     required this.user,
     this.isFriend = false,
+    this.actionLabel = 'Follow',
+    this.onTap,
     this.onFollow,
     this.followPending = false,
   });
@@ -417,90 +392,97 @@ class _FriendCard extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
     final initials = _initials(user.firstName, user.lastName);
-    final fullName = '${user.firstName} ${user.lastName}'.trim();
+    final fullName = user.wholeName;
 
-    return Container(
-      padding: const EdgeInsets.all(14),
-      decoration: BoxDecoration(
-        color: colorScheme.surfaceContainer,
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
         borderRadius: BorderRadius.circular(16),
-        border: Border.all(color: colorScheme.outlineVariant),
-        boxShadow: [
-          BoxShadow(
-            color: Colors.black.withValues(alpha: 0.06),
-            blurRadius: 10,
-            offset: const Offset(0, 4),
-          ),
-        ],
-      ),
-      child: Row(
-        children: [
-          CircleAvatar(
-            radius: 22,
-            backgroundColor: colorScheme.primary,
-            child: Text(
-              initials,
-              style: TextStyle(
-                color: colorScheme.onPrimary,
-                fontWeight: FontWeight.w700,
+        child: Ink(
+          padding: const EdgeInsets.all(14),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(16),
+            border: Border.all(color: colorScheme.outlineVariant),
+            boxShadow: [
+              BoxShadow(
+                color: Colors.black.withValues(alpha: 0.06),
+                blurRadius: 10,
+                offset: const Offset(0, 4),
               ),
-            ),
+            ],
           ),
-          const SizedBox(width: 12),
-          Expanded(
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Text(
-                  fullName.isEmpty ? 'Member' : fullName,
-                  style: textTheme.titleMedium?.copyWith(
-                    fontSize: 16,
+          child: Row(
+            children: [
+              CircleAvatar(
+                radius: 22,
+                backgroundColor: colorScheme.primary,
+                child: Text(
+                  initials,
+                  style: TextStyle(
+                    color: colorScheme.onPrimary,
                     fontWeight: FontWeight.w700,
-                    color: colorScheme.onSurface,
                   ),
                 ),
-                const SizedBox(height: 2),
-                Text(
-                  user.email.isEmpty ? 'No email provided' : user.email,
-                  style: textTheme.bodyMedium?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                    fontWeight: FontWeight.w500,
-                  ),
-                ),
-                if (user.bio.isNotEmpty) ...[
-                  const SizedBox(height: 6),
-                  Text(
-                    user.bio,
-                    maxLines: 2,
-                    overflow: TextOverflow.ellipsis,
-                    style: textTheme.bodyMedium?.copyWith(
-                      color: colorScheme.onSurfaceVariant,
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      fullName.isEmpty ? 'Member' : fullName,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontSize: 16,
+                        fontWeight: FontWeight.w700,
+                        color: colorScheme.onSurface,
+                      ),
                     ),
-                  ),
-                ],
-              ],
-            ),
+                    const SizedBox(height: 2),
+                    Text(
+                      user.email.isEmpty ? 'No email provided' : user.email,
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                        fontWeight: FontWeight.w500,
+                      ),
+                    ),
+                    if (user.bio.isNotEmpty) ...[
+                      const SizedBox(height: 6),
+                      Text(
+                        user.bio,
+                        maxLines: 2,
+                        overflow: TextOverflow.ellipsis,
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                        ),
+                      ),
+                    ],
+                  ],
+                ),
+              ),
+              const SizedBox(width: 10),
+              isFriend
+                  ? const _Pill(label: 'Friend')
+                  : FilledButton(
+                      onPressed: followPending ? null : onFollow,
+                      style: FilledButton.styleFrom(
+                        backgroundColor: colorScheme.primary,
+                        foregroundColor: colorScheme.onPrimary,
+                        padding: const EdgeInsets.symmetric(
+                          horizontal: 12,
+                          vertical: 8,
+                        ),
+                        textStyle: const TextStyle(
+                          fontSize: 12,
+                          fontWeight: FontWeight.w700,
+                        ),
+                      ),
+                      child: Text(actionLabel),
+                    ),
+            ],
           ),
-          const SizedBox(width: 10),
-          isFriend
-              ? const _Pill(label: 'Friend')
-              : FilledButton(
-                  onPressed: followPending ? null : onFollow,
-                  style: FilledButton.styleFrom(
-                    backgroundColor: colorScheme.primary,
-                    foregroundColor: colorScheme.onPrimary,
-                    padding: const EdgeInsets.symmetric(
-                      horizontal: 12,
-                      vertical: 8,
-                    ),
-                    textStyle: const TextStyle(
-                      fontSize: 12,
-                      fontWeight: FontWeight.w700,
-                    ),
-                  ),
-                  child: Text(followPending ? 'Following...' : 'Follow'),
-                ),
-        ],
+        ),
       ),
     );
   }
@@ -510,6 +492,270 @@ class _FriendCard extends StatelessWidget {
     final l = lastName.isEmpty ? '' : lastName[0].toUpperCase();
     final initials = '$f$l';
     return initials.isEmpty ? '?' : initials;
+  }
+}
+
+class _FriendProfileScreen extends StatelessWidget {
+  final _FriendEntry user;
+
+  const _FriendProfileScreen({required this.user});
+
+  @override
+  Widget build(BuildContext context) {
+    final theme = Theme.of(context);
+    final colorScheme = theme.colorScheme;
+    final textTheme = theme.textTheme;
+    final fullName = user.wholeName.isEmpty ? 'Member Profile' : user.wholeName;
+    final bio = user.bio.trim();
+    final unlockedAchievements = Achievement.all
+        .where((achievement) => user.achievements.contains(achievement.id))
+        .toList();
+
+    return Scaffold(
+      appBar: AppBar(title: Text(fullName)),
+      body: SafeArea(
+        child: SingleChildScrollView(
+          padding: const EdgeInsets.fromLTRB(20, 20, 20, 32),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(28),
+                decoration: BoxDecoration(
+                  gradient: LinearGradient(
+                    begin: Alignment.topLeft,
+                    end: Alignment.bottomRight,
+                    colors: [
+                      colorScheme.primaryContainer,
+                      colorScheme.surfaceContainerHigh,
+                    ],
+                  ),
+                  borderRadius: BorderRadius.circular(28),
+                  boxShadow: [
+                    BoxShadow(
+                      color: colorScheme.shadow.withValues(alpha: 0.10),
+                      blurRadius: 18,
+                      offset: const Offset(0, 8),
+                    ),
+                  ],
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Row(
+                      children: [
+                        Container(
+                          padding: const EdgeInsets.all(4),
+                          decoration: BoxDecoration(
+                            shape: BoxShape.circle,
+                            border: Border.all(
+                              color: colorScheme.onPrimaryContainer.withValues(
+                                alpha: 0.18,
+                              ),
+                              width: 2,
+                            ),
+                          ),
+                          child: CircleAvatar(
+                            radius: 34,
+                            backgroundColor: colorScheme.primary,
+                            child: Text(
+                              _initials(user.firstName, user.lastName),
+                              style: textTheme.headlineSmall?.copyWith(
+                                color: colorScheme.onPrimary,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                          ),
+                        ),
+                        const SizedBox(width: 16),
+                        Expanded(
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            children: [
+                              Text(
+                                fullName,
+                                style: textTheme.headlineSmall?.copyWith(
+                                  fontWeight: FontWeight.w900,
+                                  color: colorScheme.onSurface,
+                                ),
+                              ),
+                              const SizedBox(height: 8),
+                              Container(
+                                padding: const EdgeInsets.symmetric(
+                                  horizontal: 12,
+                                  vertical: 6,
+                                ),
+                                decoration: BoxDecoration(
+                                  color: colorScheme.surface.withValues(
+                                    alpha: 0.72,
+                                  ),
+                                  borderRadius: BorderRadius.circular(999),
+                                ),
+                                child: Text(
+                                  '${unlockedAchievements.length} achievement${unlockedAchievements.length == 1 ? '' : 's'}',
+                                  style: textTheme.labelLarge?.copyWith(
+                                    fontWeight: FontWeight.w700,
+                                    color: colorScheme.onSurface,
+                                  ),
+                                ),
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                    const SizedBox(height: 22),
+                    Text(
+                      'Bio',
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 10),
+                    Text(
+                      bio.isEmpty
+                          ? 'This member has not added a bio yet.'
+                          : bio,
+                      style: textTheme.bodyLarge?.copyWith(
+                        height: 1.55,
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              const SizedBox(height: 20),
+              Container(
+                width: double.infinity,
+                padding: const EdgeInsets.all(20),
+                decoration: BoxDecoration(
+                  color: colorScheme.surfaceContainer,
+                  borderRadius: BorderRadius.circular(24),
+                  border: Border.all(color: colorScheme.outlineVariant),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      'Achievements',
+                      style: textTheme.titleLarge?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 6),
+                    Text(
+                      'Badges this member has unlocked so far.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                    const SizedBox(height: 18),
+                    if (unlockedAchievements.isEmpty)
+                      Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(18),
+                        decoration: BoxDecoration(
+                          color: colorScheme.surface,
+                          borderRadius: BorderRadius.circular(18),
+                          border: Border.all(color: colorScheme.outlineVariant),
+                        ),
+                        child: Text(
+                          '$fullName has not unlocked any achievements yet.',
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                          ),
+                        ),
+                      )
+                    else
+                      Wrap(
+                        spacing: 12,
+                        runSpacing: 12,
+                        children: unlockedAchievements
+                            .map(
+                              (achievement) => _FriendAchievementBadge(
+                                achievement: achievement,
+                              ),
+                            )
+                            .toList(),
+                      ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+
+  String _initials(String firstName, String lastName) {
+    final f = firstName.isEmpty ? '' : firstName[0].toUpperCase();
+    final l = lastName.isEmpty ? '' : lastName[0].toUpperCase();
+    final initials = '$f$l';
+    return initials.isEmpty ? '?' : initials;
+  }
+}
+
+class _FriendAchievementBadge extends StatelessWidget {
+  final Achievement achievement;
+
+  const _FriendAchievementBadge({required this.achievement});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      width: 150,
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 52,
+            height: 52,
+            decoration: BoxDecoration(
+              color: achievement.color.withValues(alpha: 0.12),
+              shape: BoxShape.circle,
+              border: Border.all(
+                color: achievement.color.withValues(alpha: 0.28),
+              ),
+            ),
+            child: Icon(
+              achievement.iconData,
+              color: achievement.color,
+              size: 24,
+            ),
+          ),
+          const SizedBox(height: 12),
+          Text(
+            achievement.title,
+            style: textTheme.titleSmall?.copyWith(
+              fontWeight: FontWeight.w800,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(height: 6),
+          Text(
+            achievement.description,
+            style: textTheme.bodySmall?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.4,
+            ),
+          ),
+        ],
+      ),
+    );
   }
 }
 
