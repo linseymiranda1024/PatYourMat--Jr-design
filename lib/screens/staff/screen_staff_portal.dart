@@ -6,7 +6,6 @@ import 'package:pat_your_mat/theme/app_colors.dart';
 import '../../db_helpers/db_reservations.dart';
 import '../../models/gym_class.dart';
 import '../../util/date_time/util_attendance.dart';
-import '../../widgets/navigation/widget_app_outline.dart';
 import 'screen_staff_class_list.dart';
 import 'screen_staff_attendance.dart';
 import 'screen_create_class.dart';
@@ -367,14 +366,6 @@ class ScreenStaffPortal extends ConsumerWidget {
                     icon: Icons.add,
                     filled: true,
                     onTap: () => context.push(ScreenCreateClass.routeName),
-                  ),
-                  _buildHeaderAction(
-                    context: context,
-                    label: 'Staff Profile',
-                    icon: Icons.person_outline,
-                    filled: false,
-                    onTap: () =>
-                        context.go('${WidgetAppOutline.routeName}?tab=3'),
                   ),
                 ],
               ),
