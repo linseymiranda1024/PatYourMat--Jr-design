@@ -358,7 +358,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                             height: 56,
                             child: ElevatedButton(
                               onPressed: isFull
-                                  ? (_isSubmitting ? null : () => _joinStandbyQueue(gClass))
+                                  ? (_isSubmitting || isInStandby
+                                      ? null
+                                      : () => _joinStandbyQueue(gClass))
                                   : (_selectedMat == null || _isSubmitting)
                                       ? null
                                       : () async {
@@ -441,7 +443,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                     )
                                   : Text(
                                       isFull
-                                          ? 'Join Standby Queue'
+                                          ? (isInStandby
+                                              ? "You're on Standby"
+                                              : 'Join Standby Queue')
                                           : _selectedMat == null
                                           ? 'Select a Mat'
                                           : 'Reserve Mat ${_selectedMat! + 1}',

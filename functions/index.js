@@ -7,6 +7,30 @@ const { initializeApp } = require("firebase-admin/app");
 initializeApp();
 const db = getFirestore();
 
+function toInt(value) {
+  if (typeof value === "number" && Number.isFinite(value)) {
+    return Math.trunc(value);
+  }
+  return 0;
+}
+
+function formatClassDateTime(rawDateTime) {
+  const date = rawDateTime?.toDate?.() ?? null;
+  if (!(date instanceof Date) || Number.isNaN(date.getTime())) {
+    return "";
+  }
+
+  const months = ["Jan", "Feb", "Mar", "Apr", "May", "Jun",
+    "Jul", "Aug", "Sep", "Oct", "Nov", "Dec"];
+  const weekdays = ["Sun", "Mon", "Tue", "Wed", "Thu", "Fri", "Sat"];
+  const hours24 = date.getHours();
+  const hours12 = hours24 % 12 === 0 ? 12 : hours24 % 12;
+  const minutes = String(date.getMinutes()).padStart(2, "0");
+  const amPm = hours24 >= 12 ? "PM" : "AM";
+
+  return `${weekdays[date.getDay()]}, ${months[date.getMonth()]} ${date.getDate()} at ${hours12}:${minutes} ${amPm}`;
+}
+
 /**
  * HTTPS Callable Function to register a user for a class.
  * 
@@ -131,43 +155,41 @@ exports.promoteFromStandbyQueue = onDocumentDeleted(
   "classes/{classId}/registrations/{userId}",
   async (event) => {
     const classId = event.params.classId;
-    const cancelledUserId = event.params.userId;
 
     try {
       await db.runTransaction(async (transaction) => {
-        // Get the class document
         const classRef = db.collection("classes").doc(classId);
         const classDoc = await transaction.get(classRef);
         if (!classDoc.exists) {
-          return; // Class no longer exists
+          return;
         }
 
         const classData = classDoc.data();
-        const capacity = classData.capacity || 0;
-        const filled = classData.filled || 0;
-        const reservedMats = classData.reservedMats || [];
+        const capacity = toInt(classData.capacity);
+        const reservedMats = Array.isArray(classData.reservedMats) ?
+          classData.reservedMats.filter((value) => typeof value === "string" && value.trim()) :
+          [];
+        const occupiedCount = reservedMats.length;
+        const currentStandbyCount = toInt(classData.standbyCount);
 
-        // Check if there's an open spot
-        if (filled >= capacity) {
-          return; // No open spot
+        if (capacity <= 0 || occupiedCount >= capacity) {
+          return;
         }
 
-        // Get the standby queue, ordered by createdAt
         const standbyRef = db.collection("classes").doc(classId).collection("standby_queue");
         const standbyQuery = standbyRef.orderBy("createdAt", "asc").limit(1);
         const standbySnapshot = await transaction.get(standbyQuery);
 
         if (standbySnapshot.empty) {
-          return; // No one in standby
+          return;
         }
 
         const standbyDoc = standbySnapshot.docs[0];
         const standbyData = standbyDoc.data();
-        const userId = standbyDoc.id; // userId is the document ID
-        const userName = standbyData.userName;
-        const userEmail = standbyData.userEmail;
+        const userId = standbyDoc.id;
+        const userName = standbyData.userName || "";
+        const userEmail = standbyData.userEmail || "";
 
-        // Find an available mat
         const availableMats = [];
         for (let i = 1; i <= capacity; i++) {
           const matString = `Mat #${i}`;
@@ -177,58 +199,65 @@ exports.promoteFromStandbyQueue = onDocumentDeleted(
         }
 
         if (availableMats.length === 0) {
-          return; // No available mats
+          return;
         }
 
-        // Pick the first available mat
         const assignedMat = availableMats[0];
+        const formattedDateTime = formatClassDateTime(classData.dateTime);
 
-        // Build registration data
         const registrationData = {
           userId: userId,
           userName: userName,
           userEmail: userEmail,
           classId: classId,
-          className: classData.title || '',
-          instructor: classData.instructor || '',
-          dateTime: `${classData.dateText || ''} at ${classData.timeText || ''}`,
+          className: classData.title || "",
+          instructor: classData.instructor || "",
+          dateTime: formattedDateTime,
           date: classData.dateTime,
-          type: classData.type || '',
+          type: classData.type || "",
           matNumber: assignedMat,
-          status: 'confirmed',
+          status: "CONFIRMED",
           createdAt: FieldValue.serverTimestamp(),
         };
 
-        // Build roster data
         const rosterData = {
           userId: userId,
           userName: userName,
           userEmail: userEmail,
           matNumber: assignedMat,
-          status: 'confirmed',
+          status: "CONFIRMED",
           createdAt: FieldValue.serverTimestamp(),
         };
 
-        // Create registration documents
         const userRegistrationRef = db.collection("user_profiles").doc(userId).collection("registrations").doc(classId);
         const classRegistrationRef = db.collection("classes").doc(classId).collection("registrations").doc(userId);
+        const notificationRef = db.collection("user_profiles")
+          .doc(userId)
+          .collection("notifications")
+          .doc(`standby-promotion-${classId}`);
 
         transaction.set(userRegistrationRef, registrationData);
         transaction.set(classRegistrationRef, registrationData);
+        transaction.set(notificationRef, {
+          title: "Spot opened up",
+          message: `You were moved off standby and into ${classData.title || "your class"}. Your mat is ${assignedMat}.`,
+          type: "standby_promoted",
+          is_read: false,
+          class_id: classId,
+          created_at: FieldValue.serverTimestamp(),
+        }, {merge: true});
 
-        // Update class document
-        const newFilled = filled + 1;
+        const newFilled = occupiedCount + 1;
         const rosterField = `roster.${userId}`;
         transaction.update(classRef, {
           filled: newFilled,
           registeredCount: newFilled,
-          status: newFilled >= capacity ? 'full' : 'open',
-          reservedMats: FieldValue.arrayUnion([assignedMat]),
+          status: newFilled >= capacity ? "full" : "open",
+          reservedMats: FieldValue.arrayUnion(assignedMat),
           [rosterField]: rosterData,
-          standbyCount: FieldValue.increment(-1),
+          standbyCount: Math.max(0, currentStandbyCount - 1),
         });
 
-        // Delete from standby queue
         transaction.delete(standbyDoc.ref);
 
         console.log(`Promoted user ${userId} from standby to registered for class ${classId} with mat ${assignedMat}`);

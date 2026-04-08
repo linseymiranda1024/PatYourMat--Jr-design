@@ -17,6 +17,7 @@ class ReservationsNotifier extends ChangeNotifier {
   StreamSubscription? _subscription;
 
   List<Reservation> get reservations => _reservations;
+  String? get userId => FirebaseAuth.instance.currentUser?.uid;
 
   ReservationsNotifier() {
     _init();

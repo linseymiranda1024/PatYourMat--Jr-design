@@ -53,6 +53,26 @@ class DBReservations {
     return _classRegistrationsCollection(classId).doc(userId);
   }
 
+  static DocumentReference<Map<String, dynamic>> _classRef(String classId) {
+    return _db.collection(_classesCollection).doc(classId);
+  }
+
+  static Future<String?> registerForClass(
+    String userId,
+    GymClass gymClass, {
+    String? matNumber,
+  }) async {
+    try {
+      return await _registerForClassTransaction(
+        userId,
+        gymClass,
+        requestedMatNumber: matNumber,
+      );
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
   static CollectionReference<Map<String, dynamic>>
   _getStandbyQueueCollection(String classId) {
     return _db
@@ -97,6 +117,11 @@ class DBReservations {
         }
 
         final classData = classSnap.data() as Map<String, dynamic>;
+        final capacity = _asInt(classData['capacity']);
+        final reservedMats = _parseReservedMats(classData['reservedMats']);
+        if (capacity > 0 && reservedMats.length < capacity) {
+          throw Exception('This class still has open spots.');
+        }
         final currentStandbyCount = _asInt(classData['standbyCount']);
 
         transaction.set(standbyRef, {
@@ -120,6 +145,7 @@ class DBReservations {
   }
 
   static Stream<Set<int>> getReservedMatNumbersStream(String classId) {
+    return _db.collection(_classesCollection).doc(classId).snapshots().map((
       doc,
     ) {
       final data = doc.data();
@@ -277,6 +303,8 @@ class DBReservations {
       throw Exception(_friendlyFirestoreError(e));
     }
   }
+
+  static Future<void> cancelReservation(String userId, String classId) async {
     final userRegistrationRef = _userRegistrationRef(userId, classId);
     final classRegistrationRef = _classRegistrationRef(classId, userId);
     final classRef = _classRef(classId);

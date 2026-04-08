@@ -144,17 +144,6 @@ class ScreenStaffPortal extends ConsumerWidget {
                       accent: AppColors.deepPurple,
                       onTap: () => context.push(ScreenCreateClass.routeName),
                     ),
-                    const SizedBox(height: 10),
-                    _buildActionRow(
-                      context: context,
-                      icon: Icons.person_outline,
-                      label: 'View Staff Profile',
-                      description:
-                          'Review teaching details and instructor settings.',
-                      accent: const Color(0xFF1F8F71),
-                      onTap: () =>
-                          context.go('${WidgetAppOutline.routeName}?tab=3'),
-                    ),
                   ],
                 ),
               ),

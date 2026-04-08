@@ -23,6 +23,7 @@ service cloud.firestore {
         'registeredCount',
         'status',
         'reservedMats',
+        'standbyCount',
         'standbyQueue',
         'roster',
       ]);
