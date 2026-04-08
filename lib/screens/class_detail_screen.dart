@@ -73,6 +73,66 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     }
   }
 
+  Future<void> _joinStandbyQueue(GymClass gClass) async {
+    setState(() => _isLoading = true);
+
+    try {
+      await DBReservations.joinStandbyQueue(
+        ref.read(reservationsProvider).userId ?? '',
+        gClass,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Joined standby queue successfully!')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = e.toString();
+        if (message.startsWith('Exception: ')) {
+          message = message.replaceFirst('Exception: ', '');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to join standby: $message')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
+  Future<void> _leaveStandbyQueue(GymClass gClass) async {
+    setState(() => _isLoading = true);
+
+    try {
+      await DBReservations.leaveStandbyQueue(
+        ref.read(reservationsProvider).userId ?? '',
+        gClass.id,
+      );
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          const SnackBar(content: Text('Left standby queue')),
+        );
+      }
+    } catch (e) {
+      if (mounted) {
+        String message = e.toString();
+        if (message.startsWith('Exception: ')) {
+          message = message.replaceFirst('Exception: ', '');
+        }
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to leave standby: $message')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isLoading = false);
+      }
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return StreamBuilder<GymClass?>(
@@ -121,7 +181,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                 ? 0.0
                 : (liveFilled / gClass.capacity).clamp(0.0, 1.0);
 
-            return Scaffold(
+            return StreamBuilder<bool>(
+              stream: DBReservations.isUserInStandby(
+                ref.read(reservationsProvider).userId ?? '',
+                gClass.id,
+              ),
+              builder: (context, standbySnapshot) {
+                final isInStandby = standbySnapshot.data ?? false;
+
+                return Scaffold(
               body: Stack(
                 children: [
                   // Purple gradient header background
@@ -365,10 +433,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     width: double.infinity,
                                     height: 56,
                                     child: ElevatedButton(
-                                      onPressed:
-                                          (_isLoading || isRegistered || isFull)
+                                      onPressed: (_isLoading || isRegistered)
                                           ? null
-                                          : () => _registerForClass(gClass),
+                                          : (isFull && !isInStandby)
+                                              ? () => _joinStandbyQueue(gClass)
+                                              : (!isFull)
+                                                  ? () => _registerForClass(gClass)
+                                                  : null,
                                       style: ElevatedButton.styleFrom(
                                         backgroundColor: colorScheme.primary,
                                         foregroundColor: colorScheme.onPrimary,
@@ -386,7 +457,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           : Text(
                                               isRegistered
                                                   ? 'Registered'
-                                                  : 'Reserve Your Spot',
+                                                  : isInStandby
+                                                      ? "You're on Standby"
+                                                      : isFull
+                                                          ? 'Join Standby Queue'
+                                                          : 'Reserve Your Spot',
                                               style: const TextStyle(
                                                 fontSize: 18,
                                                 fontWeight: FontWeight.bold,
@@ -394,13 +469,39 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                             ),
                                     ),
                                   ),
+                                  if (isInStandby) ...[
+                                    const SizedBox(height: 14),
+                                    SizedBox(
+                                      width: double.infinity,
+                                      height: 54,
+                                      child: OutlinedButton(
+                                        onPressed: _isLoading
+                                            ? null
+                                            : () => _leaveStandbyQueue(gClass),
+                                        style: OutlinedButton.styleFrom(
+                                          foregroundColor: colorScheme.error,
+                                          side: BorderSide(
+                                            color: colorScheme.error,
+                                          ),
+                                          shape: RoundedRectangleBorder(
+                                            borderRadius: BorderRadius.circular(
+                                              28,
+                                            ),
+                                          ),
+                                        ),
+                                        child: const Text('Leave Standby Queue'),
+                                      ),
+                                    ),
+                                  ],
                                   const SizedBox(height: 14),
                                   SizedBox(
                                     width: double.infinity,
                                     height: 54,
                                     child: OutlinedButton.icon(
-                                      onPressed:
-                                          (_isLoading || isRegistered || isFull)
+                                      onPressed: (_isLoading ||
+                                              isRegistered ||
+                                              isFull ||
+                                              isInStandby)
                                           ? null
                                           : () {
                                               if (gClass.filled >=
@@ -446,6 +547,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                   ),
                 ],
               ),
+            );
+              },
             );
           },
         );
