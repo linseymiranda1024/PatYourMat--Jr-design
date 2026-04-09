@@ -1,6 +1,7 @@
 import 'dart:async';
 
 import 'package:flutter/material.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import '../models/gym_class.dart';
 import '../db_helpers/db_gym_class.dart';
 
@@ -19,9 +20,7 @@ class ProviderGymClass extends ChangeNotifier {
   }
 
   void _init() {
-    _isLoading = true;
-    notifyListeners();
-    _startStream();
+    updateUser();
   }
 
   void _startStream() {
@@ -68,6 +67,40 @@ class ProviderGymClass extends ChangeNotifier {
   Future<void> refreshClasses() async {
     final latestClasses = await DBGymClass.getClassesOnce();
     _classes = latestClasses;
+    _isLoading = false;
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+  }
+
+  void updateUser() {
+    _reconnectTimer?.cancel();
+    _classesSubscription?.cancel();
+    _classesSubscription = null;
+
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      _classes = [];
+      _isLoading = false;
+      if (!_isDisposed) {
+        notifyListeners();
+      }
+      return;
+    }
+
+    _isLoading = true;
+    if (!_isDisposed) {
+      notifyListeners();
+    }
+    _startStream();
+  }
+
+  void clearAndCancelForSignOut() {
+    _reconnectTimer?.cancel();
+    _classesSubscription?.cancel();
+    _reconnectTimer = null;
+    _classesSubscription = null;
+    _classes = [];
     _isLoading = false;
     if (!_isDisposed) {
       notifyListeners();

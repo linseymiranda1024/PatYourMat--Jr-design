@@ -129,7 +129,7 @@ class DBReservations {
         final skippedInvitees = <String>[];
         for (final inviteeUid in uniqueInvitees) {
           final inviteeRegistrationSnap = await transaction.get(
-            _userRegistrationRef(inviteeUid, gymClass.id),
+            _classRegistrationRef(gymClass.id, inviteeUid),
           );
           if (inviteeRegistrationSnap.exists) {
             skippedInvitees.add(inviteeUid);
@@ -450,17 +450,22 @@ class DBReservations {
     }
 
     return _db
-        .collectionGroup(_standbyQueueCollection)
-        .where(FieldPath.documentId, isEqualTo: userId)
+        .collection(_classesCollection)
+        .orderBy('dateTime', descending: false)
         .snapshots()
-        .map((snapshot) {
+        .asyncMap((snapshot) async {
           final classIds = <String>{};
-          for (final doc in snapshot.docs) {
-            final classId = doc.reference.parent.parent?.id;
-            if (classId != null && classId.trim().isNotEmpty) {
-              classIds.add(classId);
+          final classDocs = snapshot.docs;
+          final standbyChecks = await Future.wait(
+            classDocs.map((doc) => _standbyQueueRef(doc.id, userId).get()),
+          );
+
+          for (var index = 0; index < classDocs.length; index++) {
+            if (standbyChecks[index].exists) {
+              classIds.add(classDocs[index].id);
             }
           }
+
           return classIds;
         });
   }

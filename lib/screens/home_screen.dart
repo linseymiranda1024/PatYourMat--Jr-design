@@ -1,7 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:firebase_auth/firebase_auth.dart';
 import 'package:go_router/go_router.dart';
 
+import '../db_helpers/db_gym_class.dart';
 import '../db_helpers/db_reservations.dart';
 import '../main.dart';
 import '../models/gym_class.dart' as model;
@@ -569,148 +571,162 @@ class ClassCard extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
 
-    return StreamBuilder<int>(
-      stream: DBReservations.getReservationCountForClassStream(classId),
+    return StreamBuilder<model.GymClass?>(
+      stream: DBGymClass.getClassStream(classId),
       builder: (context, snapshot) {
-        final liveFilled = snapshot.data ?? filled;
-        final liveStatus = _availabilityStatus(
-          filled: liveFilled,
-          capacity: capacity,
-          standbyCount: standbyCount,
-        );
-        final statusUi = _statusUi(liveStatus);
-        final progress = capacity == 0
-            ? 0.0
-            : (liveFilled / capacity).clamp(0.0, 1.0);
+        final liveClass = snapshot.data;
+        final liveFilled = liveClass?.filled ?? filled;
+        final liveCapacity = liveClass?.capacity ?? capacity;
+        final liveStandbyCount = liveClass?.standbyCount ?? standbyCount;
+        final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
-        return Material(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(22),
-          child: InkWell(
-            onTap: onTap,
-            borderRadius: BorderRadius.circular(22),
-            child: Container(
-              padding: const EdgeInsets.all(18),
-              decoration: BoxDecoration(
-                color: colorScheme.surfaceContainer,
+        return StreamBuilder<bool>(
+          stream: currentUserId.isEmpty
+              ? Stream<bool>.value(false)
+              : DBReservations.isUserInStandby(currentUserId, classId),
+          builder: (context, standbySnapshot) {
+            final isCurrentUserInStandby = standbySnapshot.data ?? false;
+            final liveStatus = _availabilityStatus(
+              filled: liveFilled,
+              capacity: liveCapacity,
+              standbyCount: liveStandbyCount,
+              forceStandby: isCurrentUserInStandby,
+            );
+            final statusUi = _statusUi(liveStatus);
+            final progress = liveCapacity == 0
+                ? 0.0
+                : (liveFilled / liveCapacity).clamp(0.0, 1.0);
+
+            return Material(
+              color: Colors.transparent,
+              borderRadius: BorderRadius.circular(22),
+              child: InkWell(
+                onTap: onTap,
                 borderRadius: BorderRadius.circular(22),
-                boxShadow: [
-                  BoxShadow(
-                    blurRadius: 18,
-                    offset: const Offset(0, 10),
-                    color: Colors.black.withValues(alpha: 0.08),
-                  ),
-                ],
-              ),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
-                  Row(
-                    children: [
-                      Expanded(
-                        child: Text(
-                          title,
-                          style: textTheme.headlineSmall?.copyWith(
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                      ),
-                      _StatusPill(
-                        text: statusUi.label,
-                        accent: statusUi.accent,
+                child: Container(
+                  padding: const EdgeInsets.all(18),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(22),
+                    boxShadow: [
+                      BoxShadow(
+                        blurRadius: 18,
+                        offset: const Offset(0, 10),
+                        color: Colors.black.withValues(alpha: 0.08),
                       ),
                     ],
                   ),
-                  const SizedBox(height: 8),
-                  Text(
-                    instructor,
-                    style: textTheme.titleMedium?.copyWith(
-                      fontSize: 18,
-                      color: colorScheme.onSurfaceVariant,
-                      fontWeight: FontWeight.w500,
-                    ),
-                  ),
-                  const SizedBox(height: 14),
-                  Row(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Icon(
-                        Icons.calendar_today_outlined,
-                        size: 20,
-                        color: colorScheme.onSurfaceVariant,
-                      ),
-                      const SizedBox(width: 10),
-                      Text(
-                        dateText,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 16),
-                      Text(
-                        timeText,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
-                          color: colorScheme.onSurface,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        '•',
-                        style: TextStyle(
-                          color: colorScheme.onSurfaceVariant,
-                          fontSize: 16,
-                        ),
-                      ),
-                      const SizedBox(width: 14),
-                      Text(
-                        durationText,
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
-                          color: colorScheme.onSurfaceVariant,
-                          fontWeight: FontWeight.w600,
-                        ),
-                      ),
-                    ],
-                  ),
-                  const SizedBox(height: 18),
-                  Row(
-                    children: [
-                      Expanded(
-                        child: ClipRRect(
-                          borderRadius: BorderRadius.circular(10),
-                          child: LinearProgressIndicator(
-                            value: progress,
-                            minHeight: 10,
-                            backgroundColor: colorScheme.outlineVariant,
-                            valueColor: AlwaysStoppedAnimation<Color>(
-                              liveStatus == model.ClassStatus.open
-                                  ? colorScheme.primary
-                                  : liveStatus == model.ClassStatus.standby
-                                  ? AppColors.warning
-                                  : colorScheme.error,
+                      Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              title,
+                              style: textTheme.headlineSmall?.copyWith(
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
                             ),
                           ),
+                          _StatusPill(
+                            text: statusUi.label,
+                            accent: statusUi.accent,
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 8),
+                      Text(
+                        instructor,
+                        style: textTheme.titleMedium?.copyWith(
+                          fontSize: 18,
+                          color: colorScheme.onSurfaceVariant,
+                          fontWeight: FontWeight.w500,
                         ),
                       ),
-                      const SizedBox(width: 14),
-                      Text(
-                        '$liveFilled/$capacity',
-                        style: textTheme.bodyLarge?.copyWith(
-                          fontSize: 16,
-                          fontWeight: FontWeight.w700,
-                          color: colorScheme.onSurfaceVariant,
-                        ),
+                      const SizedBox(height: 14),
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.calendar_today_outlined,
+                            size: 20,
+                            color: colorScheme.onSurfaceVariant,
+                          ),
+                          const SizedBox(width: 10),
+                          Text(
+                            dateText,
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 16),
+                          Text(
+                            timeText,
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                              color: colorScheme.onSurface,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Text(
+                            '•',
+                            style: TextStyle(
+                              color: colorScheme.onSurfaceVariant,
+                              fontSize: 16,
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Text(
+                            durationText,
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                              color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w600,
+                            ),
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 18),
+                      Row(
+                        children: [
+                          Expanded(
+                            child: ClipRRect(
+                              borderRadius: BorderRadius.circular(10),
+                              child: LinearProgressIndicator(
+                                value: progress,
+                                minHeight: 10,
+                                backgroundColor: colorScheme.outlineVariant,
+                                valueColor: AlwaysStoppedAnimation<Color>(
+                                  liveStatus == model.ClassStatus.open
+                                      ? colorScheme.primary
+                                      : liveStatus == model.ClassStatus.standby
+                                      ? AppColors.warning
+                                      : colorScheme.error,
+                                ),
+                              ),
+                            ),
+                          ),
+                          const SizedBox(width: 14),
+                          Text(
+                            '$liveFilled/$liveCapacity',
+                            style: textTheme.bodyLarge?.copyWith(
+                              fontSize: 16,
+                              fontWeight: FontWeight.w700,
+                              color: colorScheme.onSurfaceVariant,
+                            ),
+                          ),
+                        ],
                       ),
                     ],
                   ),
-                ],
+                ),
               ),
-            ),
-          ),
+            );
+          },
         );
       },
     );
@@ -735,9 +751,10 @@ model.ClassStatus _availabilityStatus({
   required int filled,
   required int capacity,
   required int standbyCount,
+  bool forceStandby = false,
 }) {
   if (filled >= capacity) {
-    return standbyCount > 0
+    return (standbyCount > 0 || forceStandby)
         ? model.ClassStatus.standby
         : model.ClassStatus.full;
   }

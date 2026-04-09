@@ -86,6 +86,7 @@ class ProfileScreen extends ConsumerStatefulWidget {
 
 class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   static const int _reservationPreviewCount = 3;
+  static const double _favoriteClassCardHeight = 132;
 
   @override
   Widget build(BuildContext context) {
@@ -459,7 +460,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               ),
             )
           : SizedBox(
-              height: 112,
+              height: _favoriteClassCardHeight,
               child: ListView.separated(
                 scrollDirection: Axis.horizontal,
                 itemCount: favoriteIds.length,
@@ -489,6 +490,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           context.push(ClassDetailScreen.routeName, extra: gymClass.id),
       child: Container(
         width: 172,
+        height: _favoriteClassCardHeight,
         padding: const EdgeInsets.all(14),
         decoration: BoxDecoration(
           color: colorScheme.surface,
@@ -866,6 +868,32 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
       stream: DBReservations.getStandbyClassIdsStream(currentUserId),
       initialData: const <String>{},
       builder: (context, snapshot) {
+        if (snapshot.hasError) {
+          return _buildSectionCard(
+            context: context,
+            title: 'Standby Queue',
+            subtitle: 'Classes you are currently queued for when mats open up.',
+            child: Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surfaceContainer,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Text(
+                'Unable to load your standby classes right now.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.45,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            ),
+          );
+        }
+
         final standbyClassIds = snapshot.data ?? const <String>{};
         final classesById = <String, GymClass>{
           for (final gymClass in gymClasses) gymClass.id: gymClass,

@@ -80,13 +80,20 @@ Future<void> main() async {
     providerUserProfile,
   );
   final ProviderAuth authProvider = providerContainer.read(providerAuth);
+  final ProviderGymClass gymClassProvider = providerContainer.read(
+    providerGymClass,
+  );
   final ReservationsNotifier reservationsNotifier = providerContainer.read(
     reservationsProvider,
   );
 
   // Initialize providers
   await userProfileProvider.initProviders(authProvider);
-  authProvider.initProviders(userProfileProvider, reservationsNotifier);
+  authProvider.initProviders(
+    userProfileProvider,
+    gymClassProvider,
+    reservationsNotifier,
+  );
 
   // Run the app
   runApp(

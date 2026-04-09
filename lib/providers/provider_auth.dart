@@ -21,6 +21,7 @@ import 'package:flutter/material.dart';
 import '../util/message_display/popup_dialogue.dart';
 import '../util/message_display/snackbar.dart';
 import '../util/logging/app_logger.dart';
+import 'provider_gym_class.dart';
 import 'provider_user_profile.dart';
 import 'provider_reservations.dart';
 import '../models/user_profile.dart';
@@ -39,6 +40,7 @@ enum AuthState { UNKNOWN, AUTHENTICATED, UN_AUTHENTICATED }
 class ProviderAuth extends ChangeNotifier {
   // The "instance variables" managed in provider
   late ProviderUserProfile _providerUserProfile;
+  late ProviderGymClass _providerGymClass;
   late ReservationsNotifier _reservationsNotifier;
   StreamSubscription<User?>? _authStateSubscription;
   int _authStateEventCounter = 0;
@@ -60,9 +62,11 @@ class ProviderAuth extends ChangeNotifier {
   ///////////////////////////////////////////////////////////////////
   void initProviders(
     ProviderUserProfile providerUserProfile,
+    ProviderGymClass providerGymClass,
     ReservationsNotifier reservationsNotifier,
   ) {
     _providerUserProfile = providerUserProfile;
+    _providerGymClass = providerGymClass;
     _reservationsNotifier = reservationsNotifier;
   }
 
@@ -95,6 +99,7 @@ class ProviderAuth extends ChangeNotifier {
       // Handle account switch without full app restart (A -> B).
       if (authUidChanged && _lastAuthedUid != null) {
         await _providerUserProfile.wipeAndCancelDbStream();
+        _providerGymClass.updateUser();
         _reservationsNotifier.updateUser();
         if (_isStaleAuthEvent(eventId, currentUid)) {
           return;
@@ -608,15 +613,8 @@ class ProviderAuth extends ChangeNotifier {
   _clearAuthedUserDetails() async {
     // Wipe data stored in providers
     await _providerUserProfile.wipeAndCancelDbStream();
+    _providerGymClass.clearAndCancelForSignOut();
     _reservationsNotifier.clearAndCancelForSignOut();
-
-    // Terminate the current instance of Firestore and clear any persistant state (cache) being stored locally
-    try {
-      await FirebaseFirestore.instance.terminate();
-      await FirebaseFirestore.instance.clearPersistence();
-    } catch (e) {
-      AppLogger.error("Firestore teardown during sign-out failed: $e");
-    }
   }
 
   ///////////////////////////////////////////////////////////////////
@@ -643,6 +641,7 @@ class ProviderAuth extends ChangeNotifier {
   Future<void> _loadAuthedUserDetailsForCurrentUser(String userId) async {
     try {
       _reservationsNotifier.updateUser();
+      _providerGymClass.updateUser();
       await _providerUserProfile.fetchUserProfileIfNeeded();
 
       if (FirebaseAuth.instance.currentUser?.uid != userId || _isSigningOut) {
