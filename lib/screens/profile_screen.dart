@@ -8,10 +8,12 @@ import 'package:pat_your_mat/theme/app_colors.dart';
 import '../models/achievement.dart';
 import '../models/reservation.dart';
 import '../providers/provider_auth.dart';
+import '../db_helpers/db_gym_class.dart';
 import '../providers/provider_reservations.dart';
 import '../providers/provider_user_profile.dart';
 import '../util/date_time/util_attendance.dart';
 import '../widgets/general/widget_profile_avatar.dart';
+import '../screens/class_detail_screen.dart';
 import 'screen_member_previous_classes.dart';
 import 'settings/screen_profile_edit.dart';
 import 'settings/screen_settings.dart';
@@ -85,6 +87,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 reservations: reservations,
                 thisMonthCount: thisMonthCount,
               ),
+              const SizedBox(height: 20),
+              _buildFavoritesSection(context, profile),
               const SizedBox(height: 20),
               _buildAchievementsSection(context, profile),
               const SizedBox(height: 20),
@@ -331,6 +335,75 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildFavoritesSection(BuildContext context, ProviderUserProfile profile) {
+    final favoriteIds = profile.favoriteClassIds;
+
+    return _buildSectionCard(
+      context: context,
+      title: 'Favorite Classes',
+      subtitle: 'Classes you have marked as your favorites.',
+      child: favoriteIds.isEmpty
+          ? Text(
+              'You haven\'t favorited any classes yet. Click the heart on a class to see it here!',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            )
+          : SizedBox(
+              height: 100,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: favoriteIds.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final classId = favoriteIds[index];
+                  return StreamBuilder(
+                    stream: DBGymClass.getClassStream(classId),
+                    builder: (context, snapshot) {
+                      if (!snapshot.hasData) return const SizedBox.shrink();
+                      final gClass = snapshot.data!;
+                      return GestureDetector(
+                        onTap: () => context.pushNamed(
+                          ClassDetailScreen.routeName,
+                          pathParameters: {'classId': classId},
+                          extra: gClass,
+                        ),
+                        child: Container(
+                          width: 160,
+                          padding: const EdgeInsets.all(12),
+                          decoration: BoxDecoration(
+                            color: Theme.of(context).colorScheme.surface,
+                            borderRadius: BorderRadius.circular(16),
+                            border: Border.all(color: Theme.of(context).colorScheme.outlineVariant),
+                          ),
+                          child: Column(
+                            crossAxisAlignment: CrossAxisAlignment.start,
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            children: [
+                              Text(
+                                gClass.title,
+                                maxLines: 1,
+                                overflow: TextOverflow.ellipsis,
+                                style: const TextStyle(fontWeight: FontWeight.bold),
+                              ),
+                              const SizedBox(height: 4),
+                              Text(
+                                gClass.instructor,
+                                maxLines: 1,
+                                style: Theme.of(context).textTheme.bodySmall,
+                              ),
+                            ],
+                          ),
+                        ),
+                      );
+                    },
+                  );
+                },
+              ),
+            ),
     );
   }
 

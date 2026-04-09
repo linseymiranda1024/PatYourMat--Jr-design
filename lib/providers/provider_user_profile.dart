@@ -95,6 +95,19 @@ class ProviderUserProfile extends ChangeNotifier {
     notifyListeners();
   }
 
+  List<String> get favoriteClassIds => _userProfile.favoriteClassIds;
+  
+  Future<void> toggleFavoriteClass(String classId) async {
+    if (_userProfile.favoriteClassIds.contains(classId)) {
+      _userProfile.favoriteClassIds.remove(classId);
+    } else {
+      _userProfile.favoriteClassIds.add(classId);
+    }
+    
+    await writeUserProfileToDb();
+    notifyListeners();
+  }
+
   Map<String, int> get categoryAttendance => _userProfile.categoryAttendance;
   set categoryAttendance(Map<String, int> value) {
     _userProfile.categoryAttendance = value;

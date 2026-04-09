@@ -5,9 +5,11 @@ import 'package:go_router/go_router.dart';
 import '../models/gym_class.dart';
 import '../db_helpers/db_reservations.dart';
 import '../providers/provider_reservations.dart';
+import '../main.dart';
 import '../db_helpers/db_gym_class.dart';
 import '../models/reservation.dart';
 import '../theme/app_colors.dart';
+import '../providers/provider_user_profile.dart';
 import '../util/date_time/util_attendance.dart';
 import 'mat_selection_screen.dart';
 import 'reservation_confirmation_screen.dart';
@@ -172,6 +174,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           stream: DBReservations.getReservationCountForClassStream(gClass.id),
           builder: (context, countSnapshot) {
             final liveFilled = countSnapshot.data ?? gClass.filled;
+            final profileProvider = ref.watch(providerUserProfile);
+            final isFavorite = profileProvider.favoriteClassIds.contains(gClass.id);
+            
             final isFull = liveFilled >= gClass.capacity;
             final spotsLeft = (gClass.capacity - liveFilled).clamp(
               0,
@@ -236,6 +241,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     height: 1.2,
                                   ),
                                 ),
+                              ),
+                              IconButton(
+                                icon: Icon(
+                                  isFavorite ? Icons.favorite : Icons.favorite_border,
+                                  color: isFavorite ? Colors.redAccent : AppColors.headerOnBrand,
+                                  size: 28,
+                                ),
+                                onPressed: () => 
+                                    profileProvider.toggleFavoriteClass(gClass.id),
                               ),
                             ],
                           ),
