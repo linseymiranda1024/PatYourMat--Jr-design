@@ -1,4 +1,5 @@
 import 'package:flutter_test/flutter_test.dart';
+import 'package:pat_your_mat/models/gym_class.dart';
 import 'package:pat_your_mat/models/reservation.dart';
 import 'package:pat_your_mat/screens/profile_screen.dart';
 
@@ -58,4 +59,68 @@ void main() {
 
     expect(previous.map((reservation) => reservation.id), ['past-1']);
   });
+
+  test(
+    'favorite resolution returns next recurring occurrence when available',
+    () {
+      final classes = [
+        GymClass(
+          id: 'class-1',
+          title: 'Lunch Ride',
+          description: 'Ride hard',
+          type: 'Cardio',
+          instructor: 'Jordan',
+          dateTime: DateTime(2026, 3, 17, 13),
+          durationMinutes: 60,
+          location: 'Studio A',
+          capacity: 20,
+          filled: 10,
+          recurrenceSeriesId: 'series-1',
+          recurrenceCount: 3,
+          recurrenceIntervalWeeks: 1,
+          recurrenceIndex: 0,
+        ),
+        GymClass(
+          id: 'class-2',
+          title: 'Lunch Ride',
+          description: 'Ride hard',
+          type: 'Cardio',
+          instructor: 'Jordan',
+          dateTime: DateTime(2026, 3, 24, 13),
+          durationMinutes: 60,
+          location: 'Studio A',
+          capacity: 20,
+          filled: 8,
+          recurrenceSeriesId: 'series-1',
+          recurrenceCount: 3,
+          recurrenceIntervalWeeks: 1,
+          recurrenceIndex: 1,
+        ),
+        GymClass(
+          id: 'class-3',
+          title: 'Lunch Ride',
+          description: 'Ride hard',
+          type: 'Cardio',
+          instructor: 'Jordan',
+          dateTime: DateTime(2026, 3, 31, 13),
+          durationMinutes: 60,
+          location: 'Studio A',
+          capacity: 20,
+          filled: 6,
+          recurrenceSeriesId: 'series-1',
+          recurrenceCount: 3,
+          recurrenceIntervalWeeks: 1,
+          recurrenceIndex: 2,
+        ),
+      ];
+
+      final favoriteClass = resolveFavoriteClass(
+        classes,
+        'series-1',
+        now: DateTime(2026, 3, 24, 12),
+      );
+
+      expect(favoriteClass?.id, 'class-2');
+    },
+  );
 }

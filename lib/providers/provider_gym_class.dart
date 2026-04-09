@@ -74,8 +74,20 @@ class ProviderGymClass extends ChangeNotifier {
     }
   }
 
-  Future<void> addClass(GymClass gymClass) async {
-    await DBGymClass.createClass(gymClass);
+  Future<void> addClass(
+    GymClass gymClass, {
+    int occurrenceCount = 1,
+    int repeatEveryWeeks = 1,
+  }) async {
+    if (occurrenceCount > 1) {
+      await DBGymClass.createRecurringClassSeries(
+        gymClass,
+        occurrenceCount: occurrenceCount,
+        intervalWeeks: repeatEveryWeeks,
+      );
+    } else {
+      await DBGymClass.createClass(gymClass);
+    }
     await refreshClasses();
   }
 

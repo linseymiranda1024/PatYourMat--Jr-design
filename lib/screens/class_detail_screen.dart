@@ -167,7 +167,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         final isFavorite = ref.watch(
           providerUserProfile.select(
             (ProviderUserProfile profile) =>
-                profile.favoriteClassIds.contains(gClass.id),
+                profile.favoriteClassIds.contains(gClass.favoriteKey),
           ),
         );
         final statusPresentation = _statusPresentationForReservation(
@@ -258,7 +258,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     ),
                                     onPressed: () => ref
                                         .read(providerUserProfile)
-                                        .toggleFavoriteClass(gClass.id),
+                                        .toggleFavoriteClass(
+                                          gClass.favoriteKey,
+                                        ),
                                   ),
                                 ],
                               ),
@@ -429,6 +431,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         'Capacity',
                                         '${gClass.capacity} mats',
                                       ),
+                                      if (gClass.isRecurring)
+                                        _buildInfoRow(
+                                          Icons.repeat_rounded,
+                                          'Repeats',
+                                          gClass.recurrenceSummary,
+                                        ),
 
                                       const SizedBox(height: 32),
 

@@ -56,6 +56,10 @@ class GymClass {
   final int capacity;
   final int filled;
   final int standbyCount;
+  final String recurrenceSeriesId;
+  final int recurrenceCount;
+  final int recurrenceIntervalWeeks;
+  final int recurrenceIndex;
 
   GymClass({
     required this.id,
@@ -69,12 +73,21 @@ class GymClass {
     required this.capacity,
     required this.filled,
     this.standbyCount = 0,
+    String? recurrenceSeriesId,
+    this.recurrenceCount = 1,
+    this.recurrenceIntervalWeeks = 1,
+    this.recurrenceIndex = 0,
     ClassStatus? status,
-  });
+  }) : recurrenceSeriesId =
+           (recurrenceSeriesId == null || recurrenceSeriesId.trim().isEmpty)
+           ? id
+           : recurrenceSeriesId.trim();
 
   factory GymClass.fromFirestore(DocumentSnapshot doc) {
     try {
       final data = doc.data() as Map<String, dynamic>? ?? <String, dynamic>{};
+      final recurrenceSeriesId =
+          (data['recurrenceSeriesId'] as String?)?.trim() ?? '';
       return GymClass(
         id: doc.id,
         title: data['title'] ?? 'Untitled Class',
@@ -91,6 +104,14 @@ class GymClass {
         capacity: _asInt(data['capacity']),
         filled: _resolvedFilledCount(data),
         standbyCount: _asInt(data['standbyCount']),
+        recurrenceSeriesId: recurrenceSeriesId.isEmpty
+            ? doc.id
+            : recurrenceSeriesId,
+        recurrenceCount: _normalizedPositiveInt(data['recurrenceCount']),
+        recurrenceIntervalWeeks: _normalizedPositiveInt(
+          data['recurrenceIntervalWeeks'],
+        ),
+        recurrenceIndex: _asInt(data['recurrenceIndex']),
       );
     } catch (e) {
       print('ERROR parsing GymClass from Firestore: $e');
@@ -106,6 +127,7 @@ class GymClass {
         location: '',
         capacity: 0,
         filled: 0,
+        recurrenceSeriesId: doc.id,
       );
     }
   }
@@ -124,17 +146,79 @@ class GymClass {
       'registeredCount': filled,
       'standbyCount': standbyCount,
       'status': status.name,
+      'recurrenceSeriesId': recurrenceSeriesId,
+      'recurrenceCount': recurrenceCount,
+      'recurrenceIntervalWeeks': recurrenceIntervalWeeks,
+      'recurrenceIndex': recurrenceIndex,
     };
+  }
+
+  GymClass copyWith({
+    String? id,
+    String? title,
+    String? description,
+    String? type,
+    String? instructor,
+    DateTime? dateTime,
+    int? durationMinutes,
+    String? location,
+    int? capacity,
+    int? filled,
+    int? standbyCount,
+    String? recurrenceSeriesId,
+    int? recurrenceCount,
+    int? recurrenceIntervalWeeks,
+    int? recurrenceIndex,
+  }) {
+    return GymClass(
+      id: id ?? this.id,
+      title: title ?? this.title,
+      description: description ?? this.description,
+      type: type ?? this.type,
+      instructor: instructor ?? this.instructor,
+      dateTime: dateTime ?? this.dateTime,
+      durationMinutes: durationMinutes ?? this.durationMinutes,
+      location: location ?? this.location,
+      capacity: capacity ?? this.capacity,
+      filled: filled ?? this.filled,
+      standbyCount: standbyCount ?? this.standbyCount,
+      recurrenceSeriesId: recurrenceSeriesId ?? this.recurrenceSeriesId,
+      recurrenceCount: recurrenceCount ?? this.recurrenceCount,
+      recurrenceIntervalWeeks:
+          recurrenceIntervalWeeks ?? this.recurrenceIntervalWeeks,
+      recurrenceIndex: recurrenceIndex ?? this.recurrenceIndex,
+    );
   }
 
   ClassStatus get status {
     return filled >= capacity ? ClassStatus.full : ClassStatus.open;
   }
 
+  bool get isRecurring => recurrenceCount > 1;
+
+  String get favoriteKey => recurrenceSeriesId;
+
+  String get recurrenceSummary {
+    if (!isRecurring) {
+      return 'One-time class';
+    }
+
+    if (recurrenceIntervalWeeks == 1) {
+      return 'Repeats weekly for $recurrenceCount sessions';
+    }
+
+    return 'Repeats every $recurrenceIntervalWeeks weeks for $recurrenceCount sessions';
+  }
+
   static int _asInt(dynamic value) {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
+  }
+
+  static int _normalizedPositiveInt(dynamic value) {
+    final parsed = _asInt(value);
+    return parsed < 1 ? 1 : parsed;
   }
 
   static int _resolvedFilledCount(Map<String, dynamic> data) {
@@ -200,4 +284,28 @@ class GymClass {
   String get durationText {
     return '$durationMinutes min';
   }
+}
+
+List<GymClass> buildRecurringClassSeries({
+  required GymClass template,
+  required String seriesId,
+  required String Function(int index) idBuilder,
+  required int occurrenceCount,
+  int intervalWeeks = 1,
+}) {
+  final normalizedOccurrenceCount = occurrenceCount < 1 ? 1 : occurrenceCount;
+  final normalizedIntervalWeeks = intervalWeeks < 1 ? 1 : intervalWeeks;
+
+  return List<GymClass>.generate(normalizedOccurrenceCount, (index) {
+    return template.copyWith(
+      id: idBuilder(index),
+      dateTime: template.dateTime.add(
+        Duration(days: 7 * normalizedIntervalWeeks * index),
+      ),
+      recurrenceSeriesId: seriesId,
+      recurrenceCount: normalizedOccurrenceCount,
+      recurrenceIntervalWeeks: normalizedIntervalWeeks,
+      recurrenceIndex: index,
+    );
+  });
 }

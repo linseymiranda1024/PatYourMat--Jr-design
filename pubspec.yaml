@@ -55,6 +55,7 @@ dependency_overrides:
 dev_dependencies:
   flutter_test:
     sdk: flutter
+  fake_cloud_firestore: ^4.0.2+1
 
 # -----------------------------------------------------------------------
 # Icon Displayed in OS

@@ -6,8 +6,8 @@ import 'package:pat_your_mat/main.dart';
 import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../models/achievement.dart';
+import '../models/gym_class.dart';
 import '../models/reservation.dart';
-import '../db_helpers/db_gym_class.dart';
 import '../providers/provider_auth.dart';
 import '../providers/provider_reservations.dart';
 import '../providers/provider_user_profile.dart';
@@ -48,6 +48,33 @@ List<Reservation> previousMemberReservations(
   return previous;
 }
 
+GymClass? resolveFavoriteClass(
+  List<GymClass> classes,
+  String favoriteId, {
+  DateTime? now,
+}) {
+  final currentDateTime = now ?? DateTime.now();
+  final matchingClasses =
+      classes.where((gymClass) => gymClass.favoriteKey == favoriteId).toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
+  if (matchingClasses.isEmpty) {
+    return null;
+  }
+
+  for (final gymClass in matchingClasses) {
+    final classEnd = attendanceWindowCloses(
+      gymClass.dateTime,
+      durationMinutes: gymClass.durationMinutes,
+    );
+    if (!classEnd.isBefore(currentDateTime)) {
+      return gymClass;
+    }
+  }
+
+  return matchingClasses.last;
+}
+
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -62,6 +89,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget build(BuildContext context) {
     final profile = ref.watch(providerUserProfile);
     final auth = ref.watch(providerAuth);
+    final gymClasses = ref.watch(providerGymClass).classes;
     final reservations = [...ref.watch(reservationsProvider).reservations]
       ..sort((a, b) => a.date.compareTo(b.date));
     final upcomingReservations = upcomingMemberReservations(reservations);
@@ -88,7 +116,7 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 thisMonthCount: thisMonthCount,
               ),
               const SizedBox(height: 20),
-              _buildFavoritesSection(context, profile),
+              _buildFavoritesSection(context, profile, gymClasses),
               const SizedBox(height: 20),
               _buildAchievementsSection(context, profile),
               const SizedBox(height: 20),
@@ -393,13 +421,15 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
   Widget _buildFavoritesSection(
     BuildContext context,
     ProviderUserProfile profile,
+    List<GymClass> gymClasses,
   ) {
     final favoriteIds = profile.favoriteClassIds;
 
     return _buildSectionCard(
       context: context,
       title: 'Favorite Classes',
-      subtitle: 'Classes you have marked so you can get back to them quickly.',
+      subtitle:
+          'Recurring favorites open the next scheduled occurrence automatically.',
       child: favoriteIds.isEmpty
           ? Container(
               width: double.infinity,
@@ -426,67 +456,74 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 itemCount: favoriteIds.length,
                 separatorBuilder: (context, index) => const SizedBox(width: 12),
                 itemBuilder: (context, index) {
-                  final classId = favoriteIds[index];
-                  return _buildFavoriteClassCard(context, classId);
+                  final favoriteId = favoriteIds[index];
+                  final favoriteClass = resolveFavoriteClass(
+                    gymClasses,
+                    favoriteId,
+                  );
+                  if (favoriteClass == null) {
+                    return const SizedBox.shrink();
+                  }
+
+                  return _buildFavoriteClassCard(context, favoriteClass);
                 },
               ),
             ),
     );
   }
 
-  Widget _buildFavoriteClassCard(BuildContext context, String classId) {
+  Widget _buildFavoriteClassCard(BuildContext context, GymClass gymClass) {
     final colorScheme = Theme.of(context).colorScheme;
 
-    return StreamBuilder(
-      stream: DBGymClass.getClassStream(classId),
-      builder: (context, snapshot) {
-        final gClass = snapshot.data;
-        if (gClass == null) {
-          return const SizedBox.shrink();
-        }
-
-        return GestureDetector(
-          onTap: () =>
-              context.push(ClassDetailScreen.routeName, extra: classId),
-          child: Container(
-            width: 172,
-            padding: const EdgeInsets.all(14),
-            decoration: BoxDecoration(
-              color: colorScheme.surface,
-              borderRadius: BorderRadius.circular(18),
-              border: Border.all(color: colorScheme.outlineVariant),
+    return GestureDetector(
+      onTap: () =>
+          context.push(ClassDetailScreen.routeName, extra: gymClass.id),
+      child: Container(
+        width: 172,
+        padding: const EdgeInsets.all(14),
+        decoration: BoxDecoration(
+          color: colorScheme.surface,
+          borderRadius: BorderRadius.circular(18),
+          border: Border.all(color: colorScheme.outlineVariant),
+        ),
+        child: Column(
+          crossAxisAlignment: CrossAxisAlignment.start,
+          children: [
+            Icon(
+              Icons.favorite,
+              size: 18,
+              color: AppColors.error.withValues(alpha: 0.85),
             ),
-            child: Column(
-              crossAxisAlignment: CrossAxisAlignment.start,
-              children: [
-                Icon(
-                  Icons.favorite,
-                  size: 18,
-                  color: AppColors.error.withValues(alpha: 0.85),
-                ),
-                const Spacer(),
-                Text(
-                  gClass.title,
-                  maxLines: 2,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(
-                    context,
-                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
-                ),
-                const SizedBox(height: 6),
-                Text(
-                  gClass.instructor,
-                  maxLines: 1,
-                  overflow: TextOverflow.ellipsis,
-                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
-                    color: colorScheme.onSurfaceVariant,
-                  ),
-                ),
-              ],
+            const Spacer(),
+            Text(
+              gymClass.title,
+              maxLines: 2,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(
+                context,
+              ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
             ),
-          ),
-        );
-      },
+            const SizedBox(height: 6),
+            Text(
+              gymClass.instructor,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+            const SizedBox(height: 4),
+            Text(
+              gymClass.dateText,
+              maxLines: 1,
+              overflow: TextOverflow.ellipsis,
+              style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                color: colorScheme.onSurfaceVariant,
+              ),
+            ),
+          ],
+        ),
+      ),
     );
   }
 

@@ -22,11 +22,14 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   final _locationController = TextEditingController();
   final _capacityController = TextEditingController();
   final _durationController = TextEditingController(text: '60');
+  final _repeatEveryWeeksController = TextEditingController(text: '1');
+  final _occurrenceCountController = TextEditingController(text: '4');
 
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedType = gymClassTypes.first;
   bool _isSubmitting = false;
+  bool _repeatClass = false;
   bool get _isEditing => widget.existingClass != null;
 
   DateTime get _selectedDateTime => DateTime(
@@ -62,6 +65,10 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
         : gymClassTypes.first;
     _selectedDate = existingClass.dateTime;
     _selectedTime = TimeOfDay.fromDateTime(existingClass.dateTime);
+    _repeatClass = existingClass.isRecurring;
+    _repeatEveryWeeksController.text = existingClass.recurrenceIntervalWeeks
+        .toString();
+    _occurrenceCountController.text = existingClass.recurrenceCount.toString();
   }
 
   @override
@@ -72,8 +79,16 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     _locationController.dispose();
     _capacityController.dispose();
     _durationController.dispose();
+    _repeatEveryWeeksController.dispose();
+    _occurrenceCountController.dispose();
     super.dispose();
   }
+
+  int get _repeatEveryWeeks =>
+      int.tryParse(_repeatEveryWeeksController.text.trim()) ?? 1;
+
+  int get _occurrenceCount =>
+      int.tryParse(_occurrenceCountController.text.trim()) ?? 1;
 
   Future<void> _pickDate() async {
     final today = DateTime.now();
@@ -159,6 +174,10 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     final filled = existingClass == null
         ? 0
         : existingClass.filled.clamp(0, capacity);
+    final occurrenceCount = !_isEditing && _repeatClass ? _occurrenceCount : 1;
+    final repeatEveryWeeks = !_isEditing && _repeatClass
+        ? _repeatEveryWeeks
+        : 1;
 
     final classToSave = GymClass(
       id: existingClass?.id ?? '',
@@ -171,13 +190,24 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       location: _locationController.text.trim(),
       capacity: capacity,
       filled: filled,
+      recurrenceSeriesId: existingClass?.recurrenceSeriesId,
+      recurrenceCount: existingClass?.recurrenceCount ?? occurrenceCount,
+      recurrenceIntervalWeeks:
+          existingClass?.recurrenceIntervalWeeks ?? repeatEveryWeeks,
+      recurrenceIndex: existingClass?.recurrenceIndex ?? 0,
     );
 
     try {
       if (_isEditing) {
         await ref.read(providerGymClass).updateClass(classToSave);
       } else {
-        await ref.read(providerGymClass).addClass(classToSave);
+        await ref
+            .read(providerGymClass)
+            .addClass(
+              classToSave,
+              occurrenceCount: occurrenceCount,
+              repeatEveryWeeks: repeatEveryWeeks,
+            );
       }
       if (!mounted) return;
       Navigator.of(context).pop();
@@ -197,6 +227,13 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     final selectedDateTime = _selectedDateTime;
     final endDateTime = _selectedEndDateTime;
     final isScheduleValid = _isScheduleSelectionValid();
+    final repeatEveryWeeks = _repeatEveryWeeks;
+    final occurrenceCount = _occurrenceCount;
+    final recurrenceSummary = occurrenceCount > 1
+        ? (repeatEveryWeeks == 1
+              ? 'Repeats weekly for $occurrenceCount sessions.'
+              : 'Repeats every $repeatEveryWeeks weeks for $occurrenceCount sessions.')
+        : 'Single occurrence only.';
 
     return Scaffold(
       appBar: AppBar(
@@ -441,6 +478,152 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                           ],
                         ),
                       ),
+                    ],
+                  ),
+                ),
+                const SizedBox(height: 16),
+                Container(
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(20),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(
+                            Icons.repeat_rounded,
+                            color: colorScheme.primary,
+                          ),
+                          const SizedBox(width: 12),
+                          Expanded(
+                            child: Text(
+                              'Repeat Schedule',
+                              style: textTheme.titleMedium?.copyWith(
+                                fontWeight: FontWeight.w800,
+                                color: colorScheme.onSurface,
+                              ),
+                            ),
+                          ),
+                          Switch.adaptive(
+                            value: _repeatClass,
+                            onChanged: _isEditing
+                                ? null
+                                : (value) {
+                                    setState(() {
+                                      _repeatClass = value;
+                                      if (value && _occurrenceCount < 2) {
+                                        _occurrenceCountController.text = '4';
+                                      }
+                                    });
+                                  },
+                          ),
+                        ],
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        _isEditing && widget.existingClass?.isRecurring == true
+                            ? 'This class belongs to a recurring series. Saving changes here updates only this occurrence.'
+                            : 'Create repeating weekly sessions while keeping each occurrence bookable on its own.',
+                        style: textTheme.bodyMedium?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.4,
+                        ),
+                      ),
+                      if (!_isEditing && _repeatClass) ...[
+                        const SizedBox(height: 16),
+                        LayoutBuilder(
+                          builder: (context, constraints) {
+                            final useVerticalLayout =
+                                constraints.maxWidth < 460;
+
+                            final repeatEveryField = TextFormField(
+                              controller: _repeatEveryWeeksController,
+                              decoration: const InputDecoration(
+                                labelText: 'Repeat (weeks)',
+                                prefixIcon: Icon(Icons.repeat_one_rounded),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (!_repeatClass) {
+                                  return null;
+                                }
+                                return _validatePositiveNumber(
+                                  value,
+                                  emptyMessage: 'Enter repeat interval',
+                                  invalidMessage:
+                                      'Repeat interval must be at least 1 week',
+                                  minValue: 1,
+                                );
+                              },
+                            );
+
+                            final totalSessionsField = TextFormField(
+                              controller: _occurrenceCountController,
+                              decoration: const InputDecoration(
+                                labelText: 'Sessions',
+                                prefixIcon: Icon(Icons.event_repeat_rounded),
+                              ),
+                              onChanged: (_) => setState(() {}),
+                              keyboardType: TextInputType.number,
+                              validator: (value) {
+                                if (!_repeatClass) {
+                                  return null;
+                                }
+                                return _validatePositiveNumber(
+                                  value,
+                                  emptyMessage: 'Enter total sessions',
+                                  invalidMessage:
+                                      'Series must include at least 2 sessions',
+                                  minValue: 2,
+                                );
+                              },
+                            );
+
+                            if (useVerticalLayout) {
+                              return Column(
+                                children: [
+                                  repeatEveryField,
+                                  const SizedBox(height: 12),
+                                  totalSessionsField,
+                                ],
+                              );
+                            }
+
+                            return Row(
+                              children: [
+                                Expanded(child: repeatEveryField),
+                                const SizedBox(width: 16),
+                                Expanded(child: totalSessionsField),
+                              ],
+                            );
+                          },
+                        ),
+                        const SizedBox(height: 12),
+                        Text(
+                          recurrenceSummary,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ] else if (_isEditing &&
+                          widget.existingClass?.isRecurring == true) ...[
+                        const SizedBox(height: 12),
+                        Text(
+                          widget.existingClass!.recurrenceSummary,
+                          style: textTheme.bodySmall?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            height: 1.4,
+                            fontWeight: FontWeight.w600,
+                          ),
+                        ),
+                      ],
                     ],
                   ),
                 ),
