@@ -264,8 +264,7 @@ class DBReservations {
         );
 
         final existingData =
-            existingRegistration.data() as Map<String, dynamic>? ??
-            <String, dynamic>{};
+            existingRegistration.data() ?? <String, dynamic>{};
         return existingData['matNumber']?.toString();
       }
 
@@ -422,6 +421,48 @@ class DBReservations {
 
   static Stream<bool> isUserInStandby(String userId, String classId) {
     return _standbyQueueRef(classId, userId).snapshots().map((doc) => doc.exists);
+  }
+
+  static Stream<int?> getStandbyQueuePositionStream(
+    String classId,
+    String userId,
+  ) {
+    if (userId.trim().isEmpty) {
+      return Stream<int?>.value(null);
+    }
+
+    return _getStandbyQueueCollection(classId)
+        .orderBy('createdAt')
+        .snapshots()
+        .map((snapshot) {
+          for (var index = 0; index < snapshot.docs.length; index++) {
+            if (snapshot.docs[index].id == userId) {
+              return index + 1;
+            }
+          }
+          return null;
+        });
+  }
+
+  static Stream<Set<String>> getStandbyClassIdsStream(String userId) {
+    if (userId.trim().isEmpty) {
+      return Stream<Set<String>>.value(const <String>{});
+    }
+
+    return _db
+        .collectionGroup(_standbyQueueCollection)
+        .where(FieldPath.documentId, isEqualTo: userId)
+        .snapshots()
+        .map((snapshot) {
+          final classIds = <String>{};
+          for (final doc in snapshot.docs) {
+            final classId = doc.reference.parent.parent?.id;
+            if (classId != null && classId.trim().isNotEmpty) {
+              classIds.add(classId);
+            }
+          }
+          return classIds;
+        });
   }
 
   static Stream<Set<int>> getReservedMatNumbersStream(String classId) {
@@ -933,8 +974,7 @@ class DBReservations {
       final userRegistrationSnap = await transaction.get(userRegistrationRef);
       if (userRegistrationSnap.exists) {
         final existingData =
-            userRegistrationSnap.data() as Map<String, dynamic>? ??
-            <String, dynamic>{};
+            userRegistrationSnap.data() ?? <String, dynamic>{};
         return existingData['matNumber']?.toString() ?? reservedMatNumber;
       }
 

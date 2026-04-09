@@ -305,6 +305,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                   status: c.status,
                                   filled: c.filled,
                                   capacity: c.capacity,
+                                  standbyCount: c.standbyCount,
                                   onTap: () => context.push(
                                     ClassDetailScreen.routeName,
                                     extra: c.id,
@@ -544,6 +545,7 @@ class ClassCard extends StatelessWidget {
   final model.ClassStatus status;
   final int filled;
   final int capacity;
+  final int standbyCount;
   final VoidCallback? onTap;
 
   const ClassCard({
@@ -557,6 +559,7 @@ class ClassCard extends StatelessWidget {
     required this.status,
     required this.filled,
     required this.capacity,
+    required this.standbyCount,
     this.onTap,
   });
 
@@ -570,9 +573,11 @@ class ClassCard extends StatelessWidget {
       stream: DBReservations.getReservationCountForClassStream(classId),
       builder: (context, snapshot) {
         final liveFilled = snapshot.data ?? filled;
-        final liveStatus = liveFilled >= capacity
-            ? model.ClassStatus.full
-            : model.ClassStatus.open;
+        final liveStatus = _availabilityStatus(
+          filled: liveFilled,
+          capacity: capacity,
+          standbyCount: standbyCount,
+        );
         final statusUi = _statusUi(liveStatus);
         final progress = capacity == 0
             ? 0.0
@@ -682,9 +687,11 @@ class ClassCard extends StatelessWidget {
                             minHeight: 10,
                             backgroundColor: colorScheme.outlineVariant,
                             valueColor: AlwaysStoppedAnimation<Color>(
-                              liveStatus == model.ClassStatus.full
-                                  ? colorScheme.error
-                                  : colorScheme.primary,
+                              liveStatus == model.ClassStatus.open
+                                  ? colorScheme.primary
+                                  : liveStatus == model.ClassStatus.standby
+                                  ? AppColors.warning
+                                  : colorScheme.error,
                             ),
                           ),
                         ),
@@ -722,6 +729,19 @@ class ClassCard extends StatelessWidget {
         return const _StatusStyle('Standby', standby);
     }
   }
+}
+
+model.ClassStatus _availabilityStatus({
+  required int filled,
+  required int capacity,
+  required int standbyCount,
+}) {
+  if (filled >= capacity) {
+    return standbyCount > 0
+        ? model.ClassStatus.standby
+        : model.ClassStatus.full;
+  }
+  return model.ClassStatus.open;
 }
 
 class _StatusStyle {

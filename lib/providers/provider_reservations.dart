@@ -74,6 +74,29 @@ class ReservationsNotifier extends ChangeNotifier {
     );
   }
 
+  Stream<int?> standbyQueuePositionStream(String classId) {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) {
+      return Stream<int?>.value(null);
+    }
+
+    return DBReservations.getStandbyQueuePositionStream(classId, user.uid);
+  }
+
+  Future<void> joinStandbyQueue(GymClass gymClass) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await DBReservations.joinStandbyQueue(user.uid, gymClass);
+  }
+
+  Future<void> leaveStandbyQueue(String classId) async {
+    final user = FirebaseAuth.instance.currentUser;
+    if (user == null) return;
+
+    await DBReservations.leaveStandbyQueue(user.uid, classId);
+  }
+
   Future<void> cancelReservation(Reservation reservation) async {
     final user = FirebaseAuth.instance.currentUser;
     if (user == null || reservation.id == null) return;

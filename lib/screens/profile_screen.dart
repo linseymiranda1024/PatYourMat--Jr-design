@@ -6,6 +6,8 @@ import 'package:pat_your_mat/main.dart';
 import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../models/achievement.dart';
+import '../db_helpers/db_gym_class.dart';
+import '../db_helpers/db_reservations.dart';
 import '../models/gym_class.dart';
 import '../models/reservation.dart';
 import '../providers/provider_auth.dart';
@@ -119,6 +121,13 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
               _buildFavoritesSection(context, profile, gymClasses),
               const SizedBox(height: 20),
               _buildAchievementsSection(context, profile),
+              const SizedBox(height: 20),
+              _buildStandbyQueueSection(
+                context: context,
+                ref: ref,
+                profile: profile,
+                gymClasses: gymClasses,
+              ),
               const SizedBox(height: 20),
               _buildUpcomingReservationsSection(
                 context,
@@ -845,6 +854,81 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildStandbyQueueSection({
+    required BuildContext context,
+    required WidgetRef ref,
+    required ProviderUserProfile profile,
+    required List<GymClass> gymClasses,
+  }) {
+    final currentUserId = ref.read(reservationsProvider).userId ?? profile.uid;
+
+    return StreamBuilder<Set<String>>(
+      stream: DBReservations.getStandbyClassIdsStream(currentUserId),
+      initialData: const <String>{},
+      builder: (context, snapshot) {
+        final standbyClassIds = snapshot.data ?? const <String>{};
+        final classesById = <String, GymClass>{
+          for (final gymClass in gymClasses) gymClass.id: gymClass,
+        };
+        final standbyClassIdsList = standbyClassIds.toList()
+          ..sort((left, right) {
+            final leftClass = classesById[left];
+            final rightClass = classesById[right];
+            if (leftClass != null && rightClass != null) {
+              return leftClass.dateTime.compareTo(rightClass.dateTime);
+            }
+            if (leftClass != null) {
+              return -1;
+            }
+            if (rightClass != null) {
+              return 1;
+            }
+            return left.compareTo(right);
+          });
+
+        return _buildSectionCard(
+          context: context,
+          title: 'Standby Queue',
+          subtitle: 'Classes you are currently queued for when mats open up.',
+          child: standbyClassIds.isEmpty
+              ? Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(20),
+                  decoration: BoxDecoration(
+                    color: Theme.of(context).colorScheme.surfaceContainer,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(
+                      color: Theme.of(context).colorScheme.outlineVariant,
+                    ),
+                  ),
+                  child: Text(
+                    'You are not on standby for any classes right now.',
+                    style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                      height: 1.45,
+                      color: Theme.of(context).colorScheme.onSurfaceVariant,
+                    ),
+                  ),
+                )
+              : Column(
+                  children: standbyClassIdsList
+                      .map(
+                        (classId) => Padding(
+                          padding: const EdgeInsets.only(bottom: 12),
+                          child: _buildStandbyClassCardForId(
+                            context,
+                            ref,
+                            classId,
+                            initialGymClass: classesById[classId],
+                          ),
+                        ),
+                      )
+                      .toList(),
+                ),
+        );
+      },
+    );
+  }
+
   Widget _buildPreviousClassesSection(
     BuildContext context,
     List<Reservation> reservations,
@@ -1017,6 +1101,193 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           ],
         ],
       ),
+    );
+  }
+
+  Widget _buildStandbyClassCardForId(
+    BuildContext context,
+    WidgetRef ref,
+    String classId, {
+    GymClass? initialGymClass,
+  }) {
+    return StreamBuilder<GymClass?>(
+      stream: DBGymClass.getClassStream(classId),
+      initialData: initialGymClass,
+      builder: (context, snapshot) {
+        final gymClass = snapshot.data;
+        if (gymClass == null) {
+          return Container(
+            padding: const EdgeInsets.all(18),
+            decoration: BoxDecoration(
+              color: Theme.of(context).colorScheme.surfaceContainer,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(
+                color: Theme.of(context).colorScheme.outlineVariant,
+              ),
+            ),
+            child: Text(
+              'This standby class is no longer available.',
+              style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                color: Theme.of(context).colorScheme.onSurfaceVariant,
+              ),
+            ),
+          );
+        }
+
+        return _buildStandbyClassCard(context, ref, gymClass);
+      },
+    );
+  }
+
+  Widget _buildStandbyClassCard(
+    BuildContext context,
+    WidgetRef ref,
+    GymClass gymClass,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return StreamBuilder<int?>(
+      stream: ref
+          .read(reservationsProvider)
+          .standbyQueuePositionStream(gymClass.id),
+      builder: (context, snapshot) {
+        final queuePosition = snapshot.data;
+
+        return Container(
+          padding: const EdgeInsets.all(18),
+          decoration: BoxDecoration(
+            color: colorScheme.surfaceContainer,
+            borderRadius: BorderRadius.circular(18),
+            border: Border.all(color: colorScheme.outlineVariant),
+          ),
+          child: Column(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          gymClass.title,
+                          style: textTheme.titleMedium?.copyWith(
+                            fontSize: 17,
+                            fontWeight: FontWeight.w800,
+                            color: colorScheme.onSurface,
+                          ),
+                        ),
+                        const SizedBox(height: 4),
+                        Text(
+                          gymClass.instructor,
+                          style: textTheme.bodyMedium?.copyWith(
+                            color: colorScheme.onSurfaceVariant,
+                            fontWeight: FontWeight.w500,
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+                  Container(
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 10,
+                      vertical: 6,
+                    ),
+                    decoration: BoxDecoration(
+                      color: AppColors.warning.withValues(
+                        alpha: Theme.of(context).brightness == Brightness.dark
+                            ? 0.24
+                            : 0.14,
+                      ),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                    child: Text(
+                      'STANDBY',
+                      style: textTheme.labelSmall?.copyWith(
+                        fontSize: 12,
+                        fontWeight: FontWeight.w700,
+                        color: AppColors.warning,
+                      ),
+                    ),
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Wrap(
+                spacing: 18,
+                runSpacing: 8,
+                children: [
+                  _buildInfoPill(
+                    context,
+                    Icons.schedule,
+                    '${gymClass.dateText} at ${gymClass.timeText}',
+                  ),
+                  _buildInfoPill(
+                    context,
+                    Icons.format_list_numbered_rounded,
+                    queuePosition == null
+                        ? 'Position updating...'
+                        : 'Position #$queuePosition',
+                  ),
+                ],
+              ),
+              const SizedBox(height: 14),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.end,
+                children: [
+                  TextButton(
+                    onPressed: () async {
+                      try {
+                        await ref
+                            .read(reservationsProvider)
+                            .leaveStandbyQueue(gymClass.id);
+                        if (!context.mounted) return;
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          const SnackBar(
+                            content: Text('Left standby queue'),
+                          ),
+                        );
+                      } catch (error) {
+                        if (!context.mounted) return;
+                        var message = error.toString();
+                        if (message.startsWith('Exception: ')) {
+                          message = message.replaceFirst('Exception: ', '');
+                        }
+                        ScaffoldMessenger.of(context).showSnackBar(
+                          SnackBar(
+                            content: Text(
+                              'Failed to leave standby queue: $message',
+                            ),
+                          ),
+                        );
+                      }
+                    },
+                    style: TextButton.styleFrom(
+                      foregroundColor: colorScheme.error,
+                    ),
+                    child: const Text(
+                      'Leave Queue',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                  TextButton(
+                    onPressed: () => context.push(
+                      ClassDetailScreen.routeName,
+                      extra: gymClass.id,
+                    ),
+                    child: const Text(
+                      'View Class',
+                      style: TextStyle(fontWeight: FontWeight.w700),
+                    ),
+                  ),
+                ],
+              ),
+            ],
+          ),
+        );
+      },
     );
   }
 

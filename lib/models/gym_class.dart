@@ -191,7 +191,10 @@ class GymClass {
   }
 
   ClassStatus get status {
-    return filled >= capacity ? ClassStatus.full : ClassStatus.open;
+    if (filled >= capacity) {
+      return standbyCount > 0 ? ClassStatus.standby : ClassStatus.full;
+    }
+    return ClassStatus.open;
   }
 
   bool get isRecurring => recurrenceCount > 1;

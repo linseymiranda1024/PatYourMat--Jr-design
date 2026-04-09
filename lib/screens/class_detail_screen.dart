@@ -79,10 +79,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await DBReservations.joinStandbyQueue(
-        ref.read(reservationsProvider).userId ?? '',
-        gClass,
-      );
+      await ref.read(reservationsProvider).joinStandbyQueue(gClass);
       if (mounted) {
         ScaffoldMessenger.of(context).showSnackBar(
           const SnackBar(content: Text('Joined standby queue successfully!')),
@@ -109,10 +106,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
     setState(() => _isLoading = true);
 
     try {
-      await DBReservations.leaveStandbyQueue(
-        ref.read(reservationsProvider).userId ?? '',
-        gClass.id,
-      );
+      await ref.read(reservationsProvider).leaveStandbyQueue(gClass.id);
       if (mounted) {
         ScaffoldMessenger.of(
           context,
@@ -180,8 +174,12 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
           stream: DBReservations.getReservationCountForClassStream(gClass.id),
           builder: (context, countSnapshot) {
             final liveFilled = countSnapshot.data ?? gClass.filled;
-            final isFull = liveFilled >= gClass.capacity;
-            final liveStatus = isFull ? ClassStatus.full : ClassStatus.open;
+            final liveStatus = _classAvailabilityStatus(
+              filled: liveFilled,
+              capacity: gClass.capacity,
+              standbyCount: gClass.standbyCount,
+            );
+            final isFull = liveStatus != ClassStatus.open;
             final spotsLeft = (gClass.capacity - liveFilled).clamp(
               0,
               gClass.capacity,
@@ -190,18 +188,33 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                 ? 0.0
                 : (liveFilled / gClass.capacity).clamp(0.0, 1.0);
 
-            return StreamBuilder<bool>(
-              stream: DBReservations.isUserInStandby(
-                ref.read(reservationsProvider).userId ?? '',
-                gClass.id,
-              ),
-              builder: (context, standbySnapshot) {
-                final isInStandby = standbySnapshot.data ?? false;
+            return StreamBuilder<int?>(
+              stream: ref
+                  .read(reservationsProvider)
+                  .standbyQueuePositionStream(gClass.id),
+              builder: (context, queueSnapshot) {
+                final queuePosition = queueSnapshot.data;
+                final isQueued = queuePosition != null;
+                final statusHeadline = isRegistered
+                    ? (statusPresentation.headline ?? 'You are registered')
+                    : isQueued
+                    ? 'Standby Position #$queuePosition'
+                    : '$spotsLeft Spots Left';
+                final statusLabel = isRegistered
+                    ? statusPresentation.label
+                    : isQueued
+                    ? 'STANDBY'
+                    : _classStatusLabel(liveStatus);
+                final statusColor = isRegistered
+                    ? statusPresentation.color
+                    : _availabilityAccent(liveStatus);
+                final statusBackgroundColor = isRegistered
+                    ? statusPresentation.backgroundColor
+                    : statusColor.withValues(alpha: isDark ? 0.24 : 0.14);
 
                 return Scaffold(
                   body: Stack(
                     children: [
-                      // Purple gradient header background
                       Container(
                         height: 220,
                         decoration: const BoxDecoration(
@@ -215,11 +228,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                           ),
                         ),
                       ),
-
                       SafeArea(
                         child: Column(
                           children: [
-                            // Back button + title
                             Padding(
                               padding: const EdgeInsets.symmetric(
                                 horizontal: 8,
@@ -265,13 +276,11 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 ],
                               ),
                             ),
-
-                            // White content area
                             Expanded(
                               child: Container(
                                 decoration: BoxDecoration(
                                   color: colorScheme.surface,
-                                  borderRadius: BorderRadius.vertical(
+                                  borderRadius: const BorderRadius.vertical(
                                     top: Radius.circular(32),
                                   ),
                                 ),
@@ -286,7 +295,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                     crossAxisAlignment:
                                         CrossAxisAlignment.start,
                                     children: [
-                                      // ── Class Status ────────────────────────────────────────
                                       Text(
                                         'Class Status',
                                         style: textTheme.titleMedium?.copyWith(
@@ -296,64 +304,38 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-
                                       Row(
                                         mainAxisAlignment:
                                             MainAxisAlignment.spaceBetween,
                                         children: [
-                                          Text(
-                                            statusPresentation.headline ??
-                                                '$spotsLeft Spots Left',
-                                            style: textTheme.titleLarge
-                                                ?.copyWith(
-                                                  fontSize: 20,
-                                                  fontWeight: FontWeight.w600,
-                                                  color: colorScheme.onSurface,
-                                                ),
+                                          Expanded(
+                                            child: Text(
+                                              statusHeadline,
+                                              style: textTheme.titleLarge
+                                                  ?.copyWith(
+                                                    fontSize: 20,
+                                                    fontWeight: FontWeight.w600,
+                                                    color:
+                                                        colorScheme.onSurface,
+                                                  ),
+                                            ),
                                           ),
+                                          const SizedBox(width: 12),
                                           Container(
                                             padding: const EdgeInsets.symmetric(
                                               horizontal: 16,
                                               vertical: 6,
                                             ),
                                             decoration: BoxDecoration(
-                                              color: isRegistered
-                                                  ? statusPresentation
-                                                        .backgroundColor
-                                                  : (liveStatus ==
-                                                            ClassStatus.open
-                                                        ? AppColors.success
-                                                              .withValues(
-                                                                alpha: isDark
-                                                                    ? 0.24
-                                                                    : 0.14,
-                                                              )
-                                                        : AppColors.error
-                                                              .withValues(
-                                                                alpha: isDark
-                                                                    ? 0.24
-                                                                    : 0.14,
-                                                              )),
+                                              color: statusBackgroundColor,
                                               borderRadius:
                                                   BorderRadius.circular(20),
                                             ),
                                             child: Text(
-                                              isRegistered
-                                                  ? statusPresentation.label
-                                                  : liveStatus.name
-                                                        .toUpperCase(),
+                                              statusLabel,
                                               style: textTheme.labelMedium
                                                   ?.copyWith(
-                                                    color: isRegistered
-                                                        ? statusPresentation
-                                                              .color
-                                                        : (liveStatus ==
-                                                                  ClassStatus
-                                                                      .open
-                                                              ? AppColors
-                                                                    .success
-                                                              : AppColors
-                                                                    .error),
+                                                    color: statusColor,
                                                     fontWeight: FontWeight.bold,
                                                     fontSize: 14,
                                                   ),
@@ -361,9 +343,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           ),
                                         ],
                                       ),
-
                                       const SizedBox(height: 12),
-
                                       ClipRRect(
                                         borderRadius: BorderRadius.circular(12),
                                         child: LinearProgressIndicator(
@@ -372,13 +352,10 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           backgroundColor:
                                               colorScheme.outlineVariant,
                                           valueColor: AlwaysStoppedAnimation(
-                                            liveStatus == ClassStatus.full
-                                                ? colorScheme.error
-                                                : AppColors.success,
+                                            _availabilityAccent(liveStatus),
                                           ),
                                         ),
                                       ),
-
                                       const SizedBox(height: 8),
                                       Text(
                                         '$liveFilled / ${gClass.capacity} registered',
@@ -387,10 +364,67 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           fontSize: 14,
                                         ),
                                       ),
-
+                                      if (gClass.standbyCount > 0) ...[
+                                        const SizedBox(height: 8),
+                                        Text(
+                                          '${gClass.standbyCount} in standby queue',
+                                          style: textTheme.bodySmall?.copyWith(
+                                            color:
+                                                colorScheme.onSurfaceVariant,
+                                            fontSize: 14,
+                                          ),
+                                        ),
+                                      ],
+                                      if (isQueued) ...[
+                                        const SizedBox(height: 20),
+                                        Container(
+                                          width: double.infinity,
+                                          padding: const EdgeInsets.all(16),
+                                          decoration: BoxDecoration(
+                                            color:
+                                                colorScheme
+                                                    .surfaceContainerHigh,
+                                            borderRadius: BorderRadius.circular(
+                                              20,
+                                            ),
+                                            border: Border.all(
+                                              color:
+                                                  colorScheme.outlineVariant,
+                                            ),
+                                          ),
+                                          child: Text(
+                                            'You are in the standby queue at position #$queuePosition. When a spot opens, the next person in line is promoted automatically.',
+                                            style: textTheme.bodyMedium
+                                                ?.copyWith(
+                                                  color:
+                                                      colorScheme.onSurface,
+                                                  height: 1.4,
+                                                ),
+                                          ),
+                                        ),
+                                        const SizedBox(height: 16),
+                                        Align(
+                                          alignment: Alignment.centerRight,
+                                          child: TextButton(
+                                            onPressed: _isLoading
+                                                ? null
+                                                : () => _leaveStandbyQueue(
+                                                    gClass,
+                                                  ),
+                                            style: TextButton.styleFrom(
+                                              foregroundColor:
+                                                  colorScheme.error,
+                                            ),
+                                            child: const Text(
+                                              'Leave Standby Queue',
+                                              style: TextStyle(
+                                                fontWeight: FontWeight.w700,
+                                              ),
+                                            ),
+                                          ),
+                                        ),
+                                      ],
                                       const SizedBox(height: 32),
-
-                                      // ── Class Information ───────────────────────────────────
                                       Text(
                                         'Class Information',
                                         style: textTheme.titleMedium?.copyWith(
@@ -400,7 +434,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 16),
-
                                       _buildInfoRow(
                                         Icons.category_outlined,
                                         'Type',
@@ -437,10 +470,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           'Repeats',
                                           gClass.recurrenceSummary,
                                         ),
-
                                       const SizedBox(height: 32),
-
-                                      // ── About This Class ────────────────────────────────────
                                       Text(
                                         'About This Class',
                                         style: textTheme.titleMedium?.copyWith(
@@ -450,7 +480,6 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         ),
                                       ),
                                       const SizedBox(height: 12),
-
                                       Text(
                                         gClass.description.trim().isEmpty
                                             ? 'No description provided yet.'
@@ -461,22 +490,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           color: colorScheme.onSurface,
                                         ),
                                       ),
-
                                       const SizedBox(height: 48),
-
-                                      // ── Reserve Button ──────────────────────────────────────
                                       SizedBox(
                                         width: double.infinity,
                                         height: 56,
                                         child: ElevatedButton(
                                           onPressed:
-                                              (_isLoading || isRegistered)
+                                              (_isLoading ||
+                                                  isRegistered ||
+                                                  isQueued ||
+                                                  isFull)
                                               ? null
-                                              : (isFull && !isInStandby)
-                                              ? () => _joinStandbyQueue(gClass)
-                                              : (!isFull)
-                                              ? () => _registerForClass(gClass)
-                                              : null,
+                                              : () => _registerForClass(gClass),
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor:
                                                 colorScheme.primary,
@@ -495,10 +520,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                               : Text(
                                                   isRegistered
                                                       ? 'Registered'
-                                                      : isInStandby
-                                                      ? "You're on Standby"
-                                                      : isFull
-                                                      ? 'Join Standby Queue'
+                                                      : isQueued
+                                                      ? 'In Standby Queue'
                                                       : 'Reserve Your Spot',
                                                   style: const TextStyle(
                                                     fontSize: 18,
@@ -507,35 +530,45 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                                 ),
                                         ),
                                       ),
-                                      if (isInStandby) ...[
-                                        const SizedBox(height: 14),
+                                      const SizedBox(height: 14),
+                                      if (isFull && !isRegistered) ...[
                                         SizedBox(
                                           width: double.infinity,
                                           height: 54,
-                                          child: OutlinedButton(
+                                          child: OutlinedButton.icon(
                                             onPressed: _isLoading
                                                 ? null
-                                                : () => _leaveStandbyQueue(
-                                                    gClass,
-                                                  ),
+                                                : isQueued
+                                                ? () =>
+                                                    _leaveStandbyQueue(gClass)
+                                                : () =>
+                                                    _joinStandbyQueue(gClass),
+                                            icon: Icon(
+                                              isQueued
+                                                  ? Icons.exit_to_app_rounded
+                                                  : Icons
+                                                        .playlist_add_rounded,
+                                            ),
+                                            label: Text(
+                                              isQueued
+                                                  ? 'Leave Standby Queue'
+                                                  : 'Join Standby Queue',
+                                            ),
                                             style: OutlinedButton.styleFrom(
                                               foregroundColor:
-                                                  colorScheme.error,
+                                                  colorScheme.primary,
                                               side: BorderSide(
-                                                color: colorScheme.error,
+                                                color: colorScheme.primary,
                                               ),
                                               shape: RoundedRectangleBorder(
                                                 borderRadius:
                                                     BorderRadius.circular(28),
                                               ),
                                             ),
-                                            child: const Text(
-                                              'Leave Standby Queue',
-                                            ),
                                           ),
                                         ),
+                                        const SizedBox(height: 14),
                                       ],
-                                      const SizedBox(height: 14),
                                       SizedBox(
                                         width: double.infinity,
                                         height: 54,
@@ -544,7 +577,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                               (_isLoading ||
                                                   isRegistered ||
                                                   isFull ||
-                                                  isInStandby)
+                                                  isQueued)
                                               ? null
                                               : () {
                                                   if (liveFilled >=
@@ -706,5 +739,38 @@ _ReservationStatusPresentation _statusPresentationForReservation(
 }
 
 String gClassStatusLabel(GymClass gymClass) {
-  return gymClass.status.name.toUpperCase();
+  return _classStatusLabel(gymClass.status);
+}
+
+ClassStatus _classAvailabilityStatus({
+  required int filled,
+  required int capacity,
+  required int standbyCount,
+}) {
+  if (filled >= capacity) {
+    return standbyCount > 0 ? ClassStatus.standby : ClassStatus.full;
+  }
+  return ClassStatus.open;
+}
+
+String _classStatusLabel(ClassStatus status) {
+  switch (status) {
+    case ClassStatus.open:
+      return 'OPEN';
+    case ClassStatus.full:
+      return 'FULL';
+    case ClassStatus.standby:
+      return 'STANDBY';
+  }
+}
+
+Color _availabilityAccent(ClassStatus status) {
+  switch (status) {
+    case ClassStatus.open:
+      return AppColors.success;
+    case ClassStatus.full:
+      return AppColors.error;
+    case ClassStatus.standby:
+      return AppColors.warning;
+  }
 }
