@@ -17,7 +17,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
   final Set<String> _pendingFollowUids = <String>{};
+  final Set<String> _pendingUnfriendUids = <String>{};
   final Set<String> _optimisticFriendUids = <String>{};
+  final Set<String> _optimisticRemovedFriendUids = <String>{};
 
   @override
   void dispose() {
@@ -168,6 +170,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                             ...friendIds,
                             ..._optimisticFriendUids,
                           };
+                          combinedFriendIds.removeAll(
+                            _optimisticRemovedFriendUids,
+                          );
 
                           final friendUsers = filteredUsers
                               .where((user) => combinedFriendIds.contains(user.uid))
@@ -198,6 +203,18 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                                       user: user,
                                       isFriend: true,
                                       onTap: () => _openFriendProfile(user),
+                                      onUnfriend: _pendingUnfriendUids.contains(
+                                        user.uid,
+                                      )
+                                          ? null
+                                          : () => _handleUnfriendTap(
+                                              currentUid: currentUid,
+                                              targetUser: user,
+                                            ),
+                                      unfriendPending:
+                                          _pendingUnfriendUids.contains(
+                                            user.uid,
+                                          ),
                                     ),
                                   ),
                                 ),
@@ -291,6 +308,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       );
       if (!mounted) return;
       setState(() => _optimisticFriendUids.add(targetUser.uid));
+      setState(() => _optimisticRemovedFriendUids.remove(targetUser.uid));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('${targetUser.firstName} added to friends.'),
@@ -308,6 +326,73 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     } finally {
       if (mounted) {
         setState(() => _pendingFollowUids.remove(targetUser.uid));
+      }
+    }
+  }
+
+  Future<void> _handleUnfriendTap({
+    required String currentUid,
+    required _FriendEntry targetUser,
+  }) async {
+    if (_pendingUnfriendUids.contains(targetUser.uid)) {
+      return;
+    }
+
+    final shouldRemove = await showDialog<bool>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: const Text('Remove friend?'),
+          content: Text(
+            'Remove ${targetUser.wholeName.isEmpty ? 'this friend' : targetUser.wholeName} from your friends list?',
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: const Text('Cancel'),
+            ),
+            FilledButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              child: const Text('Unfriend'),
+            ),
+          ],
+        );
+      },
+    );
+    if (shouldRemove != true || !mounted) {
+      return;
+    }
+
+    setState(() => _pendingUnfriendUids.add(targetUser.uid));
+    try {
+      await DBFriends.removeFriend(
+        currentUid: currentUid,
+        friendUid: targetUser.uid,
+      );
+      if (!mounted) return;
+      setState(() {
+        _optimisticFriendUids.remove(targetUser.uid);
+        _optimisticRemovedFriendUids.add(targetUser.uid);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text(
+            '${targetUser.wholeName.isEmpty ? 'Friend' : targetUser.wholeName} removed.',
+          ),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      var message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text(message)),
+      );
+    } finally {
+      if (mounted) {
+        setState(() => _pendingUnfriendUids.remove(targetUser.uid));
       }
     }
   }
@@ -376,7 +461,9 @@ class _FriendCard extends StatelessWidget {
   final String actionLabel;
   final VoidCallback? onTap;
   final VoidCallback? onFollow;
+  final VoidCallback? onUnfriend;
   final bool followPending;
+  final bool unfriendPending;
 
   const _FriendCard({
     required this.user,
@@ -384,7 +471,9 @@ class _FriendCard extends StatelessWidget {
     this.actionLabel = 'Follow',
     this.onTap,
     this.onFollow,
+    this.onUnfriend,
     this.followPending = false,
+    this.unfriendPending = false,
   });
 
   @override
@@ -463,7 +552,26 @@ class _FriendCard extends StatelessWidget {
               ),
               const SizedBox(width: 10),
               isFriend
-                  ? const _Pill(label: 'Friend')
+                  ? Row(
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        const _Pill(label: 'Friend'),
+                        const SizedBox(width: 8),
+                        IconButton(
+                          tooltip: 'Unfriend',
+                          onPressed: unfriendPending ? null : onUnfriend,
+                          icon: unfriendPending
+                              ? const SizedBox(
+                                  width: 16,
+                                  height: 16,
+                                  child: CircularProgressIndicator(
+                                    strokeWidth: 2,
+                                  ),
+                                )
+                              : const Icon(Icons.person_remove_outlined),
+                        ),
+                      ],
+                    )
                   : FilledButton(
                       onPressed: followPending ? null : onFollow,
                       style: FilledButton.styleFrom(

@@ -540,20 +540,17 @@ class DBReservations {
     return _classRef(classId).snapshots().map((doc) {
       final classData = doc.data() ?? <String, dynamic>{};
       final roster = classData[_rosterField];
-      if (roster is Map && roster.isNotEmpty) {
-        return roster.length;
-      }
-
+      final rosterCount = roster is Map ? roster.length : 0;
       final reservedMats = classData['reservedMats'];
-      if (reservedMats is List) {
-        return reservedMats
-            .map((value) => value.toString().trim())
-            .where((value) => value.isNotEmpty)
-            .toSet()
-            .length;
-      }
-
-      return _asInt(classData['filled'] ?? classData['registeredCount']);
+      final reservedMatCount = reservedMats is List
+          ? reservedMats
+                .map((value) => value.toString().trim())
+                .where((value) => value.isNotEmpty)
+                .toSet()
+                .length
+          : 0;
+      final persistedCount = _asInt(classData['filled'] ?? classData['registeredCount']);
+      return max(rosterCount, max(reservedMatCount, persistedCount));
     });
   }
 

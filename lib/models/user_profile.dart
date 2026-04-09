@@ -40,6 +40,7 @@ class UserProfile {
   String _phoneNumber = "";
   String _bio = "";
   List<String> _achievements = [];
+  List<String> _favoriteClassIds = [];
   Map<String, int> _categoryAttendance = {};
   List<String> _specialties = [];
   int _yearsTeaching = 0;
@@ -69,6 +70,7 @@ class UserProfile {
     this._phoneNumber,
     this._bio,
     this._achievements,
+    this._favoriteClassIds,
     this._categoryAttendance,
     this._specialties,
     this._yearsTeaching,
@@ -93,6 +95,7 @@ class UserProfile {
     _phoneNumber = "";
     _bio = "";
     _achievements = [];
+    _favoriteClassIds = [];
     _categoryAttendance = {};
     _specialties = [];
     _yearsTeaching = 0;
@@ -122,6 +125,9 @@ class UserProfile {
     phoneNumber = jsonObject["phone_number"] ?? "";
     bio = jsonObject["bio"] ?? "";
     achievements = List<String>.from(jsonObject["achievements"] ?? const []);
+    favoriteClassIds = List<String>.from(
+      jsonObject["favorite_class_ids"] ?? const [],
+    );
     categoryAttendance = _parseCategoryAttendance(
       jsonObject["category_attendance"] ?? jsonObject["categoryAttendance"],
     );
@@ -162,6 +168,7 @@ class UserProfile {
   set phoneNumber(String value) => _phoneNumber = value;
   set bio(String value) => _bio = value;
   set achievements(List<String> value) => _achievements = value;
+  set favoriteClassIds(List<String> value) => _favoriteClassIds = value;
   set categoryAttendance(Map<String, int> value) => _categoryAttendance = value;
   set specialties(List<String> value) => _specialties = value;
   set yearsTeaching(int value) => _yearsTeaching = value;
@@ -188,6 +195,7 @@ class UserProfile {
   String get phoneNumber => _phoneNumber;
   String get bio => _bio;
   List<String> get achievements => _achievements;
+  List<String> get favoriteClassIds => _favoriteClassIds;
   Map<String, int> get categoryAttendance => _categoryAttendance;
   List<String> get specialties => _specialties;
   int get yearsTeaching => _yearsTeaching;
@@ -313,6 +321,7 @@ class UserProfile {
     jsonObject["phone_number"] = phoneNumber;
     jsonObject["bio"] = bio;
     jsonObject["achievements"] = achievements;
+    jsonObject["favorite_class_ids"] = favoriteClassIds;
     jsonObject["category_attendance"] = categoryAttendance;
     jsonObject["specialties"] = specialties;
     jsonObject["years_teaching"] = yearsTeaching;

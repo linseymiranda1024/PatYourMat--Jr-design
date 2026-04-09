@@ -237,23 +237,27 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         final textTheme = Theme.of(context).textTheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final matRows = _buildMatRows(gClass.capacity);
-        final isFull = gClass.filled >= gClass.capacity;
+        return StreamBuilder<int>(
+          stream: DBReservations.getReservationCountForClassStream(gClass.id),
+          builder: (context, countSnapshot) {
+            final liveFilled = countSnapshot.data ?? gClass.filled;
+            final isFull = liveFilled >= gClass.capacity;
 
-        return StreamBuilder<bool>(
-          stream: DBReservations.isUserInStandby(
-            ref.read(reservationsProvider).userId ?? '',
-            gClass.id,
-          ),
-          builder: (context, standbySnapshot) {
-            final isInStandby = standbySnapshot.data ?? false;
+            return StreamBuilder<bool>(
+              stream: DBReservations.isUserInStandby(
+                ref.read(reservationsProvider).userId ?? '',
+                gClass.id,
+              ),
+              builder: (context, standbySnapshot) {
+                final isInStandby = standbySnapshot.data ?? false;
 
-            return Scaffold(
-              appBar: AppBar(title: const Text('Choose Your Spot')),
-              body: Container(
-                color: colorScheme.surface,
-                child: SingleChildScrollView(
-                  child: Column(
-                    children: [
+                return Scaffold(
+                  appBar: AppBar(title: const Text('Choose Your Spot')),
+                  body: Container(
+                    color: colorScheme.surface,
+                    child: SingleChildScrollView(
+                      child: Column(
+                        children: [
                       Container(
                         margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                         padding: const EdgeInsets.all(20),
@@ -531,7 +535,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                               _selectedInviteeUids.isNotEmpty)
                                           ? null
                                           : () async {
-                                              if (gClass.filled >=
+                                              if (liveFilled >=
                                                   gClass.capacity) {
                                                 ScaffoldMessenger.of(context)
                                                     .showSnackBar(
@@ -590,7 +594,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                             isInStandby)
                                         ? null
                                         : () async {
-                                            if (gClass.filled >= gClass.capacity) {
+                                            if (liveFilled >= gClass.capacity) {
                                               ScaffoldMessenger.of(context)
                                                   .showSnackBar(
                                                 const SnackBar(
@@ -623,10 +627,12 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                           ),
                         ),
                       ),
-                    ],
+                        ],
+                      ),
+                    ),
                   ),
-                ),
-              ),
+                );
+              },
             );
           },
         );

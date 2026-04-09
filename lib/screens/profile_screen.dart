@@ -7,11 +7,13 @@ import 'package:pat_your_mat/theme/app_colors.dart';
 
 import '../models/achievement.dart';
 import '../models/reservation.dart';
+import '../db_helpers/db_gym_class.dart';
 import '../providers/provider_auth.dart';
 import '../providers/provider_reservations.dart';
 import '../providers/provider_user_profile.dart';
 import '../util/date_time/util_attendance.dart';
 import '../widgets/general/widget_profile_avatar.dart';
+import 'class_detail_screen.dart';
 import 'screen_member_previous_classes.dart';
 import 'settings/screen_profile_edit.dart';
 import 'settings/screen_settings.dart';
@@ -85,6 +87,8 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 reservations: reservations,
                 thisMonthCount: thisMonthCount,
               ),
+              const SizedBox(height: 20),
+              _buildFavoritesSection(context, profile),
               const SizedBox(height: 20),
               _buildAchievementsSection(context, profile),
               const SizedBox(height: 20),
@@ -383,6 +387,106 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 ),
               ],
             ),
+    );
+  }
+
+  Widget _buildFavoritesSection(
+    BuildContext context,
+    ProviderUserProfile profile,
+  ) {
+    final favoriteIds = profile.favoriteClassIds;
+
+    return _buildSectionCard(
+      context: context,
+      title: 'Favorite Classes',
+      subtitle: 'Classes you have marked so you can get back to them quickly.',
+      child: favoriteIds.isEmpty
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(16),
+              decoration: BoxDecoration(
+                color: Theme.of(context).colorScheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(
+                  color: Theme.of(context).colorScheme.outlineVariant,
+                ),
+              ),
+              child: Text(
+                'You have not favorited any classes yet. Tap the heart on a class to save it here.',
+                style: Theme.of(context).textTheme.bodyMedium?.copyWith(
+                  height: 1.4,
+                  color: Theme.of(context).colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : SizedBox(
+              height: 112,
+              child: ListView.separated(
+                scrollDirection: Axis.horizontal,
+                itemCount: favoriteIds.length,
+                separatorBuilder: (context, index) => const SizedBox(width: 12),
+                itemBuilder: (context, index) {
+                  final classId = favoriteIds[index];
+                  return _buildFavoriteClassCard(context, classId);
+                },
+              ),
+            ),
+    );
+  }
+
+  Widget _buildFavoriteClassCard(BuildContext context, String classId) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return StreamBuilder(
+      stream: DBGymClass.getClassStream(classId),
+      builder: (context, snapshot) {
+        final gClass = snapshot.data;
+        if (gClass == null) {
+          return const SizedBox.shrink();
+        }
+
+        return GestureDetector(
+          onTap: () =>
+              context.push(ClassDetailScreen.routeName, extra: classId),
+          child: Container(
+            width: 172,
+            padding: const EdgeInsets.all(14),
+            decoration: BoxDecoration(
+              color: colorScheme.surface,
+              borderRadius: BorderRadius.circular(18),
+              border: Border.all(color: colorScheme.outlineVariant),
+            ),
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Icon(
+                  Icons.favorite,
+                  size: 18,
+                  color: AppColors.error.withValues(alpha: 0.85),
+                ),
+                const Spacer(),
+                Text(
+                  gClass.title,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(
+                    context,
+                  ).textTheme.titleSmall?.copyWith(fontWeight: FontWeight.w800),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  gClass.instructor,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: Theme.of(context).textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        );
+      },
     );
   }
 

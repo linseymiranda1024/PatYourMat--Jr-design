@@ -60,4 +60,33 @@ class DBFriends {
 
     await batch.commit();
   }
+
+  static Future<void> removeFriend({
+    required String currentUid,
+    required String friendUid,
+  }) async {
+    final cleanCurrentUid = currentUid.trim();
+    final cleanFriendUid = friendUid.trim();
+    if (cleanCurrentUid.isEmpty ||
+        cleanFriendUid.isEmpty ||
+        cleanCurrentUid == cleanFriendUid) {
+      throw Exception('Invalid friend.');
+    }
+
+    final currentUserFriendRef = _db
+        .collection(_userProfilesCollection)
+        .doc(cleanCurrentUid)
+        .collection(_friendsSubcollection)
+        .doc(cleanFriendUid);
+    final otherUserFriendRef = _db
+        .collection(_userProfilesCollection)
+        .doc(cleanFriendUid)
+        .collection(_friendsSubcollection)
+        .doc(cleanCurrentUid);
+
+    final batch = _db.batch();
+    batch.delete(currentUserFriendRef);
+    batch.delete(otherUserFriendRef);
+    await batch.commit();
+  }
 }

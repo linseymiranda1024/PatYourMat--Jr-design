@@ -572,7 +572,7 @@ class ClassCard extends StatelessWidget {
         final liveFilled = snapshot.data ?? filled;
         final liveStatus = liveFilled >= capacity
             ? model.ClassStatus.full
-            : status;
+            : model.ClassStatus.open;
         final statusUi = _statusUi(liveStatus);
         final progress = capacity == 0
             ? 0.0

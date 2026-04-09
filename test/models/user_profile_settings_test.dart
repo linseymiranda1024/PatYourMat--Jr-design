@@ -16,6 +16,7 @@ void main() {
     expect(json['standby_alerts_enabled'], isFalse);
     expect(json['dark_mode_enabled'], isTrue);
     expect(json['achievements'], ['starter', 'early_bird']);
+    expect(json['favorite_class_ids'], isEmpty);
     expect(json['category_attendance'], {'Yoga': 3, 'Dance': 1});
   });
 
@@ -28,6 +29,7 @@ void main() {
       'standby_alerts_enabled': false,
       'dark_mode_enabled': true,
       'achievements': ['starter', 'night_owl'],
+      'favorite_class_ids': ['class-1', 'class-2'],
       'category_attendance': {'Yoga': 4, 'Cardio': 2},
     }, 'uid-123');
 
@@ -35,6 +37,7 @@ void main() {
     expect(profile.standbyAlertsEnabled, isFalse);
     expect(profile.darkModeEnabled, isTrue);
     expect(profile.achievements, ['starter', 'night_owl']);
+    expect(profile.favoriteClassIds, ['class-1', 'class-2']);
     expect(profile.categoryAttendance, {'Yoga': 4, 'Cardio': 2});
   });
 }

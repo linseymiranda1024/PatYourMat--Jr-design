@@ -138,12 +138,18 @@ class GymClass {
   }
 
   static int _resolvedFilledCount(Map<String, dynamic> data) {
-    final reservedMatCount = _reservedMatCount(data['reservedMats']);
-    if (reservedMatCount != null) {
-      return reservedMatCount;
+    final rosterCount = _rosterCount(data[_rosterFieldName]);
+    final reservedMatCount = _reservedMatCount(data['reservedMats']) ?? 0;
+    final persistedCount = _asInt(data['filled'] ?? data['registeredCount']);
+    return [rosterCount, reservedMatCount, persistedCount].reduce(maxOf);
+  }
+
+  static int _rosterCount(dynamic rawValue) {
+    if (rawValue is! Map) {
+      return 0;
     }
 
-    return _asInt(data['filled'] ?? data['registeredCount']);
+    return rawValue.length;
   }
 
   static int? _reservedMatCount(dynamic rawValue) {
@@ -157,6 +163,10 @@ class GymClass {
         .toSet()
         .length;
   }
+
+  static int maxOf(int left, int right) => left >= right ? left : right;
+
+  static const String _rosterFieldName = 'roster';
 
   String get dateText {
     // Basic formatting, can be improved with intl package
