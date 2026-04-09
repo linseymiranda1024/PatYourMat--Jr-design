@@ -16,10 +16,13 @@ class FriendsScreen extends ConsumerStatefulWidget {
 class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   final TextEditingController _searchController = TextEditingController();
   String _query = '';
-  final Set<String> _pendingFollowUids = <String>{};
+  final Set<String> _pendingSentRequestUids = <String>{};
   final Set<String> _pendingUnfriendUids = <String>{};
+  final Set<String> _busyRequestUids = <String>{};
   final Set<String> _optimisticFriendUids = <String>{};
   final Set<String> _optimisticRemovedFriendUids = <String>{};
+  final Set<String> _optimisticSentRequestUids = <String>{};
+  final Set<String> _optimisticClearedReceivedRequestUids = <String>{};
 
   @override
   void dispose() {
@@ -93,167 +96,300 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
               ),
             ),
             Expanded(
-              child: StreamBuilder<DocumentSnapshot<Map<String, dynamic>>>(
+              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                 stream: FirebaseFirestore.instance
                     .collection('user_profiles')
                     .doc(currentUid)
+                    .collection('friends')
                     .snapshots(),
-                builder: (context, snapshot) {
-                  if (snapshot.hasError) {
-                    return const _CenteredMessage(
-                      'Unable to load friends right now.',
+                builder: (context, friendsSnapshot) {
+                  if (friendsSnapshot.hasError) {
+                    final err = friendsSnapshot.error;
+                    return _CenteredMessage(
+                      err == null
+                          ? 'Unable to load friends right now.'
+                          : 'Unable to load friends right now.\n$err',
                     );
-                  }
-                  if (snapshot.connectionState == ConnectionState.waiting) {
-                    return const Center(child: CircularProgressIndicator());
                   }
 
                   return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                     stream: FirebaseFirestore.instance
                         .collection('user_profiles')
                         .doc(currentUid)
-                        .collection('friends')
+                        .collection('sent_friend_requests')
                         .snapshots(),
-                    builder: (context, friendsSnapshot) {
-                      if (friendsSnapshot.hasError) {
-                        final err = friendsSnapshot.error;
-                        return _CenteredMessage(
-                          err == null
-                              ? 'Unable to load friends right now.'
-                              : 'Unable to load friends right now.\n$err',
-                        );
-                      }
-                      final friendIds = _extractFriendIdsFromSubcollection(
-                        friendsSnapshot.data?.docs ?? const [],
-                      );
-
+                    builder: (context, sentRequestsSnapshot) {
                       return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
                         stream: FirebaseFirestore.instance
                             .collection('user_profiles')
+                            .doc(currentUid)
+                            .collection('received_friend_requests')
                             .snapshots(),
-                        builder: (context, usersSnapshot) {
-                          if (usersSnapshot.hasError) {
-                            final err = usersSnapshot.error;
-                            return _CenteredMessage(
-                              err == null
-                                  ? 'Unable to load members right now.'
-                                  : 'Unable to load members right now.\n$err',
-                            );
-                          }
-                          if (usersSnapshot.connectionState ==
-                              ConnectionState.waiting) {
-                            return const Center(
-                              child: CircularProgressIndicator(),
-                            );
-                          }
-
-                          final docs = usersSnapshot.data?.docs ?? [];
-                          final allUsers = docs
-                              .where((doc) => doc.id != currentUid)
-                              .map((doc) => _FriendEntry.fromDoc(doc))
-                              .toList();
-
-                          final filteredUsers =
-                              allUsers.where((user) {
-                                if (_query.isEmpty) return true;
-                                final name =
-                                    '${user.firstName} ${user.lastName}'
-                                        .toLowerCase();
-                                return name.contains(_query) ||
-                                    user.email.toLowerCase().contains(_query);
-                              }).toList()
-                                ..sort(
-                                  (a, b) => a.sortKey.compareTo(b.sortKey),
+                        builder: (context, receivedRequestsSnapshot) {
+                          return StreamBuilder<
+                            QuerySnapshot<Map<String, dynamic>>
+                          >(
+                            stream: FirebaseFirestore.instance
+                                .collection('user_profiles')
+                                .snapshots(),
+                            builder: (context, usersSnapshot) {
+                              if (usersSnapshot.hasError) {
+                                final err = usersSnapshot.error;
+                                return _CenteredMessage(
+                                  err == null
+                                      ? 'Unable to load members right now.'
+                                      : 'Unable to load members right now.\n$err',
                                 );
+                              }
+                              if (usersSnapshot.connectionState ==
+                                      ConnectionState.waiting ||
+                                  friendsSnapshot.connectionState ==
+                                      ConnectionState.waiting ||
+                                  sentRequestsSnapshot.connectionState ==
+                                      ConnectionState.waiting ||
+                                  receivedRequestsSnapshot.connectionState ==
+                                      ConnectionState.waiting) {
+                                return const Center(
+                                  child: CircularProgressIndicator(),
+                                );
+                              }
 
-                          final combinedFriendIds = <String>{
-                            ...friendIds,
-                            ..._optimisticFriendUids,
-                          };
-                          combinedFriendIds.removeAll(
-                            _optimisticRemovedFriendUids,
-                          );
+                              final friendIds = _extractUidsFromSubcollection(
+                                friendsSnapshot.data?.docs ?? const [],
+                              );
+                              final sentRequestIds =
+                                  _extractUidsFromSubcollection(
+                                    sentRequestsSnapshot.data?.docs ?? const [],
+                                  );
+                              final receivedRequestIds =
+                                  _extractUidsFromSubcollection(
+                                    receivedRequestsSnapshot.data?.docs ??
+                                        const [],
+                                  );
 
-                          final friendUsers = filteredUsers
-                              .where((user) => combinedFriendIds.contains(user.uid))
-                              .toList();
-                          final otherUsers = filteredUsers
-                              .where((user) => !combinedFriendIds.contains(user.uid))
-                              .toList();
+                              final docs = usersSnapshot.data?.docs ?? [];
+                              final allUsers = docs
+                                  .where((doc) => doc.id != currentUid)
+                                  .map((doc) => _FriendEntry.fromDoc(doc))
+                                  .toList();
 
-                          if (filteredUsers.isEmpty) {
-                            return const _CenteredMessage('No members found.');
-                          }
+                              final filteredUsers =
+                                  allUsers.where((user) {
+                                    if (_query.isEmpty) return true;
+                                    final name =
+                                        '${user.firstName} ${user.lastName}'
+                                            .toLowerCase();
+                                    return name.contains(_query) ||
+                                        user.email.toLowerCase().contains(
+                                          _query,
+                                        );
+                                  }).toList()..sort(
+                                    (a, b) => a.sortKey.compareTo(b.sortKey),
+                                  );
 
-                          return ListView(
-                            padding: const EdgeInsets.fromLTRB(16, 4, 16, 16),
-                            children: [
-                              _SectionHeader(
-                                label: 'Your Friends',
-                                count: friendUsers.length,
-                              ),
-                              const SizedBox(height: 8),
-                              if (friendUsers.isEmpty)
-                                const _InlineHint('No friends found yet.')
-                              else
-                                ...friendUsers.map(
-                                  (user) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: _FriendCard(
-                                      user: user,
-                                      isFriend: true,
-                                      onTap: () => _openFriendProfile(user),
-                                      onUnfriend: _pendingUnfriendUids.contains(
-                                        user.uid,
-                                      )
-                                          ? null
-                                          : () => _handleUnfriendTap(
-                                              currentUid: currentUid,
-                                              targetUser: user,
-                                            ),
-                                      unfriendPending:
-                                          _pendingUnfriendUids.contains(
-                                            user.uid,
-                                          ),
-                                    ),
-                                  ),
+                              final combinedFriendIds = <String>{
+                                ...friendIds,
+                                ..._optimisticFriendUids,
+                              }..removeAll(_optimisticRemovedFriendUids);
+                              final combinedSentRequestIds = <String>{
+                                ...sentRequestIds,
+                                ..._optimisticSentRequestUids,
+                              };
+                              final combinedReceivedRequestIds =
+                                  <String>{...receivedRequestIds}
+                                    ..removeAll(
+                                      _optimisticClearedReceivedRequestUids,
+                                    )
+                                    ..removeAll(combinedFriendIds);
+
+                              final friendUsers = filteredUsers
+                                  .where(
+                                    (user) =>
+                                        combinedFriendIds.contains(user.uid),
+                                  )
+                                  .toList();
+                              final receivedRequestUsers = filteredUsers
+                                  .where(
+                                    (user) => combinedReceivedRequestIds
+                                        .contains(user.uid),
+                                  )
+                                  .toList();
+                              final sentRequestUsers = filteredUsers
+                                  .where(
+                                    (user) =>
+                                        combinedSentRequestIds.contains(
+                                          user.uid,
+                                        ) &&
+                                        !combinedFriendIds.contains(user.uid),
+                                  )
+                                  .toList();
+                              final otherUsers = filteredUsers
+                                  .where(
+                                    (user) =>
+                                        !combinedFriendIds.contains(user.uid) &&
+                                        !combinedSentRequestIds.contains(
+                                          user.uid,
+                                        ) &&
+                                        !combinedReceivedRequestIds.contains(
+                                          user.uid,
+                                        ),
+                                  )
+                                  .toList();
+
+                              if (filteredUsers.isEmpty) {
+                                return const _CenteredMessage(
+                                  'No members found.',
+                                );
+                              }
+
+                              return ListView(
+                                padding: const EdgeInsets.fromLTRB(
+                                  16,
+                                  4,
+                                  16,
+                                  16,
                                 ),
-                              const SizedBox(height: 8),
-                              _SectionHeader(
-                                label: _query.isEmpty
-                                    ? 'All Members'
-                                    : 'Search Results',
-                                count: otherUsers.length,
-                              ),
-                              const SizedBox(height: 8),
-                              if (otherUsers.isEmpty)
-                                const _InlineHint(
-                                  'No additional members match your search.',
-                                )
-                              else
-                                ...otherUsers.map(
-                                  (user) => Padding(
-                                    padding: const EdgeInsets.only(bottom: 10),
-                                    child: _FriendCard(
-                                      user: user,
-                                      onTap: () => _openFriendProfile(user),
-                                      actionLabel: 'Add',
-                                      onFollow: _pendingFollowUids.contains(
-                                        user.uid,
-                                      )
-                                          ? null
-                                          : () => _handleFollowTap(
-                                              currentUid: currentUid,
-                                              currentName: currentName,
-                                              targetUser: user,
-                                            ),
-                                      followPending: _pendingFollowUids.contains(
-                                        user.uid,
+                                children: [
+                                  _SectionHeader(
+                                    label: 'Your Friends',
+                                    count: friendUsers.length,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (friendUsers.isEmpty)
+                                    const _InlineHint('No friends found yet.')
+                                  else
+                                    ...friendUsers.map(
+                                      (user) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _FriendCard(
+                                          user: user,
+                                          isFriend: true,
+                                          onTap: () => _openFriendProfile(user),
+                                          onUnfriend:
+                                              _pendingUnfriendUids.contains(
+                                                user.uid,
+                                              )
+                                              ? null
+                                              : () => _handleUnfriendTap(
+                                                  currentUid: currentUid,
+                                                  targetUser: user,
+                                                ),
+                                          unfriendPending: _pendingUnfriendUids
+                                              .contains(user.uid),
+                                        ),
                                       ),
                                     ),
+                                  const SizedBox(height: 8),
+                                  _SectionHeader(
+                                    label: 'Friend Requests Received',
+                                    count: receivedRequestUsers.length,
                                   ),
-                                ),
-                            ],
+                                  const SizedBox(height: 8),
+                                  if (receivedRequestUsers.isEmpty)
+                                    const _InlineHint('No pending requests.')
+                                  else
+                                    ...receivedRequestUsers.map(
+                                      (user) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _FriendCard(
+                                          user: user,
+                                          onTap: () => _openFriendProfile(user),
+                                          isRequestReceived: true,
+                                          onAcceptRequest:
+                                              _busyRequestUids.contains(
+                                                user.uid,
+                                              )
+                                              ? null
+                                              : () =>
+                                                    _handleAcceptFriendRequestTap(
+                                                      currentUid: currentUid,
+                                                      currentName: currentName,
+                                                      targetUser: user,
+                                                    ),
+                                          onDeclineRequest:
+                                              _busyRequestUids.contains(
+                                                user.uid,
+                                              )
+                                              ? null
+                                              : () =>
+                                                    _handleDeclineFriendRequestTap(
+                                                      currentUid: currentUid,
+                                                      currentName: currentName,
+                                                      targetUser: user,
+                                                    ),
+                                          requestPending: _busyRequestUids
+                                              .contains(user.uid),
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  _SectionHeader(
+                                    label: 'Pending Requests',
+                                    count: sentRequestUsers.length,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (sentRequestUsers.isEmpty)
+                                    const _InlineHint('No requests sent.')
+                                  else
+                                    ...sentRequestUsers.map(
+                                      (user) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _FriendCard(
+                                          user: user,
+                                          onTap: () => _openFriendProfile(user),
+                                          isRequestSent: true,
+                                        ),
+                                      ),
+                                    ),
+                                  const SizedBox(height: 8),
+                                  _SectionHeader(
+                                    label: _query.isEmpty
+                                        ? 'All Members'
+                                        : 'Search Results',
+                                    count: otherUsers.length,
+                                  ),
+                                  const SizedBox(height: 8),
+                                  if (otherUsers.isEmpty)
+                                    const _InlineHint(
+                                      'No additional members match your search.',
+                                    )
+                                  else
+                                    ...otherUsers.map(
+                                      (user) => Padding(
+                                        padding: const EdgeInsets.only(
+                                          bottom: 10,
+                                        ),
+                                        child: _FriendCard(
+                                          user: user,
+                                          onTap: () => _openFriendProfile(user),
+                                          actionLabel: 'Add',
+                                          onSendRequest:
+                                              _pendingSentRequestUids.contains(
+                                                user.uid,
+                                              )
+                                              ? null
+                                              : () =>
+                                                    _handleSendFriendRequestTap(
+                                                      currentUid: currentUid,
+                                                      currentName: currentName,
+                                                      targetUser: user,
+                                                    ),
+                                          requestPending:
+                                              _pendingSentRequestUids.contains(
+                                                user.uid,
+                                              ),
+                                        ),
+                                      ),
+                                    ),
+                                ],
+                              );
+                            },
                           );
                         },
                       );
@@ -268,7 +404,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     );
   }
 
-  Set<String> _extractFriendIdsFromSubcollection(
+  Set<String> _extractUidsFromSubcollection(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
     final ids = <String>{};
@@ -290,28 +426,70 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     return ids;
   }
 
-  Future<void> _handleFollowTap({
+  Future<void> _handleAcceptFriendRequestTap({
     required String currentUid,
     required String currentName,
     required _FriendEntry targetUser,
   }) async {
-    if (_pendingFollowUids.contains(targetUser.uid)) {
+    if (_busyRequestUids.contains(targetUser.uid)) {
       return;
     }
 
-    setState(() => _pendingFollowUids.add(targetUser.uid));
+    setState(() => _busyRequestUids.add(targetUser.uid));
     try {
-      await _addFriend(
+      await DBFriends.acceptFriendRequest(
         currentUid: currentUid,
+        targetUid: targetUser.uid,
         currentName: currentName,
-        targetUser: targetUser,
       );
       if (!mounted) return;
-      setState(() => _optimisticFriendUids.add(targetUser.uid));
-      setState(() => _optimisticRemovedFriendUids.remove(targetUser.uid));
+      setState(() {
+        _optimisticFriendUids.add(targetUser.uid);
+        _optimisticClearedReceivedRequestUids.add(targetUser.uid);
+        _optimisticRemovedFriendUids.remove(targetUser.uid);
+      });
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('${targetUser.firstName} is now your friend!')),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      var message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _busyRequestUids.remove(targetUser.uid));
+      }
+    }
+  }
+
+  Future<void> _handleDeclineFriendRequestTap({
+    required String currentUid,
+    required String currentName,
+    required _FriendEntry targetUser,
+  }) async {
+    if (_busyRequestUids.contains(targetUser.uid)) {
+      return;
+    }
+
+    setState(() => _busyRequestUids.add(targetUser.uid));
+    try {
+      await DBFriends.declineFriendRequest(
+        currentUid: currentUid,
+        targetUid: targetUser.uid,
+        currentName: currentName,
+      );
+      if (!mounted) return;
+      setState(() => _optimisticClearedReceivedRequestUids.add(targetUser.uid));
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
-          content: Text('${targetUser.firstName} added to friends.'),
+          content: Text(
+            'Friend request from ${targetUser.firstName} declined.',
+          ),
         ),
       );
     } catch (error) {
@@ -320,12 +498,52 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       if (message.startsWith('Exception: ')) {
         message = message.replaceFirst('Exception: ', '');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
-        setState(() => _pendingFollowUids.remove(targetUser.uid));
+        setState(() => _busyRequestUids.remove(targetUser.uid));
+      }
+    }
+  }
+
+  Future<void> _handleSendFriendRequestTap({
+    required String currentUid,
+    required String currentName,
+    required _FriendEntry targetUser,
+  }) async {
+    if (_pendingSentRequestUids.contains(targetUser.uid)) {
+      return;
+    }
+
+    setState(() => _pendingSentRequestUids.add(targetUser.uid));
+    try {
+      await DBFriends.sendFriendRequest(
+        fromUid: currentUid,
+        fromName: currentName,
+        toUid: targetUser.uid,
+      );
+      if (!mounted) return;
+      setState(() => _optimisticSentRequestUids.add(targetUser.uid));
+      setState(() => _optimisticRemovedFriendUids.remove(targetUser.uid));
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('Friend request sent to ${targetUser.firstName}.'),
+        ),
+      );
+    } catch (error) {
+      if (!mounted) return;
+      var message = error.toString();
+      if (message.startsWith('Exception: ')) {
+        message = message.replaceFirst('Exception: ', '');
+      }
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
+    } finally {
+      if (mounted) {
+        setState(() => _pendingSentRequestUids.remove(targetUser.uid));
       }
     }
   }
@@ -387,9 +605,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
       if (message.startsWith('Exception: ')) {
         message = message.replaceFirst('Exception: ', '');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() => _pendingUnfriendUids.remove(targetUser.uid));
@@ -397,23 +615,9 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
     }
   }
 
-  Future<void> _addFriend({
-    required String currentUid,
-    required String currentName,
-    required _FriendEntry targetUser,
-  }) async {
-    await DBFriends.addFriend(
-      fromUid: currentUid,
-      fromName: currentName,
-      toUid: targetUser.uid,
-    );
-  }
-
   void _openFriendProfile(_FriendEntry user) {
     Navigator.of(context).push(
-      MaterialPageRoute<void>(
-        builder: (_) => _FriendProfileScreen(user: user),
-      ),
+      MaterialPageRoute<void>(builder: (_) => _FriendProfileScreen(user: user)),
     );
   }
 }
@@ -458,21 +662,29 @@ class _FriendEntry {
 class _FriendCard extends StatelessWidget {
   final _FriendEntry user;
   final bool isFriend;
-  final String actionLabel;
+  final bool isRequestSent;
+  final bool isRequestReceived;
+  final String? actionLabel;
   final VoidCallback? onTap;
-  final VoidCallback? onFollow;
+  final VoidCallback? onSendRequest;
+  final VoidCallback? onAcceptRequest;
+  final VoidCallback? onDeclineRequest;
   final VoidCallback? onUnfriend;
-  final bool followPending;
+  final bool requestPending;
   final bool unfriendPending;
 
   const _FriendCard({
     required this.user,
     this.isFriend = false,
     this.actionLabel = 'Follow',
+    this.isRequestSent = false,
+    this.isRequestReceived = false,
     this.onTap,
-    this.onFollow,
+    this.onSendRequest,
+    this.onAcceptRequest,
+    this.onDeclineRequest,
     this.onUnfriend,
-    this.followPending = false,
+    this.requestPending = false,
     this.unfriendPending = false,
   });
 
@@ -551,43 +763,101 @@ class _FriendCard extends StatelessWidget {
                 ),
               ),
               const SizedBox(width: 10),
-              isFriend
-                  ? Row(
-                      mainAxisSize: MainAxisSize.min,
-                      children: [
-                        const _Pill(label: 'Friend'),
-                        const SizedBox(width: 8),
-                        IconButton(
-                          tooltip: 'Unfriend',
-                          onPressed: unfriendPending ? null : onUnfriend,
-                          icon: unfriendPending
-                              ? const SizedBox(
-                                  width: 16,
-                                  height: 16,
-                                  child: CircularProgressIndicator(
-                                    strokeWidth: 2,
-                                  ),
-                                )
-                              : const Icon(Icons.person_remove_outlined),
-                        ),
-                      ],
-                    )
-                  : FilledButton(
-                      onPressed: followPending ? null : onFollow,
-                      style: FilledButton.styleFrom(
-                        backgroundColor: colorScheme.primary,
-                        foregroundColor: colorScheme.onPrimary,
-                        padding: const EdgeInsets.symmetric(
-                          horizontal: 12,
-                          vertical: 8,
-                        ),
-                        textStyle: const TextStyle(
-                          fontSize: 12,
-                          fontWeight: FontWeight.w700,
-                        ),
-                      ),
-                      child: Text(actionLabel),
+              if (isFriend)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    const _Pill(label: 'Friend'),
+                    const SizedBox(width: 8),
+                    IconButton(
+                      tooltip: 'Unfriend',
+                      onPressed: unfriendPending ? null : onUnfriend,
+                      icon: unfriendPending
+                          ? const SizedBox(
+                              width: 16,
+                              height: 16,
+                              child: CircularProgressIndicator(strokeWidth: 2),
+                            )
+                          : const Icon(Icons.person_remove_outlined),
                     ),
+                  ],
+                )
+              else if (isRequestSent)
+                const _Pill(label: 'Pending')
+              else if (isRequestReceived)
+                Row(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
+                    SizedBox(
+                      height: 36,
+                      child: OutlinedButton(
+                        onPressed: requestPending ? null : onDeclineRequest,
+                        style: OutlinedButton.styleFrom(
+                          foregroundColor: colorScheme.error,
+                          side: BorderSide(color: colorScheme.error),
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: const Text('Decline'),
+                      ),
+                    ),
+                    const SizedBox(width: 8),
+                    SizedBox(
+                      height: 36,
+                      child: FilledButton(
+                        onPressed: requestPending ? null : onAcceptRequest,
+                        style: FilledButton.styleFrom(
+                          backgroundColor: colorScheme.primary,
+                          foregroundColor: colorScheme.onPrimary,
+                          padding: const EdgeInsets.symmetric(horizontal: 10),
+                          textStyle: const TextStyle(
+                            fontSize: 12,
+                            fontWeight: FontWeight.w700,
+                          ),
+                        ),
+                        child: requestPending
+                            ? const SizedBox(
+                                width: 16,
+                                height: 16,
+                                child: CircularProgressIndicator(
+                                  strokeWidth: 2,
+                                  color: Colors.white,
+                                ),
+                              )
+                            : const Text('Accept'),
+                      ),
+                    ),
+                  ],
+                )
+              else
+                FilledButton(
+                  onPressed: requestPending ? null : onSendRequest,
+                  style: FilledButton.styleFrom(
+                    backgroundColor: colorScheme.primary,
+                    foregroundColor: colorScheme.onPrimary,
+                    padding: const EdgeInsets.symmetric(
+                      horizontal: 12,
+                      vertical: 8,
+                    ),
+                    textStyle: const TextStyle(
+                      fontSize: 12,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                  child: requestPending
+                      ? const SizedBox(
+                          width: 16,
+                          height: 16,
+                          child: CircularProgressIndicator(
+                            strokeWidth: 2,
+                            color: Colors.white,
+                          ),
+                        )
+                      : Text(actionLabel ?? 'Add Friend'),
+                ),
             ],
           ),
         ),
