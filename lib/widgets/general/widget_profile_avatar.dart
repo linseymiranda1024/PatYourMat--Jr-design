@@ -13,6 +13,9 @@
 // Flutter external package imports
 import 'package:flutter/material.dart';
 
+// App relative file imports
+import '../../db_helpers/db_user_profile.dart';
+
 //////////////////////////////////////////////////////////////////////////
 // StateFUL widget which manages state. Simply initializes the
 // state object.
@@ -148,4 +151,180 @@ class _ProfileAvatarState extends State<ProfileAvatar> {
       );
     }
   }
+}
+
+class UserUidAvatar extends StatefulWidget {
+  const UserUidAvatar({
+    super.key,
+    required this.uid,
+    required this.userWholeName,
+    required this.radius,
+    this.initialsSize = 0,
+    this.attemptFetch = true,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderColor,
+    this.borderWidth = 0,
+  });
+
+  final String uid;
+  final String userWholeName;
+  final double radius;
+  final double initialsSize;
+  final bool attemptFetch;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final Color? borderColor;
+  final double borderWidth;
+
+  @override
+  State<UserUidAvatar> createState() => _UserUidAvatarState();
+}
+
+class _UserUidAvatarState extends State<UserUidAvatar> {
+  late Future<ImageProvider?> _imageFuture;
+
+  @override
+  void initState() {
+    super.initState();
+    _imageFuture = _loadImage();
+  }
+
+  @override
+  void didUpdateWidget(covariant UserUidAvatar oldWidget) {
+    super.didUpdateWidget(oldWidget);
+    if (oldWidget.uid != widget.uid ||
+        oldWidget.attemptFetch != widget.attemptFetch) {
+      _imageFuture = _loadImage();
+    }
+  }
+
+  Future<ImageProvider?> _loadImage() {
+    return DBUserProfile.fetchUserProfileImageFromUid(
+      widget.uid,
+      widget.attemptFetch,
+    );
+  }
+
+  @override
+  Widget build(BuildContext context) {
+    final cachedImage = DBUserProfile.getCachedUserProfileImage(widget.uid);
+
+    return FutureBuilder<ImageProvider?>(
+      future: _imageFuture,
+      initialData: cachedImage,
+      builder: (context, snapshot) {
+        return _AvatarShell(
+          radius: widget.radius,
+          initialsSize: widget.initialsSize,
+          userWholeName: widget.userWholeName,
+          userImage: snapshot.data ?? cachedImage,
+          backgroundColor: widget.backgroundColor,
+          foregroundColor: widget.foregroundColor,
+          borderColor: widget.borderColor,
+          borderWidth: widget.borderWidth,
+        );
+      },
+    );
+  }
+}
+
+class _AvatarShell extends StatelessWidget {
+  final double radius;
+  final double initialsSize;
+  final String userWholeName;
+  final ImageProvider? userImage;
+  final Color? backgroundColor;
+  final Color? foregroundColor;
+  final Color? borderColor;
+  final double borderWidth;
+
+  const _AvatarShell({
+    required this.radius,
+    required this.initialsSize,
+    required this.userWholeName,
+    required this.userImage,
+    this.backgroundColor,
+    this.foregroundColor,
+    this.borderColor,
+    this.borderWidth = 0,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final resolvedBackgroundColor =
+        backgroundColor ?? colorScheme.surfaceContainerHighest;
+    final resolvedForegroundColor = foregroundColor ?? colorScheme.onSurface;
+    final resolvedInitialsSize = initialsSize == 0
+        ? radius * 0.7
+        : initialsSize;
+
+    return Container(
+      width: (radius * 2) + (borderWidth * 2),
+      height: (radius * 2) + (borderWidth * 2),
+      padding: EdgeInsets.all(borderWidth),
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        border: borderWidth > 0 && borderColor != null
+            ? Border.all(color: borderColor!, width: borderWidth)
+            : null,
+      ),
+      child: ClipOval(
+        child: userImage == null
+            ? ColoredBox(
+                color: resolvedBackgroundColor,
+                child: Center(
+                  child: Text(
+                    _initialsFromLabel(userWholeName),
+                    style: TextStyle(
+                      fontSize: resolvedInitialsSize,
+                      color: resolvedForegroundColor,
+                      fontWeight: FontWeight.w700,
+                    ),
+                  ),
+                ),
+              )
+            : Image(
+                image: userImage!,
+                gaplessPlayback: true,
+                fit: BoxFit.cover,
+              ),
+      ),
+    );
+  }
+}
+
+String _initialsFromLabel(String label) {
+  final trimmedLabel = label.trim();
+  if (trimmedLabel.isEmpty) {
+    return '?';
+  }
+
+  if (trimmedLabel.contains('@')) {
+    final localPart = trimmedLabel.split('@').first.trim();
+    if (localPart.isEmpty) {
+      return '?';
+    }
+    final parts = localPart
+        .split(RegExp(r'[^A-Za-z0-9]+'))
+        .where((part) => part.trim().isNotEmpty)
+        .toList();
+    if (parts.length >= 2) {
+      return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
+    }
+    return localPart.substring(0, localPart.length >= 2 ? 2 : 1).toUpperCase();
+  }
+
+  final parts = trimmedLabel
+      .split(' ')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) {
+    return '?';
+  }
+  final first = parts.first[0].toUpperCase();
+  final last = parts.length > 1 ? parts.last[0].toUpperCase() : '';
+  return '$first$last';
 }

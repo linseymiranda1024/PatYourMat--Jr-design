@@ -12,6 +12,7 @@ import '../models/gym_class.dart';
 import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
 import '../theme/app_colors.dart';
+import '../widgets/general/widget_profile_avatar.dart';
 import 'reservation_confirmation_screen.dart';
 
 final _socialMatOccupancyProvider = StreamProvider.autoDispose
@@ -210,6 +211,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
       showDragHandle: true,
       builder: (_) => _GroupInviteSheet(
         currentUid: currentUid,
+        classId: widget.classId,
         initiallySelectedUids: _selectedInviteeUids,
       ),
     );
@@ -265,15 +267,45 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
-        final isDark = Theme.of(context).brightness == Brightness.dark;
         final matRows = _buildMatRows(gClass.capacity);
         final socialMatOccupancy =
             socialMatOccupancyAsync.asData?.value ??
             const _SocialMatOccupancy();
+        final invalidSelectedInviteeUids = _selectedInviteeUids
+            .where(socialMatOccupancy.registeredUserIds.contains)
+            .toSet();
+        final friendCount = socialMatOccupancy.friendMatsByNumber.length;
         final liveFilled = socialMatOccupancyAsync.hasValue
             ? socialMatOccupancy.reservedMatNumbers.length
             : gClass.filled;
         final isFull = liveFilled >= gClass.capacity;
+
+        if (invalidSelectedInviteeUids.isNotEmpty) {
+          WidgetsBinding.instance.addPostFrameCallback((_) {
+            if (!mounted) {
+              return;
+            }
+
+            setState(() {
+              _selectedInviteeUids.removeAll(invalidSelectedInviteeUids);
+              final maxSelections = _groupSize;
+              if (_selectedMats.length > maxSelections) {
+                _selectedMats.removeRange(maxSelections, _selectedMats.length);
+              }
+            });
+
+            final removedCount = invalidSelectedInviteeUids.length;
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(
+                  removedCount == 1
+                      ? 'A selected friend already booked this class and was removed from your group.'
+                      : '$removedCount selected friends already booked this class and were removed from your group.',
+                ),
+              ),
+            );
+          });
+        }
 
         return StreamBuilder<bool>(
           stream: DBReservations.isUserInStandby(
@@ -292,56 +324,61 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                     children: [
                       Container(
                         margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
-                        padding: const EdgeInsets.all(20),
+                        padding: const EdgeInsets.all(18),
                         decoration: BoxDecoration(
-                          gradient: LinearGradient(
-                            begin: Alignment.topLeft,
-                            end: Alignment.bottomRight,
-                            colors: isDark
-                                ? const [
-                                    AppColors.gradientStartDark,
-                                    AppColors.gradientEndDark,
-                                  ]
-                                : const [
-                                    AppColors.gradientStart,
-                                    AppColors.gradientEnd,
-                                  ],
-                          ),
+                          color: colorScheme.surfaceContainerHigh,
                           borderRadius: BorderRadius.circular(24),
+                          border: Border.all(color: colorScheme.outlineVariant),
                           boxShadow: [
                             BoxShadow(
-                              color: Colors.black.withValues(alpha: 0.14),
-                              blurRadius: 16,
-                              offset: const Offset(0, 8),
+                              color: Colors.black.withValues(alpha: 0.05),
+                              blurRadius: 12,
+                              offset: const Offset(0, 6),
                             ),
                           ],
                         ),
                         child: Column(
                           crossAxisAlignment: CrossAxisAlignment.start,
                           children: [
-                            Text(
-                              gClass.title,
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: AppColors.headerOnBrand,
-                                fontWeight: FontWeight.w800,
-                              ),
+                            Row(
+                              children: [
+                                Expanded(
+                                  child: Text(
+                                    gClass.title,
+                                    style: textTheme.headlineSmall?.copyWith(
+                                      color: colorScheme.onSurface,
+                                      fontWeight: FontWeight.w800,
+                                    ),
+                                  ),
+                                ),
+                                _SummaryPill(
+                                  icon: Icons.event_seat_outlined,
+                                  label: '$liveFilled/${gClass.capacity} taken',
+                                ),
+                              ],
                             ),
                             const SizedBox(height: 8),
                             Text(
                               _groupSize == 1
-                                  ? 'Choose the mat spot you want before confirming. $liveFilled/${gClass.capacity} are already taken.'
-                                  : 'Choose $_groupSize mats for your group. The first mat you tap is yours, and the rest are held for your invited friends. $liveFilled/${gClass.capacity} are already taken.',
+                                  ? 'Tap an open mat to reserve it. Friend mats are marked with an avatar.'
+                                  : 'Select $_groupSize open mats for your group. Friend mats stay locked and show an avatar.',
                               style: textTheme.bodyMedium?.copyWith(
-                                color: AppColors.headerOnBrand.withValues(
-                                  alpha: 0.88,
-                                ),
+                                color: colorScheme.onSurfaceVariant,
                                 height: 1.4,
                               ),
                             ),
+                            if (friendCount > 0) ...[
+                              const SizedBox(height: 10),
+                              _SummaryPill(
+                                icon: Icons.people_outline_rounded,
+                                label:
+                                    '$friendCount friend${friendCount == 1 ? '' : 's'} on the floor',
+                              ),
+                            ],
                             const SizedBox(height: 16),
                             Wrap(
-                              spacing: 12,
-                              runSpacing: 12,
+                              spacing: 8,
+                              runSpacing: 8,
                               children: [
                                 const _LegendPill(
                                   label: 'Available',
@@ -354,6 +391,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                 const _LegendPill(
                                   label: 'Friend',
                                   color: AppColors.primaryPurple,
+                                  marker: _LegendAvatarMarker(),
                                 ),
                                 _LegendPill(
                                   label: 'Reserved',
@@ -365,35 +403,46 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                         ),
                       ),
                       Padding(
-                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 10),
-                        child: Container(
-                          width: double.infinity,
-                          padding: const EdgeInsets.symmetric(vertical: 14),
-                          decoration: BoxDecoration(
-                            color: colorScheme.surfaceContainerHigh,
-                            borderRadius: BorderRadius.circular(20),
-                            border: Border.all(
-                              color: colorScheme.outlineVariant,
+                        padding: const EdgeInsets.fromLTRB(16, 18, 16, 8),
+                        child: Row(
+                          children: [
+                            Expanded(
+                              child: Divider(
+                                color: colorScheme.outlineVariant,
+                                thickness: 1,
+                              ),
                             ),
-                          ),
-                          child: Row(
-                            mainAxisAlignment: MainAxisAlignment.center,
-                            children: [
-                              Icon(
-                                Icons.self_improvement,
-                                color: colorScheme.primary,
+                            Padding(
+                              padding: const EdgeInsets.symmetric(
+                                horizontal: 12,
                               ),
-                              const SizedBox(width: 10),
-                              Text(
-                                'INSTRUCTOR FRONT',
-                                style: textTheme.labelLarge?.copyWith(
-                                  fontWeight: FontWeight.w800,
-                                  color: colorScheme.primary,
-                                  letterSpacing: 0.6,
-                                ),
+                              child: Row(
+                                mainAxisSize: MainAxisSize.min,
+                                children: [
+                                  Icon(
+                                    Icons.self_improvement,
+                                    size: 18,
+                                    color: colorScheme.primary,
+                                  ),
+                                  const SizedBox(width: 8),
+                                  Text(
+                                    'Instructor Front',
+                                    style: textTheme.labelLarge?.copyWith(
+                                      fontWeight: FontWeight.w800,
+                                      color: colorScheme.primary,
+                                      letterSpacing: 0.4,
+                                    ),
+                                  ),
+                                ],
                               ),
-                            ],
-                          ),
+                            ),
+                            Expanded(
+                              child: Divider(
+                                color: colorScheme.outlineVariant,
+                                thickness: 1,
+                              ),
+                            ),
+                          ],
                         ),
                       ),
                       Padding(
@@ -460,10 +509,12 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                                     number: matNumber,
                                                     reserved: isReserved,
                                                     selected: isSelected,
-                                                    isFriend:
-                                                        friendInfo != null,
-                                                    friendInitials:
-                                                        friendInfo?.initials,
+                                                    friendUid:
+                                                        friendInfo?.userId,
+                                                    friendName:
+                                                        friendInfo
+                                                            ?.displayName ??
+                                                        '',
                                                     onTap:
                                                         isReserved ||
                                                             isFull ||
@@ -677,10 +728,12 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
 class _SocialMatOccupancy {
   final Set<int> reservedMatNumbers;
+  final Set<String> registeredUserIds;
   final Map<int, _FriendMatInfo> friendMatsByNumber;
 
   const _SocialMatOccupancy({
     this.reservedMatNumbers = const <int>{},
+    this.registeredUserIds = const <String>{},
     this.friendMatsByNumber = const <int, _FriendMatInfo>{},
   });
 
@@ -690,6 +743,7 @@ class _SocialMatOccupancy {
     required Set<int> reservedMatNumbers,
   }) {
     final allReservedMatNumbers = <int>{...reservedMatNumbers};
+    final registeredUserIds = <String>{};
     final friendMatsByNumber = <int, _FriendMatInfo>{};
 
     for (final reservation in reservations) {
@@ -700,226 +754,271 @@ class _SocialMatOccupancy {
       }
 
       allReservedMatNumbers.add(matNumber);
+      if (userId.isNotEmpty) {
+        registeredUserIds.add(userId);
+      }
 
       if (userId.isEmpty || !friendUids.contains(userId)) {
         continue;
       }
 
       friendMatsByNumber[matNumber] = _FriendMatInfo(
-        initials: _initialsFromReservation(reservation),
+        userId: userId,
+        displayName: _friendDisplayNameForReservation(reservation),
       );
     }
 
     return _SocialMatOccupancy(
       reservedMatNumbers: allReservedMatNumbers,
+      registeredUserIds: registeredUserIds,
       friendMatsByNumber: friendMatsByNumber,
     );
   }
 }
 
 class _FriendMatInfo {
-  final String initials;
+  final String userId;
+  final String displayName;
 
-  const _FriendMatInfo({required this.initials});
+  const _FriendMatInfo({required this.userId, required this.displayName});
 }
 
 class _YogaMatTile extends StatelessWidget {
   final int number;
   final bool reserved;
   final bool selected;
-  final bool isFriend;
-  final String? friendInitials;
+  final String? friendUid;
+  final String friendName;
   final VoidCallback? onTap;
 
   const _YogaMatTile({
     required this.number,
     required this.reserved,
     required this.selected,
-    required this.isFriend,
-    this.friendInitials,
+    this.friendUid,
+    this.friendName = '',
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final isFriendMat = reserved && isFriend;
+    final hasFriend = friendName.trim().isNotEmpty;
+    final isFriendMat = reserved && hasFriend;
+    final friendFill = Color.lerp(AppColors.primaryPurple, Colors.white, 0.58)!;
     final fill = isFriendMat
-        ? AppColors.primaryPurple
+        ? friendFill
         : reserved
         ? colorScheme.outline
         : selected
         ? colorScheme.primary
         : AppColors.success;
     final border = isFriendMat
-        ? AppColors.primaryPurple.withValues(alpha: 0.88)
+        ? AppColors.accentPurple.withValues(alpha: 0.92)
         : reserved
         ? colorScheme.onSurfaceVariant.withValues(alpha: 0.7)
         : selected
         ? colorScheme.primary.withValues(alpha: 0.88)
         : AppColors.success.withValues(alpha: 0.88);
-    final centerLabel = isFriendMat
-        ? (friendInitials?.trim().isNotEmpty == true ? friendInitials! : '?')
-        : '$number';
+    final foregroundColor = isFriendMat || reserved
+        ? colorScheme.onSurface
+        : Colors.white;
+    final avatarBackground = Color.lerp(
+      AppColors.secondaryBlue,
+      Colors.black,
+      0.10,
+    )!;
+    final label = isFriendMat
+        ? (friendName.trim().isEmpty
+              ? 'Friend on mat $number'
+              : '$friendName on mat $number')
+        : 'Mat $number';
 
-    return GestureDetector(
-      onTap: onTap,
-      child: AnimatedContainer(
-        duration: const Duration(milliseconds: 180),
-        curve: Curves.easeOut,
-        padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-        decoration: BoxDecoration(
-          color: Colors.transparent,
-          borderRadius: BorderRadius.circular(24),
-          boxShadow: [
-            BoxShadow(
-              color: selected
-                  ? colorScheme.primary.withValues(alpha: 0.22)
-                  : Colors.black.withValues(alpha: 0.08),
-              blurRadius: selected ? 16 : 8,
-              offset: const Offset(0, 6),
-            ),
-          ],
-        ),
-        child: Stack(
-          children: [
-            Positioned.fill(
-              child: DecoratedBox(
-                decoration: BoxDecoration(
-                  gradient: LinearGradient(
-                    begin: Alignment.topCenter,
-                    end: Alignment.bottomCenter,
-                    colors: [
-                      Color.lerp(fill, Colors.white, 0.10)!,
-                      fill,
-                      Color.lerp(fill, Colors.black, 0.12)!,
-                    ],
-                  ),
-                  borderRadius: BorderRadius.circular(22),
-                  border: Border.all(color: border, width: 1.5),
-                ),
+    return Tooltip(
+      message: label,
+      child: GestureDetector(
+        onTap: onTap,
+        child: AnimatedContainer(
+          duration: const Duration(milliseconds: 180),
+          curve: Curves.easeOut,
+          padding: const EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+          decoration: BoxDecoration(
+            color: Colors.transparent,
+            borderRadius: BorderRadius.circular(24),
+            boxShadow: [
+              BoxShadow(
+                color: selected
+                    ? colorScheme.primary.withValues(alpha: 0.22)
+                    : Colors.black.withValues(alpha: 0.08),
+                blurRadius: selected ? 16 : 8,
+                offset: const Offset(0, 6),
               ),
-            ),
-            Positioned(
-              top: 8,
-              left: 10,
-              right: 10,
-              child: Container(
-                height: 7,
-                decoration: BoxDecoration(
-                  color: Colors.white.withValues(alpha: 0.28),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            Positioned(
-              top: 18,
-              left: 16,
-              right: 16,
-              child: Container(
-                height: 1.5,
-                color: Colors.white.withValues(alpha: 0.16),
-              ),
-            ),
-            Positioned(
-              bottom: 16,
-              left: 14,
-              right: 14,
-              child: Container(
-                height: 10,
-                decoration: BoxDecoration(
-                  color: Colors.black.withValues(alpha: 0.10),
-                  borderRadius: BorderRadius.circular(999),
-                ),
-              ),
-            ),
-            Center(
-              child: RotatedBox(
-                quarterTurns: 3,
-                child: Text(
-                  centerLabel,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w900,
-                    fontSize: 22,
-                    letterSpacing: 1,
+            ],
+          ),
+          child: Stack(
+            clipBehavior: Clip.none,
+            children: [
+              Positioned.fill(
+                child: DecoratedBox(
+                  decoration: BoxDecoration(
+                    gradient: LinearGradient(
+                      begin: Alignment.topCenter,
+                      end: Alignment.bottomCenter,
+                      colors: [
+                        Color.lerp(fill, Colors.white, 0.08)!,
+                        fill,
+                        Color.lerp(fill, Colors.black, 0.10)!,
+                      ],
+                    ),
+                    borderRadius: BorderRadius.circular(22),
+                    border: Border.all(color: border, width: 1.5),
                   ),
                 ),
               ),
-            ),
-            if (isFriendMat)
               Positioned(
-                bottom: 26,
-                left: 8,
-                right: 8,
+                top: isFriendMat ? 30 : 10,
+                left: 10,
+                right: 10,
+                child: Container(
+                  height: 6,
+                  decoration: BoxDecoration(
+                    color: (isFriendMat ? foregroundColor : Colors.white)
+                        .withValues(alpha: 0.18),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              Positioned(
+                top: isFriendMat ? 40 : 20,
+                left: 16,
+                right: 16,
+                child: Container(
+                  height: 1.5,
+                  color: foregroundColor.withValues(
+                    alpha: isFriendMat || reserved ? 0.12 : 0.16,
+                  ),
+                ),
+              ),
+              Positioned(
+                bottom: 16,
+                left: 14,
+                right: 14,
+                child: Container(
+                  height: 9,
+                  decoration: BoxDecoration(
+                    color: Colors.black.withValues(
+                      alpha: isFriendMat ? 0.06 : 0.10,
+                    ),
+                    borderRadius: BorderRadius.circular(999),
+                  ),
+                ),
+              ),
+              if (isFriendMat)
+                Positioned(
+                  top: 8,
+                  left: 0,
+                  right: 0,
+                  child: Center(
+                    child: UserUidAvatar(
+                      uid: friendUid ?? '',
+                      userWholeName: friendName,
+                      radius: 12,
+                      backgroundColor: avatarBackground,
+                      foregroundColor: Colors.white,
+                      borderColor: Colors.white,
+                      borderWidth: 1.5,
+                    ),
+                  ),
+                )
+              else
+                Center(
+                  child: Text(
+                    '$number',
+                    style: TextStyle(
+                      color: foregroundColor,
+                      fontWeight: FontWeight.w900,
+                      fontSize: 26,
+                      letterSpacing: 0.2,
+                    ),
+                  ),
+                ),
+              Positioned(
+                bottom: isFriendMat ? 12 : 10,
+                left: 6,
+                right: 6,
                 child: Text(
-                  'Mat $number',
+                  isFriendMat ? '$number' : 'Mat $number',
                   textAlign: TextAlign.center,
-                  style: const TextStyle(
-                    color: Colors.white,
-                    fontWeight: FontWeight.w700,
-                    fontSize: 10,
+                  style: TextStyle(
+                    color: foregroundColor.withValues(alpha: 0.96),
+                    fontWeight: FontWeight.w900,
+                    fontSize: isFriendMat ? 18 : 11,
                     letterSpacing: 0.3,
                   ),
                 ),
               ),
-            if (selected)
-              const Positioned(
-                top: 10,
-                right: 10,
-                child: Icon(Icons.check_circle, color: Colors.white, size: 18),
-              ),
-            if (reserved)
-              Positioned(
-                top: 10,
-                right: 10,
-                child: Container(
-                  padding: const EdgeInsets.all(3),
-                  decoration: BoxDecoration(
-                    color: Colors.white.withValues(alpha: 0.18),
-                    shape: BoxShape.circle,
-                  ),
-                  child: const Icon(
-                    Icons.close_rounded,
-                    color: Colors.white,
-                    size: 14,
+              if (selected)
+                Positioned(
+                  top: 10,
+                  right: 10,
+                  child: Icon(
+                    Icons.check_circle,
+                    color: foregroundColor,
+                    size: 18,
                   ),
                 ),
-              ),
-          ],
+              if (reserved)
+                Positioned(
+                  top: isFriendMat ? 12 : 10,
+                  right: 10,
+                  child: Container(
+                    padding: const EdgeInsets.all(3),
+                    decoration: BoxDecoration(
+                      color: foregroundColor.withValues(alpha: 0.12),
+                      shape: BoxShape.circle,
+                    ),
+                    child: Icon(
+                      Icons.close_rounded,
+                      color: foregroundColor,
+                      size: 14,
+                    ),
+                  ),
+                ),
+            ],
+          ),
         ),
       ),
     );
   }
 }
 
-class _LegendPill extends StatelessWidget {
+class _SummaryPill extends StatelessWidget {
+  final IconData icon;
   final String label;
-  final Color color;
 
-  const _LegendPill({required this.label, required this.color});
+  const _SummaryPill({required this.icon, required this.label});
 
   @override
   Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
       decoration: BoxDecoration(
-        color: Colors.white.withValues(alpha: 0.16),
+        color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colorScheme.outlineVariant),
       ),
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Container(
-            width: 12,
-            height: 12,
-            decoration: BoxDecoration(color: color, shape: BoxShape.circle),
-          ),
-          const SizedBox(width: 8),
+          Icon(icon, size: 14, color: colorScheme.primary),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
-              color: AppColors.headerOnBrand,
+            style: textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
           ),
@@ -929,69 +1028,109 @@ class _LegendPill extends StatelessWidget {
   }
 }
 
-String _initialsFromReservation(Reservation reservation) {
-  final fromName = _initialsFromName(reservation.userName);
-  if (fromName != '?') {
-    return fromName;
+class _LegendPill extends StatelessWidget {
+  final String label;
+  final Color color;
+  final Widget? marker;
+
+  const _LegendPill({required this.label, required this.color, this.marker});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          marker ??
+              Container(
+                width: 12,
+                height: 12,
+                decoration: BoxDecoration(color: color, shape: BoxShape.circle),
+              ),
+          const SizedBox(width: 8),
+          Text(
+            label,
+            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+        ],
+      ),
+    );
   }
-  return _initialsFromEmail(reservation.userEmail);
 }
 
-String _initialsFromName(String wholeName) {
-  final parts = wholeName
-      .split(' ')
-      .map((part) => part.trim())
-      .where((part) => part.isNotEmpty)
-      .toList();
-  if (parts.isEmpty) {
-    return '?';
+class _LegendAvatarMarker extends StatelessWidget {
+  const _LegendAvatarMarker();
+
+  @override
+  Widget build(BuildContext context) {
+    return Container(
+      width: 16,
+      height: 16,
+      decoration: BoxDecoration(
+        shape: BoxShape.circle,
+        color: AppColors.primaryPurple.withValues(alpha: 0.86),
+        border: Border.all(color: Colors.white, width: 1.2),
+      ),
+      child: const Icon(Icons.person, size: 9, color: Colors.white),
+    );
   }
-  final first = parts.first[0].toUpperCase();
-  final last = parts.length > 1 ? parts.last[0].toUpperCase() : '';
-  return '$first$last';
 }
 
-String _initialsFromEmail(String email) {
-  final localPart = email.trim().split('@').first.trim();
-  if (localPart.isEmpty) {
-    return '?';
+String _friendDisplayNameForReservation(Reservation reservation) {
+  final trimmedUserName = reservation.userName.trim();
+  if (trimmedUserName.isNotEmpty) {
+    return trimmedUserName;
   }
 
-  final parts = localPart
-      .split(RegExp(r'[^A-Za-z0-9]+'))
-      .map((part) => part.trim())
-      .where((part) => part.isNotEmpty)
-      .toList();
-  if (parts.length >= 2) {
-    return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
+  final trimmedEmail = reservation.userEmail.trim();
+  if (trimmedEmail.isNotEmpty) {
+    return trimmedEmail;
   }
 
-  final normalized = localPart.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
-  if (normalized.isEmpty) {
-    return '?';
-  }
+  return 'Friend';
+}
 
-  return normalized.substring(0, normalized.length >= 2 ? 2 : 1).toUpperCase();
+bool _isStaffRole(String role) {
+  return role.trim().toLowerCase() == 'staff';
 }
 
 class _InviteFriend {
   final String uid;
   final String wholeName;
   final String bio;
+  final String role;
+  final bool isAlreadyRegistered;
 
   const _InviteFriend({
     required this.uid,
     required this.wholeName,
     required this.bio,
+    required this.role,
+    this.isAlreadyRegistered = false,
   });
+
+  bool get canInvite => !_isStaffRole(role) && !isAlreadyRegistered;
 }
 
 class _GroupInviteSheet extends StatefulWidget {
   final String currentUid;
+  final String classId;
   final Set<String> initiallySelectedUids;
 
   const _GroupInviteSheet({
     required this.currentUid,
+    required this.classId,
     this.initiallySelectedUids = const <String>{},
   });
 
@@ -1009,6 +1148,60 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
+    final inviteOptionsStream =
+        Rx.combineLatest3<
+          QuerySnapshot<Map<String, dynamic>>,
+          List<Reservation>,
+          QuerySnapshot<Map<String, dynamic>>,
+          List<_InviteFriend>
+        >(
+          FirebaseFirestore.instance
+              .collection('user_profiles')
+              .doc(widget.currentUid)
+              .collection('friends')
+              .snapshots(),
+          DBReservations.getReservationsForClassStream(widget.classId),
+          FirebaseFirestore.instance.collection('user_profiles').snapshots(),
+          (friendsSnapshot, reservations, usersSnapshot) {
+            final friendIds = friendsSnapshot.docs
+                .map((doc) => (doc.data()['uid'] ?? doc.id).toString().trim())
+                .where((uid) => uid.isNotEmpty)
+                .toSet();
+
+            if (friendIds.isEmpty) {
+              return const <_InviteFriend>[];
+            }
+
+            final registeredUserIds = reservations
+                .map((reservation) => reservation.userId.trim())
+                .where((userId) => userId.isNotEmpty)
+                .toSet();
+
+            final friends =
+                usersSnapshot.docs
+                    .where((doc) => friendIds.contains(doc.id))
+                    .map(
+                      (doc) => _InviteFriend(
+                        uid: doc.id,
+                        wholeName:
+                            '${(doc.data()['first_name'] ?? '').toString().trim()} ${(doc.data()['last_name'] ?? '').toString().trim()}'
+                                .trim(),
+                        bio: (doc.data()['bio'] ?? '').toString(),
+                        role: (doc.data()['role'] ?? 'Member').toString(),
+                        isAlreadyRegistered: registeredUserIds.contains(doc.id),
+                      ),
+                    )
+                    .where((friend) => !_isStaffRole(friend.role))
+                    .toList()
+                  ..sort(
+                    (a, b) => a.wholeName.toLowerCase().compareTo(
+                      b.wholeName.toLowerCase(),
+                    ),
+                  );
+
+            return friends;
+          },
+        );
 
     return SafeArea(
       child: Padding(
@@ -1026,7 +1219,7 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
             ),
             const SizedBox(height: 8),
             Text(
-              'Choose friends now, then pick the group mats you want to book.',
+              'Choose friends now, then pick the group mats you want to book. Friends who already have a spot stay unavailable here.',
               style: textTheme.bodyMedium?.copyWith(
                 color: colorScheme.onSurfaceVariant,
                 height: 1.4,
@@ -1035,34 +1228,20 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
             const SizedBox(height: 18),
             SizedBox(
               height: 360,
-              child: StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                stream: FirebaseFirestore.instance
-                    .collection('user_profiles')
-                    .doc(widget.currentUid)
-                    .collection('friends')
-                    .snapshots(),
-                builder: (context, friendsSnapshot) {
-                  if (friendsSnapshot.hasError) {
+              child: StreamBuilder<List<_InviteFriend>>(
+                stream: inviteOptionsStream,
+                builder: (context, snapshot) {
+                  if (snapshot.hasError) {
                     return const Center(
                       child: Text('Unable to load your friends right now.'),
                     );
                   }
-                  if (friendsSnapshot.connectionState ==
-                      ConnectionState.waiting) {
+                  if (snapshot.connectionState == ConnectionState.waiting) {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final friendIds =
-                      friendsSnapshot.data?.docs
-                          .map(
-                            (doc) => (doc.data()['uid'] ?? doc.id).toString(),
-                          )
-                          .where((uid) => uid.trim().isNotEmpty)
-                          .map((uid) => uid.trim())
-                          .toSet() ??
-                      <String>{};
-
-                  if (friendIds.isEmpty) {
+                  final friends = snapshot.data ?? const <_InviteFriend>[];
+                  if (friends.isEmpty) {
                     return Container(
                       width: double.infinity,
                       padding: const EdgeInsets.all(18),
@@ -1072,7 +1251,7 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                         border: Border.all(color: colorScheme.outlineVariant),
                       ),
                       child: Text(
-                        'Add a few friends first, then you can invite them to join from this screen.',
+                        'Add a few member friends first, then you can invite them to join from this screen.',
                         style: textTheme.bodyMedium?.copyWith(
                           color: colorScheme.onSurfaceVariant,
                           height: 1.4,
@@ -1081,138 +1260,150 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                     );
                   }
 
-                  return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
-                    stream: FirebaseFirestore.instance
-                        .collection('user_profiles')
-                        .snapshots(),
-                    builder: (context, usersSnapshot) {
-                      if (usersSnapshot.hasError) {
-                        return const Center(
-                          child: Text('Unable to load members right now.'),
-                        );
-                      }
-                      if (usersSnapshot.connectionState ==
-                          ConnectionState.waiting) {
-                        return const Center(child: CircularProgressIndicator());
-                      }
+                  final selectableUids = friends
+                      .where((friend) => friend.canInvite)
+                      .map((friend) => friend.uid)
+                      .toSet();
+                  final invalidSelectedUids = _selectedUids
+                      .where((uid) => !selectableUids.contains(uid))
+                      .toSet();
 
-                      final friends =
-                          usersSnapshot.data?.docs
-                              .where((doc) => friendIds.contains(doc.id))
-                              .map(
-                                (doc) => _InviteFriend(
-                                  uid: doc.id,
-                                  wholeName:
-                                      '${(doc.data()['first_name'] ?? '').toString().trim()} ${(doc.data()['last_name'] ?? '').toString().trim()}'
-                                          .trim(),
-                                  bio: (doc.data()['bio'] ?? '').toString(),
-                                ),
-                              )
-                              .toList() ??
-                          <_InviteFriend>[];
-
-                      friends.sort(
-                        (a, b) => a.wholeName.toLowerCase().compareTo(
-                          b.wholeName.toLowerCase(),
-                        ),
+                  if (invalidSelectedUids.isNotEmpty) {
+                    WidgetsBinding.instance.addPostFrameCallback((_) {
+                      if (!mounted) {
+                        return;
+                      }
+                      setState(
+                        () => _selectedUids.removeAll(invalidSelectedUids),
                       );
-                      _friendsById
-                        ..clear()
-                        ..addEntries(
-                          friends.map((friend) => MapEntry(friend.uid, friend)),
-                        );
+                    });
+                  }
 
-                      return ListView.separated(
-                        itemCount: friends.length,
-                        separatorBuilder: (_, __) => const SizedBox(height: 10),
-                        itemBuilder: (context, index) {
-                          final friend = friends[index];
-                          final isSelected = _selectedUids.contains(friend.uid);
-                          return InkWell(
-                            onTap: () {
-                              setState(() {
-                                if (isSelected) {
-                                  _selectedUids.remove(friend.uid);
-                                } else {
-                                  _selectedUids.add(friend.uid);
-                                }
-                              });
-                            },
+                  _friendsById
+                    ..clear()
+                    ..addEntries(
+                      friends
+                          .where((friend) => friend.canInvite)
+                          .map((friend) => MapEntry(friend.uid, friend)),
+                    );
+
+                  return ListView.separated(
+                    itemCount: friends.length,
+                    separatorBuilder: (_, __) => const SizedBox(height: 10),
+                    itemBuilder: (context, index) {
+                      final friend = friends[index];
+                      final isSelected = _selectedUids.contains(friend.uid);
+                      final isDisabled = !friend.canInvite;
+                      final cardColor = isDisabled
+                          ? colorScheme.surfaceContainerLow
+                          : isSelected
+                          ? colorScheme.primaryContainer
+                          : colorScheme.surfaceContainer;
+                      final borderColor = isDisabled
+                          ? colorScheme.outlineVariant
+                          : isSelected
+                          ? colorScheme.primary
+                          : colorScheme.outlineVariant;
+                      final titleColor = isDisabled
+                          ? colorScheme.onSurfaceVariant
+                          : colorScheme.onSurface;
+
+                      return InkWell(
+                        onTap: isDisabled
+                            ? null
+                            : () {
+                                setState(() {
+                                  if (isSelected) {
+                                    _selectedUids.remove(friend.uid);
+                                  } else {
+                                    _selectedUids.add(friend.uid);
+                                  }
+                                });
+                              },
+                        borderRadius: BorderRadius.circular(18),
+                        child: Container(
+                          padding: const EdgeInsets.all(14),
+                          decoration: BoxDecoration(
+                            color: cardColor,
                             borderRadius: BorderRadius.circular(18),
-                            child: Container(
-                              padding: const EdgeInsets.all(14),
-                              decoration: BoxDecoration(
-                                color: isSelected
-                                    ? colorScheme.primaryContainer
-                                    : colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(18),
-                                border: Border.all(
-                                  color: isSelected
-                                      ? colorScheme.primary
-                                      : colorScheme.outlineVariant,
-                                ),
+                            border: Border.all(color: borderColor),
+                          ),
+                          child: Row(
+                            children: [
+                              UserUidAvatar(
+                                uid: friend.uid,
+                                userWholeName: friend.wholeName,
+                                radius: 20,
+                                backgroundColor: colorScheme.primary,
+                                foregroundColor: colorScheme.onPrimary,
                               ),
-                              child: Row(
-                                children: [
-                                  CircleAvatar(
-                                    backgroundColor: colorScheme.primary,
-                                    child: Text(
-                                      _initialsFromName(friend.wholeName),
-                                      style: TextStyle(
-                                        color: colorScheme.onPrimary,
+                              const SizedBox(width: 12),
+                              Expanded(
+                                child: Column(
+                                  crossAxisAlignment: CrossAxisAlignment.start,
+                                  children: [
+                                    Text(
+                                      friend.wholeName.isEmpty
+                                          ? 'Member'
+                                          : friend.wholeName,
+                                      style: textTheme.titleMedium?.copyWith(
                                         fontWeight: FontWeight.w700,
+                                        color: titleColor,
                                       ),
                                     ),
+                                    const SizedBox(height: 4),
+                                    Text(
+                                      friend.isAlreadyRegistered
+                                          ? 'Already registered for this class'
+                                          : friend.bio.trim().isEmpty
+                                          ? 'Available to add to your group'
+                                          : friend.bio.trim(),
+                                      maxLines: 2,
+                                      overflow: TextOverflow.ellipsis,
+                                      style: textTheme.bodySmall?.copyWith(
+                                        color: colorScheme.onSurfaceVariant,
+                                      ),
+                                    ),
+                                  ],
+                                ),
+                              ),
+                              if (friend.isAlreadyRegistered)
+                                Container(
+                                  padding: const EdgeInsets.symmetric(
+                                    horizontal: 10,
+                                    vertical: 6,
                                   ),
-                                  const SizedBox(width: 12),
-                                  Expanded(
-                                    child: Column(
-                                      crossAxisAlignment:
-                                          CrossAxisAlignment.start,
-                                      children: [
-                                        Text(
-                                          friend.wholeName.isEmpty
-                                              ? 'Member'
-                                              : friend.wholeName,
-                                          style: textTheme.titleMedium
-                                              ?.copyWith(
-                                                fontWeight: FontWeight.w700,
-                                                color: colorScheme.onSurface,
-                                              ),
-                                        ),
-                                        if (friend.bio.trim().isNotEmpty) ...[
-                                          const SizedBox(height: 4),
-                                          Text(
-                                            friend.bio.trim(),
-                                            maxLines: 2,
-                                            overflow: TextOverflow.ellipsis,
-                                            style: textTheme.bodySmall
-                                                ?.copyWith(
-                                                  color: colorScheme
-                                                      .onSurfaceVariant,
-                                                ),
-                                          ),
-                                        ],
-                                      ],
+                                  decoration: BoxDecoration(
+                                    color: colorScheme.surface,
+                                    borderRadius: BorderRadius.circular(999),
+                                    border: Border.all(
+                                      color: colorScheme.outlineVariant,
                                     ),
                                   ),
-                                  Checkbox(
-                                    value: isSelected,
-                                    onChanged: (_) {
-                                      setState(() {
-                                        if (isSelected) {
-                                          _selectedUids.remove(friend.uid);
-                                        } else {
-                                          _selectedUids.add(friend.uid);
-                                        }
-                                      });
-                                    },
+                                  child: Text(
+                                    'Booked',
+                                    style: textTheme.labelMedium?.copyWith(
+                                      color: colorScheme.onSurfaceVariant,
+                                      fontWeight: FontWeight.w700,
+                                    ),
                                   ),
-                                ],
-                              ),
-                            ),
-                          );
-                        },
+                                )
+                              else
+                                Checkbox(
+                                  value: isSelected,
+                                  onChanged: (_) {
+                                    setState(() {
+                                      if (isSelected) {
+                                        _selectedUids.remove(friend.uid);
+                                      } else {
+                                        _selectedUids.add(friend.uid);
+                                      }
+                                    });
+                                  },
+                                ),
+                            ],
+                          ),
+                        ),
                       );
                     },
                   );

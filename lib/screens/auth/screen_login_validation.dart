@@ -54,6 +54,7 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
   late ProviderUserProfile _providerUserProfile;
   bool isEmailVerified = false;
   Timer? timer;
+  bool _queuedAuthedLoad = false;
 
   ////////////////////////////////////////////////////////////////
   ////////////////////////////////////////////////////////////////
@@ -116,7 +117,7 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
       //   return const InternetIssuesWidget();
       // }
       else if (!_providerUserProfile.dataLoaded) {
-        _providerAuth.loadAuthedUserDetailsUponSignin();
+        _queueAuthedUserLoadIfNeeded();
         return WidgetAnnotatedLoading(
           loadingText: "Loading Profile...",
           timeOutEnabled: true,
@@ -172,5 +173,27 @@ class _ScreenLoginValidationState extends ConsumerState<ScreenLoginValidation> {
         },
       ),
     );
+  }
+
+  void _queueAuthedUserLoadIfNeeded() {
+    if (_queuedAuthedLoad ||
+        _providerAuth.authState != AuthState.AUTHENTICATED ||
+        _providerAuth.isSigningOut ||
+        _providerUserProfile.dataLoaded) {
+      return;
+    }
+
+    _queuedAuthedLoad = true;
+    WidgetsBinding.instance.addPostFrameCallback((_) async {
+      if (!mounted) {
+        return;
+      }
+
+      try {
+        await _providerAuth.loadAuthedUserDetailsUponSignin();
+      } finally {
+        _queuedAuthedLoad = false;
+      }
+    });
   }
 }

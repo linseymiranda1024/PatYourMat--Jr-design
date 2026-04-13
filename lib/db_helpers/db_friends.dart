@@ -37,6 +37,11 @@ class DBFriends {
       throw Exception('Invalid friend.');
     }
 
+    await _ensureMembersOnlyFriendship(
+      currentUid: cleanFromUid,
+      targetUid: cleanToUid,
+    );
+
     final currentUserFriendRef = _db
         .collection(_userProfilesCollection)
         .doc(cleanFromUid)
@@ -95,6 +100,11 @@ class DBFriends {
         'Invalid friend request: UIDs cannot be empty or identical.',
       );
     }
+
+    await _ensureMembersOnlyFriendship(
+      currentUid: cleanFromUid,
+      targetUid: cleanToUid,
+    );
 
     final existingFriendshipDoc = await _db
         .collection(_userProfilesCollection)
@@ -185,6 +195,11 @@ class DBFriends {
         cleanCurrentUid == cleanTargetUid) {
       throw Exception('Invalid friend request acceptance.');
     }
+
+    await _ensureMembersOnlyFriendship(
+      currentUid: cleanCurrentUid,
+      targetUid: cleanTargetUid,
+    );
 
     final batch = _db.batch();
 
@@ -369,5 +384,25 @@ class DBFriends {
               .where((uid) => uid.isNotEmpty)
               .toSet();
         });
+  }
+
+  static Future<void> _ensureMembersOnlyFriendship({
+    required String currentUid,
+    required String targetUid,
+  }) async {
+    final profileSnapshots = await Future.wait([
+      _db.collection(_userProfilesCollection).doc(currentUid).get(),
+      _db.collection(_userProfilesCollection).doc(targetUid).get(),
+    ]);
+
+    final currentRole = _normalizedRole(profileSnapshots[0].data());
+    final targetRole = _normalizedRole(profileSnapshots[1].data());
+    if (currentRole == 'staff' || targetRole == 'staff') {
+      throw Exception('Staff accounts cannot be added as friends.');
+    }
+  }
+
+  static String _normalizedRole(Map<String, dynamic>? profileData) {
+    return (profileData?['role'] ?? 'Member').toString().trim().toLowerCase();
   }
 }

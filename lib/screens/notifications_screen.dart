@@ -5,8 +5,10 @@ import 'package:intl/intl.dart';
 
 import '../db_helpers/db_friends.dart';
 import '../db_helpers/db_reservations.dart';
+import '../models/gym_class.dart';
 import '../main.dart';
 import '../models/reservation.dart';
+import '../models/user_profile.dart';
 import '../providers/provider_reservations.dart';
 import '../theme/app_colors.dart';
 
@@ -23,15 +25,20 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final userProfile = ref.watch(providerUserProfile);
     final reservations = ref.watch(reservationsProvider).reservations;
-    final currentUid = ref.watch(
-      providerUserProfile.select((profile) => profile.uid),
-    );
-    final wholeName = ref.watch(
-      providerUserProfile.select((profile) => profile.wholeName),
-    );
-    final currentName = wholeName.trim().isEmpty ? 'Someone' : wholeName.trim();
-    final scheduleNotifications = _buildScheduleNotifications(reservations);
+    final currentUid = userProfile.uid;
+    final currentName = userProfile.wholeName.trim().isEmpty
+        ? 'Someone'
+        : userProfile.wholeName.trim();
+    final isStaff = userProfile.role == UserRole.STAFF;
+    final managedClasses = ref.watch(providerGymClass).classes;
+    final scheduleNotifications = isStaff
+        ? _buildStaffScheduleNotifications(
+            managedClasses,
+            staffName: userProfile.wholeName,
+          )
+        : _buildScheduleNotifications(reservations);
     final colorScheme = Theme.of(context).colorScheme;
     final heroGradient = Theme.of(context).brightness == Brightness.dark
         ? const [AppColors.gradientStartDark, AppColors.gradientEndDark]
@@ -94,6 +101,8 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                         Text(
                           notifications.isEmpty
                               ? 'You are all caught up.'
+                              : isStaff
+                              ? '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your classes.'
                               : '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your schedule.',
                           style: const TextStyle(
                             color: AppColors.headerOnBrandMuted,
@@ -116,10 +125,10 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                           ),
                         )
                       : notifications.isEmpty
-                      ? const Center(
+                      ? Center(
                           child: Padding(
                             padding: EdgeInsets.all(24),
-                            child: _NotificationEmptyState(),
+                            child: _NotificationEmptyState(isStaff: isStaff),
                           ),
                         )
                       : ListView.separated(
@@ -435,7 +444,9 @@ class _StatusChip extends StatelessWidget {
 }
 
 class _NotificationEmptyState extends StatelessWidget {
-  const _NotificationEmptyState();
+  final bool isStaff;
+
+  const _NotificationEmptyState({this.isStaff = false});
 
   @override
   Widget build(BuildContext context) {
@@ -467,7 +478,9 @@ class _NotificationEmptyState extends StatelessWidget {
           ),
           const SizedBox(height: 6),
           Text(
-            'Class reminders and friend invites will show up here.',
+            isStaff
+                ? 'Class readiness updates and schedule reminders will show up here.'
+                : 'Class reminders and friend invites will show up here.',
             textAlign: TextAlign.center,
             style: textTheme.bodyMedium?.copyWith(
               color: colorScheme.onSurfaceVariant,
@@ -713,6 +726,111 @@ List<_NotificationItem> _buildScheduleNotifications(
           icon: Icons.history,
           color: const Color(0xFF7C3AED),
           sortDate: reservation.date,
+        ),
+      );
+    }
+  }
+
+  return items;
+}
+
+List<_NotificationItem> _buildStaffScheduleNotifications(
+  List<GymClass> classes, {
+  required String staffName,
+  DateTime? now,
+}) {
+  final normalizedStaffName = staffName.trim().toLowerCase();
+  if (normalizedStaffName.isEmpty) {
+    return const <_NotificationItem>[];
+  }
+
+  final currentTime = now ?? DateTime.now();
+  final managedClasses =
+      classes
+          .where(
+            (gymClass) =>
+                gymClass.instructor.trim().toLowerCase() == normalizedStaffName,
+          )
+          .toList()
+        ..sort((a, b) => a.dateTime.compareTo(b.dateTime));
+
+  final items = <_NotificationItem>[];
+  for (final gymClass in managedClasses) {
+    final classDuration = gymClass.durationMinutes > 0
+        ? gymClass.durationMinutes
+        : 60;
+    final classEnd = gymClass.dateTime.add(Duration(minutes: classDuration));
+    if (classEnd.isBefore(currentTime)) {
+      continue;
+    }
+
+    final difference = gymClass.dateTime.difference(currentTime);
+    final occupancySummary =
+        '${gymClass.filled}/${gymClass.capacity} booked • ${gymClass.location}';
+
+    if (difference.inMinutes >= 0 && difference.inHours < 3) {
+      items.add(
+        _NotificationItem(
+          type: 'staff_schedule',
+          title: 'Class begins soon',
+          message:
+              '${gymClass.title} starts at ${DateFormat.jm().format(gymClass.dateTime)}. ${gymClass.filled}/${gymClass.capacity} spots are booked.',
+          timeLabel: 'Soon',
+          icon: Icons.alarm,
+          color: const Color(0xFFDC2626),
+          sortDate: gymClass.dateTime,
+          subtitle: occupancySummary,
+        ),
+      );
+      continue;
+    }
+
+    if (gymClass.filled >= gymClass.capacity) {
+      items.add(
+        _NotificationItem(
+          type: 'staff_schedule',
+          title: 'Class is full',
+          message:
+              '${gymClass.title} reached capacity for ${DateFormat.MMMd().add_jm().format(gymClass.dateTime)}.${gymClass.standbyCount > 0 ? ' ${gymClass.standbyCount} on standby.' : ''}',
+          timeLabel: 'Full',
+          icon: Icons.groups_2_rounded,
+          color: const Color(0xFFF59E0B),
+          sortDate: gymClass.dateTime,
+          subtitle: occupancySummary,
+        ),
+      );
+      continue;
+    }
+
+    if (_isTomorrow(gymClass.dateTime, currentTime)) {
+      items.add(
+        _NotificationItem(
+          type: 'staff_schedule',
+          title: 'Tomorrow\'s class',
+          message:
+              '${gymClass.title} starts tomorrow at ${DateFormat.jm().format(gymClass.dateTime)}.',
+          timeLabel: 'Tomorrow',
+          icon: Icons.event_available,
+          color: const Color(0xFF2563EB),
+          sortDate: gymClass.dateTime,
+          subtitle: occupancySummary,
+        ),
+      );
+      continue;
+    }
+
+    if (difference.inDays >= 0 && difference.inDays < 7) {
+      items.add(
+        _NotificationItem(
+          type: 'staff_schedule',
+          title: 'Upcoming class',
+          message:
+              '${gymClass.title} is scheduled for ${DateFormat.MMMd().add_jm().format(gymClass.dateTime)}.',
+          timeLabel: DateFormat.MMMd().format(gymClass.dateTime),
+          icon: Icons.calendar_today,
+          color: const Color(0xFF16A34A),
+          sortDate: gymClass.dateTime,
+          subtitle: occupancySummary,
         ),
       );
     }
