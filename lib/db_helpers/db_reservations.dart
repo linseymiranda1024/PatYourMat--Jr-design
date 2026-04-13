@@ -95,10 +95,17 @@ class DBReservations {
     required List<String> inviteeUids,
   }) async {
     try {
-      return await _db.runTransaction<GroupReservationResult>((transaction) async {
+      return await _db.runTransaction<GroupReservationResult>((
+        transaction,
+      ) async {
         final classRef = _classRef(gymClass.id);
-        final hostProfileRef = _db.collection(_userProfilesCollection).doc(hostUserId);
-        final hostRegistrationRef = _userRegistrationRef(hostUserId, gymClass.id);
+        final hostProfileRef = _db
+            .collection(_userProfilesCollection)
+            .doc(hostUserId);
+        final hostRegistrationRef = _userRegistrationRef(
+          hostUserId,
+          gymClass.id,
+        );
         final hostClassRegistrationRef = _classRegistrationRef(
           gymClass.id,
           hostUserId,
@@ -244,7 +251,10 @@ class DBReservations {
       final reservedMatNumber =
           notificationData['reserved_mat_number']?.toString() ?? '';
 
-      final existingRegistration = await _userRegistrationRef(userId, classId).get();
+      final existingRegistration = await _userRegistrationRef(
+        userId,
+        classId,
+      ).get();
       if (existingRegistration.exists) {
         await _releaseHeldInviteSpot(
           classId: classId,
@@ -263,8 +273,7 @@ class DBReservations {
           accepted: true,
         );
 
-        final existingData =
-            existingRegistration.data() ?? <String, dynamic>{};
+        final existingData = existingRegistration.data() ?? <String, dynamic>{};
         return existingData['matNumber']?.toString();
       }
 
@@ -352,8 +361,9 @@ class DBReservations {
     }
   }
 
-  static CollectionReference<Map<String, dynamic>>
-  _getStandbyQueueCollection(String classId) {
+  static CollectionReference<Map<String, dynamic>> _getStandbyQueueCollection(
+    String classId,
+  ) {
     return _db
         .collection(_classesCollection)
         .doc(classId)
@@ -367,12 +377,11 @@ class DBReservations {
     return _getStandbyQueueCollection(classId).doc(userId);
   }
 
-  static Future<void> joinStandbyQueue(
-    String userId,
-    GymClass gymClass,
-  ) async {
+  static Future<void> joinStandbyQueue(String userId, GymClass gymClass) async {
     try {
-      final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
+      final userProfileRef = _db
+          .collection(_userProfilesCollection)
+          .doc(userId);
       final userProfileSnap = await userProfileRef.get();
       final userProfileData = userProfileSnap.data() ?? <String, dynamic>{};
 
@@ -382,10 +391,14 @@ class DBReservations {
       await _db.runTransaction((transaction) async {
         final standbySnap = await transaction.get(standbyRef);
         if (standbySnap.exists) {
-          throw Exception('You are already in the standby queue for this class.');
+          throw Exception(
+            'You are already in the standby queue for this class.',
+          );
         }
 
-        final userRegistrationSnap = await transaction.get(_userRegistrationRef(userId, gymClass.id));
+        final userRegistrationSnap = await transaction.get(
+          _userRegistrationRef(userId, gymClass.id),
+        );
         if (userRegistrationSnap.exists) {
           throw Exception('You are already registered for this class.');
         }
@@ -410,9 +423,7 @@ class DBReservations {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        transaction.update(classRef, {
-          'standbyCount': currentStandbyCount + 1,
-        });
+        transaction.update(classRef, {'standbyCount': currentStandbyCount + 1});
       });
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
@@ -420,7 +431,10 @@ class DBReservations {
   }
 
   static Stream<bool> isUserInStandby(String userId, String classId) {
-    return _standbyQueueRef(classId, userId).snapshots().map((doc) => doc.exists);
+    return _standbyQueueRef(
+      classId,
+      userId,
+    ).snapshots().map((doc) => doc.exists);
   }
 
   static Stream<int?> getStandbyQueuePositionStream(
@@ -431,17 +445,16 @@ class DBReservations {
       return Stream<int?>.value(null);
     }
 
-    return _getStandbyQueueCollection(classId)
-        .orderBy('createdAt')
-        .snapshots()
-        .map((snapshot) {
-          for (var index = 0; index < snapshot.docs.length; index++) {
-            if (snapshot.docs[index].id == userId) {
-              return index + 1;
-            }
-          }
-          return null;
-        });
+    return _getStandbyQueueCollection(
+      classId,
+    ).orderBy('createdAt').snapshots().map((snapshot) {
+      for (var index = 0; index < snapshot.docs.length; index++) {
+        if (snapshot.docs[index].id == userId) {
+          return index + 1;
+        }
+      }
+      return null;
+    });
   }
 
   static Stream<Set<String>> getStandbyClassIdsStream(String userId) {
@@ -504,7 +517,7 @@ class DBReservations {
             final data = doc.data();
             final classId = data['classId'] as String?;
             int durationMinutes = 60;
-            
+
             if (classId != null && classId.isNotEmpty) {
               try {
                 final classSnap = await _classRef(classId).get();
@@ -518,7 +531,7 @@ class DBReservations {
                 // Fall back to default duration if class not found
               }
             }
-            
+
             reservations.add(
               Reservation.fromMap({
                 ...data,
@@ -544,16 +557,34 @@ class DBReservations {
       );
       final classTitle = classData['title']?.toString() ?? '';
       final classInstructor = classData['instructor']?.toString() ?? '';
-      final classType = normalizeGymClassType(classData['type']?.toString() ?? '');
+      final classType = normalizeGymClassType(
+        classData['type']?.toString() ?? '',
+      );
       final classDateTime = classData['dateTime'] is Timestamp
           ? (classData['dateTime'] as Timestamp).toDate()
           : DateTime.now();
 
       // Calculate formatted date and time strings
-      final months = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+      final months = [
+        'Jan',
+        'Feb',
+        'Mar',
+        'Apr',
+        'May',
+        'Jun',
+        'Jul',
+        'Aug',
+        'Sep',
+        'Oct',
+        'Nov',
+        'Dec',
+      ];
       final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      final classDateText = '${weekdays[classDateTime.weekday - 1]}, ${months[classDateTime.month - 1]} ${classDateTime.day}';
-      final hour = classDateTime.hour > 12 ? classDateTime.hour - 12 : (classDateTime.hour == 0 ? 12 : classDateTime.hour);
+      final classDateText =
+          '${weekdays[classDateTime.weekday - 1]}, ${months[classDateTime.month - 1]} ${classDateTime.day}';
+      final hour = classDateTime.hour > 12
+          ? classDateTime.hour - 12
+          : (classDateTime.hour == 0 ? 12 : classDateTime.hour);
       final amPm = classDateTime.hour >= 12 ? 'PM' : 'AM';
       final minute = classDateTime.minute.toString().padLeft(2, '0');
       final classTimeText = '$hour:$minute $amPm';
@@ -595,7 +626,9 @@ class DBReservations {
                 .toSet()
                 .length
           : 0;
-      final persistedCount = _asInt(classData['filled'] ?? classData['registeredCount']);
+      final persistedCount = _asInt(
+        classData['filled'] ?? classData['registeredCount'],
+      );
       return max(rosterCount, max(reservedMatCount, persistedCount));
     });
   }
@@ -616,7 +649,9 @@ class DBReservations {
           final classData = classSnap.data() as Map<String, dynamic>;
           final currentStandbyCount = _asInt(classData['standbyCount']);
           transaction.update(classRef, {
-            'standbyCount': (currentStandbyCount - 1).clamp(0, double.infinity).toInt(),
+            'standbyCount': (currentStandbyCount - 1)
+                .clamp(0, double.infinity)
+                .toInt(),
           });
         }
 
@@ -978,8 +1013,7 @@ class DBReservations {
 
       final userRegistrationSnap = await transaction.get(userRegistrationRef);
       if (userRegistrationSnap.exists) {
-        final existingData =
-            userRegistrationSnap.data() ?? <String, dynamic>{};
+        final existingData = userRegistrationSnap.data() ?? <String, dynamic>{};
         return existingData['matNumber']?.toString() ?? reservedMatNumber;
       }
 
@@ -1242,9 +1276,13 @@ class DBReservations {
     return 'Mat #${availableMatNumbers[Random().nextInt(availableMatNumbers.length)]}';
   }
 
+  static int? parseMatNumber(String rawMatNumber) {
+    final match = RegExp(r'(\d+)').firstMatch(rawMatNumber);
+    return int.tryParse(match?.group(1) ?? '');
+  }
+
   static String _normalizeMatNumber(String rawValue, int capacity) {
-    final match = RegExp(r'(\d+)').firstMatch(rawValue);
-    final matNumber = int.tryParse(match?.group(1) ?? '');
+    final matNumber = parseMatNumber(rawValue);
     if (matNumber == null || matNumber <= 0 || matNumber > capacity) {
       throw Exception('Invalid mat selection.');
     }
@@ -1252,7 +1290,6 @@ class DBReservations {
   }
 
   static int _matSortValue(String matNumber) {
-    final match = RegExp(r'(\d+)').firstMatch(matNumber);
-    return int.tryParse(match?.group(1) ?? '') ?? 999999;
+    return parseMatNumber(matNumber) ?? 999999;
   }
 }

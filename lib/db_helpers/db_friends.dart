@@ -351,4 +351,23 @@ class DBFriends {
     batch.delete(otherUserFriendRef);
     await batch.commit();
   }
+
+  static Stream<Set<String>> getFriendUidsStream(String userId) {
+    final cleanUserId = userId.trim();
+    if (cleanUserId.isEmpty) {
+      return Stream.value(const <String>{});
+    }
+
+    return _db
+        .collection(_userProfilesCollection)
+        .doc(cleanUserId)
+        .collection(_friendsSubcollection)
+        .snapshots()
+        .map((snapshot) {
+          return snapshot.docs
+              .map((doc) => (doc.data()['uid'] ?? doc.id).toString().trim())
+              .where((uid) => uid.isNotEmpty)
+              .toSet();
+        });
+  }
 }

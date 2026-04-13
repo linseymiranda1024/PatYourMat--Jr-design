@@ -2,7 +2,9 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
 import 'package:go_router/go_router.dart';
+import 'package:rxdart/rxdart.dart';
 
+import '../db_helpers/db_friends.dart';
 import '../db_helpers/db_gym_class.dart';
 import '../db_helpers/db_reservations.dart';
 import '../main.dart';
@@ -11,6 +13,34 @@ import '../models/reservation.dart';
 import '../providers/provider_reservations.dart';
 import '../theme/app_colors.dart';
 import 'reservation_confirmation_screen.dart';
+
+final _socialMatOccupancyProvider = StreamProvider.autoDispose
+    .family<_SocialMatOccupancy, String>((ref, classId) {
+      final currentUid = ref.watch(
+        providerUserProfile.select((profile) => profile.uid.trim()),
+      );
+      final friendsStream = currentUid.isEmpty
+          ? Stream.value(const <String>{})
+          : DBFriends.getFriendUidsStream(currentUid);
+
+      return Rx.combineLatest3<
+        List<Reservation>,
+        Set<String>,
+        Set<int>,
+        _SocialMatOccupancy
+      >(
+        DBReservations.getReservationsForClassStream(classId),
+        friendsStream,
+        DBReservations.getReservedMatNumbersStream(classId),
+        (reservations, friendUids, reservedMatNumbers) {
+          return _SocialMatOccupancy.fromReservations(
+            reservations: reservations,
+            friendUids: friendUids,
+            reservedMatNumbers: reservedMatNumbers,
+          );
+        },
+      );
+    });
 
 class MatSelectionScreen extends ConsumerStatefulWidget {
   static const String routeName = '/mat_selection';
@@ -38,8 +68,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
     final rowSize = safeCapacity <= 8
         ? 4
         : safeCapacity <= 15
-            ? 5
-            : 6;
+        ? 5
+        : 6;
 
     final rows = <List<int>>[];
     for (var i = 0; i < mats.length; i += rowSize) {
@@ -102,20 +132,19 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
             : currentUser.wholeName.trim();
         final groupResult =
             await DBReservations.registerForClassWithGroupInvites(
-          hostUserId: currentUser.uid,
-          hostName: currentName,
-          gymClass: gClass,
-          selectedMatNumbers: matNumbers,
-          inviteeUids: _selectedInviteeUids.toList(),
-        );
+              hostUserId: currentUser.uid,
+              hostName: currentName,
+              gymClass: gClass,
+              selectedMatNumbers: matNumbers,
+              inviteeUids: _selectedInviteeUids.toList(),
+            );
         reservedMat = groupResult.hostMatNumber;
         inviteCount = groupResult.invitesSent;
         skippedInviteCount = groupResult.skippedInviteeUids.length;
       } else {
-        reservedMat = await ref.read(reservationsProvider).registerForClass(
-              gClass,
-              matNumber: matNumbers.first,
-            );
+        reservedMat = await ref
+            .read(reservationsProvider)
+            .registerForClass(gClass, matNumber: matNumbers.first);
       }
 
       if (!mounted || reservedMat == null) {
@@ -148,10 +177,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
       context.pushNamed(
         ReservationConfirmationScreen.routeName,
-        extra: {
-          'gymClass': gClass,
-          'reservation': reservation,
-        },
+        extra: {'gymClass': gClass, 'reservation': reservation},
       );
     } catch (e) {
       if (!mounted) return;
@@ -159,9 +185,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
       if (message.startsWith('Exception: ')) {
         message = message.replaceFirst('Exception: ', '');
       }
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text(message)),
-      );
+      ScaffoldMessenger.of(
+        context,
+      ).showSnackBar(SnackBar(content: Text(message)));
     } finally {
       if (mounted) {
         setState(() => _isSubmitting = false);
@@ -219,6 +245,10 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
   @override
   Widget build(BuildContext context) {
+    final socialMatOccupancyAsync = ref.watch(
+      _socialMatOccupancyProvider(widget.classId),
+    );
+
     return StreamBuilder<GymClass?>(
       stream: DBGymClass.getClassStream(widget.classId),
       initialData: widget.initialGymClass,
@@ -237,27 +267,29 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         final textTheme = Theme.of(context).textTheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
         final matRows = _buildMatRows(gClass.capacity);
-        return StreamBuilder<int>(
-          stream: DBReservations.getReservationCountForClassStream(gClass.id),
-          builder: (context, countSnapshot) {
-            final liveFilled = countSnapshot.data ?? gClass.filled;
-            final isFull = liveFilled >= gClass.capacity;
+        final socialMatOccupancy =
+            socialMatOccupancyAsync.asData?.value ??
+            const _SocialMatOccupancy();
+        final liveFilled = socialMatOccupancyAsync.hasValue
+            ? socialMatOccupancy.reservedMatNumbers.length
+            : gClass.filled;
+        final isFull = liveFilled >= gClass.capacity;
 
-            return StreamBuilder<bool>(
-              stream: DBReservations.isUserInStandby(
-                ref.read(reservationsProvider).userId ?? '',
-                gClass.id,
-              ),
-              builder: (context, standbySnapshot) {
-                final isInStandby = standbySnapshot.data ?? false;
+        return StreamBuilder<bool>(
+          stream: DBReservations.isUserInStandby(
+            ref.read(reservationsProvider).userId ?? '',
+            gClass.id,
+          ),
+          builder: (context, standbySnapshot) {
+            final isInStandby = standbySnapshot.data ?? false;
 
-                return Scaffold(
-                  appBar: AppBar(title: const Text('Choose Your Spot')),
-                  body: Container(
-                    color: colorScheme.surface,
-                    child: SingleChildScrollView(
-                      child: Column(
-                        children: [
+            return Scaffold(
+              appBar: AppBar(title: const Text('Choose Your Spot')),
+              body: Container(
+                color: colorScheme.surface,
+                child: SingleChildScrollView(
+                  child: Column(
+                    children: [
                       Container(
                         margin: const EdgeInsets.fromLTRB(16, 16, 16, 0),
                         padding: const EdgeInsets.all(20),
@@ -295,26 +327,16 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                               ),
                             ),
                             const SizedBox(height: 8),
-                            StreamBuilder<Set<int>>(
-                              stream: DBReservations.getReservedMatNumbersStream(
-                                gClass.id,
+                            Text(
+                              _groupSize == 1
+                                  ? 'Choose the mat spot you want before confirming. $liveFilled/${gClass.capacity} are already taken.'
+                                  : 'Choose $_groupSize mats for your group. The first mat you tap is yours, and the rest are held for your invited friends. $liveFilled/${gClass.capacity} are already taken.',
+                              style: textTheme.bodyMedium?.copyWith(
+                                color: AppColors.headerOnBrand.withValues(
+                                  alpha: 0.88,
+                                ),
+                                height: 1.4,
                               ),
-                              initialData: const <int>{},
-                              builder: (context, snapshot) {
-                                final reservedCount =
-                                    (snapshot.data ?? const <int>{}).length;
-                                return Text(
-                                  _groupSize == 1
-                                      ? 'Choose the mat spot you want before confirming. $reservedCount/${gClass.capacity} are already taken.'
-                                      : 'Choose $_groupSize mats for your group. The first mat you tap is yours, and the rest are held for your invited friends. $reservedCount/${gClass.capacity} are already taken.',
-                                  style: textTheme.bodyMedium?.copyWith(
-                                    color: AppColors.headerOnBrand.withValues(
-                                      alpha: 0.88,
-                                    ),
-                                    height: 1.4,
-                                  ),
-                                );
-                              },
                             ),
                             const SizedBox(height: 16),
                             Wrap(
@@ -328,6 +350,10 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                 _LegendPill(
                                   label: 'Selected',
                                   color: colorScheme.primary,
+                                ),
+                                const _LegendPill(
+                                  label: 'Friend',
+                                  color: AppColors.primaryPurple,
                                 ),
                                 _LegendPill(
                                   label: 'Reserved',
@@ -346,7 +372,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                           decoration: BoxDecoration(
                             color: colorScheme.surfaceContainerHigh,
                             borderRadius: BorderRadius.circular(20),
-                            border: Border.all(color: colorScheme.outlineVariant),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                            ),
                           ),
                           child: Row(
                             mainAxisAlignment: MainAxisAlignment.center,
@@ -368,108 +396,111 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                           ),
                         ),
                       ),
-                      StreamBuilder<Set<int>>(
-                        stream: DBReservations.getReservedMatNumbersStream(
-                          gClass.id,
-                        ),
-                        initialData: const <int>{},
-                        builder: (context, snapshot) {
-                          final reservedMats = snapshot.data ?? <int>{};
-                          return Padding(
-                            padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
-                            child: Container(
-                              decoration: BoxDecoration(
-                                color: colorScheme.surfaceContainer,
-                                borderRadius: BorderRadius.circular(28),
-                                border: Border.all(
-                                  color: colorScheme.outlineVariant,
-                                ),
-                              ),
-                              child: Column(
-                                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                                children: matRows
-                                    .asMap()
-                                    .entries
-                                    .map(
-                                      (entry) => Padding(
-                                        padding: EdgeInsets.symmetric(
-                                          horizontal: entry.key.isEven ? 16 : 28,
-                                          vertical: 10,
-                                        ),
-                                        child: LayoutBuilder(
-                                          builder: (context, constraints) {
-                                            final rowCount = entry.value.length;
-                                            const horizontalPaddingPerMat = 8.0;
-                                            final availableWidth =
-                                                constraints.maxWidth -
-                                                    (rowCount *
-                                                        horizontalPaddingPerMat);
-                                            final maxTileWidth =
-                                                availableWidth / rowCount;
-                                            final tileWidth = maxTileWidth.clamp(
-                                              32.0,
-                                              54.0,
-                                            );
+                      Padding(
+                        padding: const EdgeInsets.fromLTRB(12, 4, 12, 0),
+                        child: Container(
+                          decoration: BoxDecoration(
+                            color: colorScheme.surfaceContainer,
+                            borderRadius: BorderRadius.circular(28),
+                            border: Border.all(
+                              color: colorScheme.outlineVariant,
+                            ),
+                          ),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                            children: matRows
+                                .asMap()
+                                .entries
+                                .map(
+                                  (entry) => Padding(
+                                    padding: EdgeInsets.symmetric(
+                                      horizontal: entry.key.isEven ? 16 : 28,
+                                      vertical: 10,
+                                    ),
+                                    child: LayoutBuilder(
+                                      builder: (context, constraints) {
+                                        final rowCount = entry.value.length;
+                                        const horizontalPaddingPerMat = 8.0;
+                                        final availableWidth =
+                                            constraints.maxWidth -
+                                            (rowCount *
+                                                horizontalPaddingPerMat);
+                                        final maxTileWidth =
+                                            availableWidth / rowCount;
+                                        final tileWidth = maxTileWidth.clamp(
+                                          32.0,
+                                          54.0,
+                                        );
 
-                                            return Row(
-                                              mainAxisAlignment:
-                                                  MainAxisAlignment.center,
-                                              children: entry.value.map((matNumber) {
-                                                final isReserved = reservedMats
+                                        return Row(
+                                          mainAxisAlignment:
+                                              MainAxisAlignment.center,
+                                          children: entry.value.map((
+                                            matNumber,
+                                          ) {
+                                            final isReserved =
+                                                socialMatOccupancy
+                                                    .reservedMatNumbers
                                                     .contains(matNumber);
-                                                final isSelected = _selectedMats
-                                                    .contains(matNumber);
+                                            final isSelected = _selectedMats
+                                                .contains(matNumber);
+                                            final friendInfo = socialMatOccupancy
+                                                .friendMatsByNumber[matNumber];
 
-                                                return Padding(
-                                                  padding:
-                                                      const EdgeInsets.symmetric(
+                                            return Padding(
+                                              padding:
+                                                  const EdgeInsets.symmetric(
                                                     horizontal: 4,
                                                   ),
-                                                  child: SizedBox(
-                                                    width: tileWidth,
-                                                    child: AspectRatio(
-                                                      aspectRatio: 0.52,
-                                                      child: _YogaMatTile(
-                                                        number: matNumber,
-                                                        reserved: isReserved,
-                                                        selected: isSelected,
-                                                        onTap: isReserved ||
-                                                                isFull ||
-                                                                isInStandby
-                                                            ? null
-                                                            : () {
-                                                                setState(() {
-                                                                  if (isSelected) {
-                                                                    _selectedMats.remove(
+                                              child: SizedBox(
+                                                width: tileWidth,
+                                                child: AspectRatio(
+                                                  aspectRatio: 0.52,
+                                                  child: _YogaMatTile(
+                                                    number: matNumber,
+                                                    reserved: isReserved,
+                                                    selected: isSelected,
+                                                    isFriend:
+                                                        friendInfo != null,
+                                                    friendInitials:
+                                                        friendInfo?.initials,
+                                                    onTap:
+                                                        isReserved ||
+                                                            isFull ||
+                                                            isInStandby
+                                                        ? null
+                                                        : () {
+                                                            setState(() {
+                                                              if (isSelected) {
+                                                                _selectedMats
+                                                                    .remove(
                                                                       matNumber,
                                                                     );
-                                                                    return;
-                                                                  }
-                                                                  if (_selectedMats
-                                                                          .length >=
-                                                                      _groupSize) {
-                                                                    return;
-                                                                  }
-                                                                  _selectedMats.add(
-                                                                    matNumber,
-                                                                  );
-                                                                });
-                                                              },
-                                                      ),
-                                                    ),
+                                                                return;
+                                                              }
+                                                              if (_selectedMats
+                                                                      .length >=
+                                                                  _groupSize) {
+                                                                return;
+                                                              }
+                                                              _selectedMats.add(
+                                                                matNumber,
+                                                              );
+                                                            });
+                                                          },
                                                   ),
-                                                );
-                                              }).toList(),
+                                                ),
+                                              ),
                                             );
-                                          },
-                                        ),
-                                      ),
-                                    )
-                                    .toList(),
-                              ),
-                            ),
-                          );
-                        },
+                                          }).toList(),
+                                        );
+                                      },
+                                    ),
+                                  ),
+                                )
+                                .toList(),
+                          ),
+                        ),
                       ),
                       SafeArea(
                         top: false,
@@ -497,8 +528,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                       child: Text(
                                         _selectedInviteeUids.isEmpty
                                             ? (_selectedMats.isEmpty
-                                                ? 'No mat selected'
-                                                : _selectionSummary())
+                                                  ? 'No mat selected'
+                                                  : _selectionSummary())
                                             : '${_selectedInviteeUids.length} friend${_selectedInviteeUids.length == 1 ? '' : 's'} selected, so choose $_groupSize mats',
                                         style: textTheme.bodyMedium?.copyWith(
                                           fontSize: 14,
@@ -508,10 +539,13 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                       ),
                                     ),
                                     TextButton.icon(
-                                      onPressed: _isSubmitting || isFull || isInStandby
+                                      onPressed:
+                                          _isSubmitting || isFull || isInStandby
                                           ? null
                                           : _openInviteSheet,
-                                      icon: const Icon(Icons.group_add_outlined),
+                                      icon: const Icon(
+                                        Icons.group_add_outlined,
+                                      ),
                                       label: Text(
                                         _selectedInviteeUids.isEmpty
                                             ? 'Invite Friends'
@@ -528,35 +562,35 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                 child: ElevatedButton(
                                   onPressed: isFull
                                       ? (_isSubmitting || isInStandby
-                                          ? null
-                                          : () => _joinStandbyQueue(gClass))
+                                            ? null
+                                            : () => _joinStandbyQueue(gClass))
                                       : (_selectedMats.length != 1 ||
-                                              _isSubmitting ||
-                                              _selectedInviteeUids.isNotEmpty)
-                                          ? null
-                                          : () async {
-                                              if (liveFilled >=
-                                                  gClass.capacity) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Class just filled up',
-                                                    ),
-                                                  ),
-                                                );
-                                                return;
-                                              }
+                                            _isSubmitting ||
+                                            _selectedInviteeUids.isNotEmpty)
+                                      ? null
+                                      : () async {
+                                          if (liveFilled >= gClass.capacity) {
+                                            ScaffoldMessenger.of(
+                                              context,
+                                            ).showSnackBar(
+                                              const SnackBar(
+                                                content: Text(
+                                                  'Class just filled up',
+                                                ),
+                                              ),
+                                            );
+                                            return;
+                                          }
 
-                                              final matNumbers = <String>[
-                                                'Mat #${_selectedMats.first}',
-                                              ];
-                                              await _submitReservation(
-                                                gClass,
-                                                matNumbers: matNumbers,
-                                                sendInvites: false,
-                                              );
-                                            },
+                                          final matNumbers = <String>[
+                                            'Mat #${_selectedMats.first}',
+                                          ];
+                                          await _submitReservation(
+                                            gClass,
+                                            matNumbers: matNumbers,
+                                            sendInvites: false,
+                                          );
+                                        },
                                   child: _isSubmitting
                                       ? SizedBox(
                                           width: 22,
@@ -569,16 +603,16 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                       : Text(
                                           isFull
                                               ? (isInStandby
-                                                  ? "You're on Standby"
-                                                  : 'Join Standby Queue')
+                                                    ? "You're on Standby"
+                                                    : 'Join Standby Queue')
                                               : _selectedMats.isEmpty
-                                                  ? 'Select a Mat'
-                                                  : 'Reserve ${_selectionSummary()}',
-                                          style:
-                                              textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w800,
-                                            color: colorScheme.onPrimary,
-                                          ),
+                                              ? 'Select a Mat'
+                                              : 'Reserve ${_selectionSummary()}',
+                                          style: textTheme.titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w800,
+                                                color: colorScheme.onPrimary,
+                                              ),
                                         ),
                                 ),
                               ),
@@ -588,15 +622,17 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                   width: double.infinity,
                                   height: 54,
                                   child: FilledButton.icon(
-                                    onPressed: (_selectedMats.length != _groupSize ||
+                                    onPressed:
+                                        (_selectedMats.length != _groupSize ||
                                             _isSubmitting ||
                                             isFull ||
                                             isInStandby)
                                         ? null
                                         : () async {
                                             if (liveFilled >= gClass.capacity) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Class just filled up',
@@ -627,12 +663,10 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                           ),
                         ),
                       ),
-                        ],
-                      ),
-                    ),
+                    ],
                   ),
-                );
-              },
+                ),
+              ),
             );
           },
         );
@@ -641,32 +675,92 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
   }
 }
 
+class _SocialMatOccupancy {
+  final Set<int> reservedMatNumbers;
+  final Map<int, _FriendMatInfo> friendMatsByNumber;
+
+  const _SocialMatOccupancy({
+    this.reservedMatNumbers = const <int>{},
+    this.friendMatsByNumber = const <int, _FriendMatInfo>{},
+  });
+
+  factory _SocialMatOccupancy.fromReservations({
+    required List<Reservation> reservations,
+    required Set<String> friendUids,
+    required Set<int> reservedMatNumbers,
+  }) {
+    final allReservedMatNumbers = <int>{...reservedMatNumbers};
+    final friendMatsByNumber = <int, _FriendMatInfo>{};
+
+    for (final reservation in reservations) {
+      final userId = reservation.userId.trim();
+      final matNumber = DBReservations.parseMatNumber(reservation.matNumber);
+      if (matNumber == null) {
+        continue;
+      }
+
+      allReservedMatNumbers.add(matNumber);
+
+      if (userId.isEmpty || !friendUids.contains(userId)) {
+        continue;
+      }
+
+      friendMatsByNumber[matNumber] = _FriendMatInfo(
+        initials: _initialsFromReservation(reservation),
+      );
+    }
+
+    return _SocialMatOccupancy(
+      reservedMatNumbers: allReservedMatNumbers,
+      friendMatsByNumber: friendMatsByNumber,
+    );
+  }
+}
+
+class _FriendMatInfo {
+  final String initials;
+
+  const _FriendMatInfo({required this.initials});
+}
+
 class _YogaMatTile extends StatelessWidget {
   final int number;
   final bool reserved;
   final bool selected;
+  final bool isFriend;
+  final String? friendInitials;
   final VoidCallback? onTap;
 
   const _YogaMatTile({
     required this.number,
     required this.reserved,
     required this.selected,
+    required this.isFriend,
+    this.friendInitials,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final fill = reserved
+    final isFriendMat = reserved && isFriend;
+    final fill = isFriendMat
+        ? AppColors.primaryPurple
+        : reserved
         ? colorScheme.outline
         : selected
-            ? colorScheme.primary
-            : AppColors.success;
-    final border = reserved
+        ? colorScheme.primary
+        : AppColors.success;
+    final border = isFriendMat
+        ? AppColors.primaryPurple.withValues(alpha: 0.88)
+        : reserved
         ? colorScheme.onSurfaceVariant.withValues(alpha: 0.7)
         : selected
-            ? colorScheme.primary.withValues(alpha: 0.88)
-            : AppColors.success.withValues(alpha: 0.88);
+        ? colorScheme.primary.withValues(alpha: 0.88)
+        : AppColors.success.withValues(alpha: 0.88);
+    final centerLabel = isFriendMat
+        ? (friendInitials?.trim().isNotEmpty == true ? friendInitials! : '?')
+        : '$number';
 
     return GestureDetector(
       onTap: onTap,
@@ -743,7 +837,7 @@ class _YogaMatTile extends StatelessWidget {
               child: RotatedBox(
                 quarterTurns: 3,
                 child: Text(
-                  '$number',
+                  centerLabel,
                   style: const TextStyle(
                     color: Colors.white,
                     fontWeight: FontWeight.w900,
@@ -753,6 +847,22 @@ class _YogaMatTile extends StatelessWidget {
                 ),
               ),
             ),
+            if (isFriendMat)
+              Positioned(
+                bottom: 26,
+                left: 8,
+                right: 8,
+                child: Text(
+                  'Mat $number',
+                  textAlign: TextAlign.center,
+                  style: const TextStyle(
+                    color: Colors.white,
+                    fontWeight: FontWeight.w700,
+                    fontSize: 10,
+                    letterSpacing: 0.3,
+                  ),
+                ),
+              ),
             if (selected)
               const Positioned(
                 top: 10,
@@ -809,14 +919,59 @@ class _LegendPill extends StatelessWidget {
           Text(
             label,
             style: Theme.of(context).textTheme.labelLarge?.copyWith(
-                  color: AppColors.headerOnBrand,
-                  fontWeight: FontWeight.w700,
-                ),
+              color: AppColors.headerOnBrand,
+              fontWeight: FontWeight.w700,
+            ),
           ),
         ],
       ),
     );
   }
+}
+
+String _initialsFromReservation(Reservation reservation) {
+  final fromName = _initialsFromName(reservation.userName);
+  if (fromName != '?') {
+    return fromName;
+  }
+  return _initialsFromEmail(reservation.userEmail);
+}
+
+String _initialsFromName(String wholeName) {
+  final parts = wholeName
+      .split(' ')
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.isEmpty) {
+    return '?';
+  }
+  final first = parts.first[0].toUpperCase();
+  final last = parts.length > 1 ? parts.last[0].toUpperCase() : '';
+  return '$first$last';
+}
+
+String _initialsFromEmail(String email) {
+  final localPart = email.trim().split('@').first.trim();
+  if (localPart.isEmpty) {
+    return '?';
+  }
+
+  final parts = localPart
+      .split(RegExp(r'[^A-Za-z0-9]+'))
+      .map((part) => part.trim())
+      .where((part) => part.isNotEmpty)
+      .toList();
+  if (parts.length >= 2) {
+    return '${parts.first[0]}${parts[1][0]}'.toUpperCase();
+  }
+
+  final normalized = localPart.replaceAll(RegExp(r'[^A-Za-z0-9]'), '');
+  if (normalized.isEmpty) {
+    return '?';
+  }
+
+  return normalized.substring(0, normalized.length >= 2 ? 2 : 1).toUpperCase();
 }
 
 class _InviteFriend {
@@ -897,8 +1052,11 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                     return const Center(child: CircularProgressIndicator());
                   }
 
-                  final friendIds = friendsSnapshot.data?.docs
-                          .map((doc) => (doc.data()['uid'] ?? doc.id).toString())
+                  final friendIds =
+                      friendsSnapshot.data?.docs
+                          .map(
+                            (doc) => (doc.data()['uid'] ?? doc.id).toString(),
+                          )
                           .where((uid) => uid.trim().isNotEmpty)
                           .map((uid) => uid.trim())
                           .toSet() ??
@@ -938,7 +1096,8 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                         return const Center(child: CircularProgressIndicator());
                       }
 
-                      final friends = usersSnapshot.data?.docs
+                      final friends =
+                          usersSnapshot.data?.docs
                               .where((doc) => friendIds.contains(doc.id))
                               .map(
                                 (doc) => _InviteFriend(
@@ -1008,16 +1167,18 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                                   const SizedBox(width: 12),
                                   Expanded(
                                     child: Column(
-                                      crossAxisAlignment: CrossAxisAlignment.start,
+                                      crossAxisAlignment:
+                                          CrossAxisAlignment.start,
                                       children: [
                                         Text(
                                           friend.wholeName.isEmpty
                                               ? 'Member'
                                               : friend.wholeName,
-                                          style: textTheme.titleMedium?.copyWith(
-                                            fontWeight: FontWeight.w700,
-                                            color: colorScheme.onSurface,
-                                          ),
+                                          style: textTheme.titleMedium
+                                              ?.copyWith(
+                                                fontWeight: FontWeight.w700,
+                                                color: colorScheme.onSurface,
+                                              ),
                                         ),
                                         if (friend.bio.trim().isNotEmpty) ...[
                                           const SizedBox(height: 4),
@@ -1025,9 +1186,11 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                                             friend.bio.trim(),
                                             maxLines: 2,
                                             overflow: TextOverflow.ellipsis,
-                                            style: textTheme.bodySmall?.copyWith(
-                                              color: colorScheme.onSurfaceVariant,
-                                            ),
+                                            style: textTheme.bodySmall
+                                                ?.copyWith(
+                                                  color: colorScheme
+                                                      .onSurfaceVariant,
+                                                ),
                                           ),
                                         ],
                                       ],
@@ -1079,19 +1242,5 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
         ),
       ),
     );
-  }
-
-  String _initialsFromName(String wholeName) {
-    final parts = wholeName
-        .split(' ')
-        .map((part) => part.trim())
-        .where((part) => part.isNotEmpty)
-        .toList();
-    if (parts.isEmpty) {
-      return '?';
-    }
-    final first = parts.first[0].toUpperCase();
-    final last = parts.length > 1 ? parts.last[0].toUpperCase() : '';
-    return '$first$last';
   }
 }
