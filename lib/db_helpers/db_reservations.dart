@@ -34,6 +34,17 @@ class GroupReservationResult {
   });
 }
 
+class _StandbyQueueSnapshot {
+  final String? frontUserId;
+  final int count;
+
+  const _StandbyQueueSnapshot({required this.frontUserId, required this.count});
+
+  bool get hasEntries => count > 0 && frontUserId != null;
+
+  int get countAfterFrontRemoval => count > 0 ? count - 1 : 0;
+}
+
 class DBReservations {
   static final FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _userProfilesCollection = 'user_profiles';
@@ -80,11 +91,17 @@ class DBReservations {
     String? bookingRole,
   }) async {
     try {
+      final standbyQueue = await _loadStandbyQueueSnapshot(gymClass.id);
+      if (standbyQueue.hasEntries && standbyQueue.frontUserId != userId) {
+        throw Exception('Standby queue has priority for the next open spot.');
+      }
+
       return await _registerForClassTransaction(
         userId,
         gymClass,
         requestedMatNumber: matNumber,
         bookingRole: bookingRole,
+        standbyQueue: standbyQueue,
       );
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
@@ -100,6 +117,11 @@ class DBReservations {
     String? hostBookingRole,
   }) async {
     try {
+      final standbyQueue = await _loadStandbyQueueSnapshot(gymClass.id);
+      if (standbyQueue.hasEntries) {
+        throw Exception('Standby queue has priority for the next open spot.');
+      }
+
       return await _db.runTransaction<GroupReservationResult>((
         transaction,
       ) async {
@@ -125,13 +147,22 @@ class DBReservations {
         if (hostRegistrationSnap.exists) {
           throw Exception('You are already registered for this class.');
         }
+        final hostClassRegistrationSnap = await transaction.get(
+          hostClassRegistrationRef,
+        );
+        if (hostClassRegistrationSnap.exists) {
+          throw Exception('You are already registered for this class.');
+        }
 
         final hostProfileSnap = await transaction.get(hostProfileRef);
         final hostProfileData = hostProfileSnap.data() ?? <String, dynamic>{};
         final classData = classSnap.data() as Map<String, dynamic>;
         final capacity = _asInt(classData['capacity']);
         final reservedMats = _parseReservedMats(classData['reservedMats']);
-        final occupiedCount = reservedMats.length;
+        final currentStandbyCount = _asInt(classData['standbyCount']);
+        if (currentStandbyCount > 0 && !standbyQueue.hasEntries) {
+          throw Exception('Standby queue changed. Try again.');
+        }
         final uniqueInvitees = inviteeUids
             .where((uid) => uid.trim().isNotEmpty && uid != hostUserId)
             .toSet()
@@ -205,14 +236,18 @@ class DBReservations {
           });
         }
 
-        final nextFilled = occupiedCount + assignedMats.length;
+        final nextReservedMats = <String>{...reservedMats, ...assignedMats};
+        final nextFilled = _normalizedFilledCount(capacity, nextReservedMats);
         transaction.update(classRef, <String, dynamic>{
           'filled': nextFilled,
           'registeredCount': nextFilled,
-          'status': nextFilled >= capacity
-              ? ClassStatus.full.name
-              : ClassStatus.open.name,
-          'reservedMats': FieldValue.arrayUnion(assignedMats),
+          'standbyCount': standbyQueue.count,
+          'status': _classStatusName(
+            filled: nextFilled,
+            capacity: capacity,
+            standbyCount: standbyQueue.count,
+          ),
+          'reservedMats': _sortedReservedMats(nextReservedMats),
           _rosterEntryField(hostUserId): hostRosterData,
         });
 
@@ -262,7 +297,11 @@ class DBReservations {
         userId,
         classId,
       ).get();
-      if (existingRegistration.exists) {
+      final existingClassRegistration = await _classRegistrationRef(
+        classId,
+        userId,
+      ).get();
+      if (existingRegistration.exists || existingClassRegistration.exists) {
         await _releaseHeldInviteSpot(
           classId: classId,
           reservedMatNumber: reservedMatNumber,
@@ -280,7 +319,10 @@ class DBReservations {
           accepted: true,
         );
 
-        final existingData = existingRegistration.data() ?? <String, dynamic>{};
+        final existingData =
+            existingRegistration.data() ??
+            existingClassRegistration.data() ??
+            <String, dynamic>{};
         return existingData['matNumber']?.toString();
       }
 
@@ -291,7 +333,7 @@ class DBReservations {
 
       final gymClass = GymClass.fromFirestore(classSnap);
       final reservedMat = reservedMatNumber.trim().isEmpty
-          ? await _registerForClassTransaction(userId, gymClass)
+          ? await registerForClass(userId, gymClass)
           : await _claimHeldInviteSpot(
               userId: userId,
               gymClass: gymClass,
@@ -391,6 +433,7 @@ class DBReservations {
           .doc(userId);
       final userProfileSnap = await userProfileRef.get();
       final userProfileData = userProfileSnap.data() ?? <String, dynamic>{};
+      final standbyQueue = await _loadStandbyQueueSnapshot(gymClass.id);
 
       final standbyRef = _standbyQueueRef(gymClass.id, userId);
       final classRef = _classRef(gymClass.id);
@@ -409,6 +452,12 @@ class DBReservations {
         if (userRegistrationSnap.exists) {
           throw Exception('You are already registered for this class.');
         }
+        final classRegistrationSnap = await transaction.get(
+          _classRegistrationRef(gymClass.id, userId),
+        );
+        if (classRegistrationSnap.exists) {
+          throw Exception('You are already registered for this class.');
+        }
 
         final classSnap = await transaction.get(classRef);
         if (!classSnap.exists) {
@@ -418,10 +467,15 @@ class DBReservations {
         final classData = classSnap.data() as Map<String, dynamic>;
         final capacity = _asInt(classData['capacity']);
         final reservedMats = _parseReservedMats(classData['reservedMats']);
-        if (capacity > 0 && reservedMats.length < capacity) {
+        final currentStandbyCount = _asInt(classData['standbyCount']);
+        final hasExistingStandbyQueue =
+            currentStandbyCount > 0 || standbyQueue.hasEntries;
+        if (!hasExistingStandbyQueue &&
+            capacity > 0 &&
+            reservedMats.length < capacity) {
           throw Exception('This class still has open spots.');
         }
-        final currentStandbyCount = _asInt(classData['standbyCount']);
+        final nextStandbyCount = standbyQueue.count + 1;
 
         transaction.set(standbyRef, {
           'userId': userId,
@@ -430,7 +484,14 @@ class DBReservations {
           'createdAt': FieldValue.serverTimestamp(),
         });
 
-        transaction.update(classRef, {'standbyCount': currentStandbyCount + 1});
+        transaction.update(classRef, {
+          'standbyCount': nextStandbyCount,
+          'status': _classStatusName(
+            filled: _normalizedFilledCount(capacity, reservedMats),
+            capacity: capacity,
+            standbyCount: nextStandbyCount,
+          ),
+        });
       });
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
@@ -611,6 +672,7 @@ class DBReservations {
     try {
       final standbyRef = _standbyQueueRef(classId, userId);
       final classRef = _classRef(classId);
+      final standbyQueue = await _loadStandbyQueueSnapshot(classId);
 
       await _db.runTransaction((transaction) async {
         final standbySnap = await transaction.get(standbyRef);
@@ -621,11 +683,19 @@ class DBReservations {
         final classSnap = await transaction.get(classRef);
         if (classSnap.exists) {
           final classData = classSnap.data() as Map<String, dynamic>;
-          final currentStandbyCount = _asInt(classData['standbyCount']);
+          final capacity = _asInt(classData['capacity']);
+          final reservedMats = _parseReservedMats(classData['reservedMats']);
+          final actualRemainingCount = standbyQueue.count > 0
+              ? standbyQueue.count - 1
+              : 0;
+          final nextStandbyCount = actualRemainingCount;
           transaction.update(classRef, {
-            'standbyCount': (currentStandbyCount - 1)
-                .clamp(0, double.infinity)
-                .toInt(),
+            'standbyCount': nextStandbyCount,
+            'status': _classStatusName(
+              filled: _normalizedFilledCount(capacity, reservedMats),
+              capacity: capacity,
+              standbyCount: nextStandbyCount,
+            ),
           });
         }
 
@@ -642,6 +712,7 @@ class DBReservations {
     final classRef = _classRef(classId);
 
     try {
+      final standbyQueue = await _loadStandbyQueueSnapshot(classId);
       await _db.runTransaction((transaction) async {
         final userRegSnap = await transaction.get(userRegistrationRef);
         if (!userRegSnap.exists) {
@@ -662,23 +733,25 @@ class DBReservations {
         final classData = classSnap.data() as Map<String, dynamic>;
         final capacity = _asInt(classData['capacity']);
         final reservedMats = _parseReservedMats(classData['reservedMats']);
-        final hadReservedMat =
-            matNumber.isNotEmpty && reservedMats.contains(matNumber);
-        final nextFilled =
-            (hadReservedMat ? reservedMats.length - 1 : reservedMats.length)
-                .clamp(0, capacity);
+        final nextReservedMats = Set<String>.from(reservedMats);
+        if (matNumber.isNotEmpty) {
+          nextReservedMats.remove(matNumber);
+        }
+        final nextFilled = _normalizedFilledCount(capacity, nextReservedMats);
+        final nextStandbyCount = standbyQueue.count;
 
         final classUpdates = <String, dynamic>{
           'filled': nextFilled,
           'registeredCount': nextFilled,
-          'status': nextFilled >= capacity
-              ? ClassStatus.full.name
-              : ClassStatus.open.name,
+          'standbyCount': nextStandbyCount,
+          'status': _classStatusName(
+            filled: nextFilled,
+            capacity: capacity,
+            standbyCount: nextStandbyCount,
+          ),
+          'reservedMats': _sortedReservedMats(nextReservedMats),
           _rosterEntryField(userId): FieldValue.delete(),
         };
-        if (matNumber.isNotEmpty) {
-          classUpdates['reservedMats'] = FieldValue.arrayRemove([matNumber]);
-        }
 
         transaction.update(classRef, classUpdates);
       });
@@ -783,11 +856,13 @@ class DBReservations {
     GymClass gymClass, {
     String? requestedMatNumber,
     String? bookingRole,
+    _StandbyQueueSnapshot? standbyQueue,
   }) {
     final classRef = _classRef(gymClass.id);
     final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
     final userRegistrationRef = _userRegistrationRef(userId, gymClass.id);
     final classRegistrationRef = _classRegistrationRef(gymClass.id, userId);
+    final userStandbyRef = _standbyQueueRef(gymClass.id, userId);
 
     return _db.runTransaction<String>((transaction) async {
       final classSnap = await transaction.get(classRef);
@@ -799,6 +874,10 @@ class DBReservations {
       if (userRegistrationSnap.exists) {
         throw Exception('You are already registered for this class.');
       }
+      final classRegistrationSnap = await transaction.get(classRegistrationRef);
+      if (classRegistrationSnap.exists) {
+        throw Exception('You are already registered for this class.');
+      }
 
       final classData = classSnap.data() as Map<String, dynamic>;
       final userProfileSnap = await transaction.get(userProfileRef);
@@ -806,6 +885,26 @@ class DBReservations {
       final capacity = _asInt(classData['capacity']);
       final reservedMats = _parseReservedMats(classData['reservedMats']);
       final occupiedCount = reservedMats.length;
+      final currentStandbyCount = _asInt(classData['standbyCount']);
+      final resolvedStandbyQueue =
+          standbyQueue ??
+          const _StandbyQueueSnapshot(frontUserId: null, count: 0);
+
+      if (currentStandbyCount > 0 && !resolvedStandbyQueue.hasEntries) {
+        throw Exception('Standby queue changed. Try again.');
+      }
+
+      if (resolvedStandbyQueue.hasEntries) {
+        if (resolvedStandbyQueue.frontUserId != userId) {
+          throw Exception('Standby queue has priority for the next open spot.');
+        }
+
+        final userStandbySnap = await transaction.get(userStandbyRef);
+        if (!userStandbySnap.exists) {
+          throw Exception('Standby queue changed. Try again.');
+        }
+      }
+
       if (capacity <= 0 || occupiedCount >= capacity) {
         throw Exception('Class is Full');
       }
@@ -835,16 +934,26 @@ class DBReservations {
         matNumber: selectedMatNumber,
         bookingRole: bookingRole,
       );
-      final nextFilled = occupiedCount + 1;
+      final nextReservedMats = <String>{...reservedMats, selectedMatNumber};
+      final nextFilled = _normalizedFilledCount(capacity, nextReservedMats);
+      final nextStandbyCount = resolvedStandbyQueue.hasEntries
+          ? resolvedStandbyQueue.countAfterFrontRemoval
+          : 0;
       transaction.set(userRegistrationRef, registrationData);
       transaction.set(classRegistrationRef, registrationData);
+      if (resolvedStandbyQueue.hasEntries) {
+        transaction.delete(userStandbyRef);
+      }
       transaction.update(classRef, {
         'filled': nextFilled,
         'registeredCount': nextFilled,
-        'status': nextFilled >= capacity
-            ? ClassStatus.full.name
-            : ClassStatus.open.name,
-        'reservedMats': FieldValue.arrayUnion([selectedMatNumber]),
+        'standbyCount': nextStandbyCount,
+        'status': _classStatusName(
+          filled: nextFilled,
+          capacity: capacity,
+          standbyCount: nextStandbyCount,
+        ),
+        'reservedMats': _sortedReservedMats(nextReservedMats),
         _rosterEntryField(userId): rosterData,
       });
       return selectedMatNumber;
@@ -864,6 +973,13 @@ class DBReservations {
       'userName': userName,
       'userEmail': userEmail,
       'classId': gymClass.id,
+      'className': gymClass.title,
+      'instructor': gymClass.instructor,
+      'dateTime': '${gymClass.dateText} at ${gymClass.timeText}',
+      'date': Timestamp.fromDate(gymClass.dateTime),
+      'type': gymClass.type,
+      'durationMinutes': gymClass.durationMinutes,
+      'location': gymClass.location,
       'matNumber': matNumber,
       if (bookingRole != null && bookingRole.trim().isNotEmpty)
         'bookingRole': bookingRole.trim(),
@@ -996,6 +1112,12 @@ class DBReservations {
         final existingData = userRegistrationSnap.data() ?? <String, dynamic>{};
         return existingData['matNumber']?.toString() ?? reservedMatNumber;
       }
+      final classRegistrationSnap = await transaction.get(classRegistrationRef);
+      if (classRegistrationSnap.exists) {
+        final existingData =
+            classRegistrationSnap.data() ?? <String, dynamic>{};
+        return existingData['matNumber']?.toString() ?? reservedMatNumber;
+      }
 
       final classData = classSnap.data() as Map<String, dynamic>;
       final reservedMats = _parseReservedMats(classData['reservedMats']);
@@ -1039,6 +1161,7 @@ class DBReservations {
     }
 
     final classRef = _classRef(classId);
+    final standbyQueue = await _loadStandbyQueueSnapshot(classId);
     await _db.runTransaction((transaction) async {
       final classSnap = await transaction.get(classRef);
       if (!classSnap.exists) {
@@ -1051,16 +1174,20 @@ class DBReservations {
         return;
       }
 
-      reservedMats.remove(reservedMatNumber);
       final capacity = _asInt(classData['capacity']);
-      final nextFilled = reservedMats.length.clamp(0, capacity);
+      final nextReservedMats = Set<String>.from(reservedMats)
+        ..remove(reservedMatNumber);
+      final nextFilled = _normalizedFilledCount(capacity, nextReservedMats);
       transaction.update(classRef, <String, dynamic>{
         'filled': nextFilled,
         'registeredCount': nextFilled,
-        'status': nextFilled >= capacity
-            ? ClassStatus.full.name
-            : ClassStatus.open.name,
-        'reservedMats': FieldValue.arrayRemove([reservedMatNumber]),
+        'standbyCount': standbyQueue.count,
+        'status': _classStatusName(
+          filled: nextFilled,
+          capacity: capacity,
+          standbyCount: standbyQueue.count,
+        ),
+        'reservedMats': _sortedReservedMats(nextReservedMats),
       });
     });
   }
@@ -1122,6 +1249,53 @@ class DBReservations {
         .map((value) => value.toString().trim())
         .where((value) => value.isNotEmpty)
         .toSet();
+  }
+
+  static Future<_StandbyQueueSnapshot> _loadStandbyQueueSnapshot(
+    String classId,
+  ) async {
+    final queueCollection = _getStandbyQueueCollection(classId);
+    final results = await Future.wait<dynamic>([
+      queueCollection.orderBy('createdAt').limit(1).get(),
+      queueCollection.count().get(),
+    ]);
+    final frontSnapshot = results[0] as QuerySnapshot<Map<String, dynamic>>;
+    final countSnapshot = results[1] as AggregateQuerySnapshot;
+    final count = countSnapshot.count ?? frontSnapshot.docs.length;
+    return _StandbyQueueSnapshot(
+      frontUserId: frontSnapshot.docs.isEmpty
+          ? null
+          : frontSnapshot.docs.first.id,
+      count: count,
+    );
+  }
+
+  static int _normalizedFilledCount(int capacity, Set<String> reservedMats) {
+    return reservedMats.length.clamp(0, capacity);
+  }
+
+  static String _classStatusName({
+    required int filled,
+    required int capacity,
+    required int standbyCount,
+  }) {
+    return filled < capacity && standbyCount == 0
+        ? ClassStatus.open.name
+        : ClassStatus.full.name;
+  }
+
+  static List<String> _sortedReservedMats(Iterable<String> reservedMats) {
+    final sorted =
+        reservedMats
+            .map((value) => value.trim())
+            .where((value) => value.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort(
+            (left, right) =>
+                _matSortValue(left).compareTo(_matSortValue(right)),
+          );
+    return sorted;
   }
 
   static Map<String, int> _parseCategoryAttendance(dynamic rawValue) {

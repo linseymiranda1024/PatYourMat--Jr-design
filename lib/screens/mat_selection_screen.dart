@@ -698,7 +698,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         final liveFilled = socialMatOccupancyAsync.hasValue
             ? socialMatOccupancy.reservedMatNumbers.length
             : gClass.filled;
-        final isFull = liveFilled >= gClass.capacity;
+        final isFull = liveFilled >= gClass.capacity || gClass.standbyCount > 0;
         final roleOptions = _roleOptionsForClass(gClass);
         final zoneOptions = _zoneOptionsForClass(gClass);
         final headerDescription = _headerDescriptionFor(gClass);

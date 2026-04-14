@@ -205,11 +205,18 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                     : isQueued
                     ? 'STANDBY'
                     : _classStatusLabel(liveStatus);
+                final queueStatusAccent = _availabilityAccent(
+                  ClassStatus.standby,
+                );
                 final statusColor = isRegistered
                     ? statusPresentation.color
+                    : isQueued
+                    ? queueStatusAccent
                     : _availabilityAccent(liveStatus);
                 final statusBackgroundColor = isRegistered
                     ? statusPresentation.backgroundColor
+                    : isQueued
+                    ? queueStatusAccent.withValues(alpha: isDark ? 0.24 : 0.14)
                     : statusColor.withValues(alpha: isDark ? 0.24 : 0.14);
 
                 return Scaffold(
@@ -784,10 +791,9 @@ ClassStatus _classAvailabilityStatus({
   required int capacity,
   required int standbyCount,
 }) {
-  if (filled >= capacity) {
-    return standbyCount > 0 ? ClassStatus.standby : ClassStatus.full;
-  }
-  return ClassStatus.open;
+  return filled < capacity && standbyCount == 0
+      ? ClassStatus.open
+      : ClassStatus.full;
 }
 
 String _classStatusLabel(ClassStatus status) {

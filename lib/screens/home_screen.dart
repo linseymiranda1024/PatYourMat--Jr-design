@@ -753,12 +753,12 @@ model.ClassStatus _availabilityStatus({
   required int standbyCount,
   bool forceStandby = false,
 }) {
-  if (filled >= capacity) {
-    return (standbyCount > 0 || forceStandby)
-        ? model.ClassStatus.standby
-        : model.ClassStatus.full;
+  if (forceStandby) {
+    return model.ClassStatus.standby;
   }
-  return model.ClassStatus.open;
+  return filled < capacity && standbyCount == 0
+      ? model.ClassStatus.open
+      : model.ClassStatus.full;
 }
 
 class _StatusStyle {
