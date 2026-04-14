@@ -233,16 +233,19 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 
   int get _groupSize => _selectedInviteeUids.length + 1;
 
+  String _reserveLabel(int count) =>
+      'Reserve $count Mat${count == 1 ? '' : 's'}';
+
   String _selectionSummary() {
     if (_selectedMats.isEmpty) {
       return _groupSize == 1
           ? 'No mat selected'
           : 'Select $_groupSize mats for your group';
     }
-    final labels = _selectedMats.map((mat) => 'Mat $mat').join(', ');
-    return _groupSize == 1
-        ? labels
-        : '$labels selected (${_selectedMats.length}/$_groupSize)';
+    if (_groupSize == 1 || _selectedMats.length == _groupSize) {
+      return _reserveLabel(_selectedMats.length);
+    }
+    return '${_selectedMats.length} of $_groupSize mats selected';
   }
 
   @override
@@ -274,7 +277,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         final invalidSelectedInviteeUids = _selectedInviteeUids
             .where(socialMatOccupancy.registeredUserIds.contains)
             .toSet();
-        final friendCount = socialMatOccupancy.friendMatsByNumber.length;
+        final friendCount = socialMatOccupancy.friendCount;
         final liveFilled = socialMatOccupancyAsync.hasValue
             ? socialMatOccupancy.reservedMatNumbers.length
             : gClass.filled;
@@ -360,8 +363,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                             const SizedBox(height: 8),
                             Text(
                               _groupSize == 1
-                                  ? 'Tap an open mat to reserve it. Friend mats are marked with an avatar.'
-                                  : 'Select $_groupSize open mats for your group. Friend mats stay locked and show an avatar.',
+                                  ? 'Tap an open mat. Occupied mats show avatars, and friends stay highlighted.'
+                                  : 'Select $_groupSize open mats. Occupied mats show avatars, and friends stay highlighted.',
                               style: textTheme.bodyMedium?.copyWith(
                                 color: colorScheme.onSurfaceVariant,
                                 height: 1.4,
@@ -389,9 +392,13 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                   color: colorScheme.primary,
                                 ),
                                 const _LegendPill(
+                                  label: 'Occupied',
+                                  color: AppColors.secondaryBlue,
+                                  marker: _LegendAvatarMarker(),
+                                ),
+                                const _LegendPill(
                                   label: 'Friend',
                                   color: AppColors.primaryPurple,
-                                  marker: _LegendAvatarMarker(),
                                 ),
                                 _LegendPill(
                                   label: 'Reserved',
@@ -493,8 +500,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                                     .contains(matNumber);
                                             final isSelected = _selectedMats
                                                 .contains(matNumber);
-                                            final friendInfo = socialMatOccupancy
-                                                .friendMatsByNumber[matNumber];
+                                            final occupantInfo = socialMatOccupancy
+                                                .occupantInfoByNumber[matNumber];
 
                                             return Padding(
                                               padding:
@@ -509,12 +516,16 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                                     number: matNumber,
                                                     reserved: isReserved,
                                                     selected: isSelected,
-                                                    friendUid:
-                                                        friendInfo?.userId,
-                                                    friendName:
-                                                        friendInfo
+                                                    occupantUid:
+                                                        occupantInfo?.userId,
+                                                    occupantName:
+                                                        occupantInfo
                                                             ?.displayName ??
                                                         '',
+                                                    isFriendOccupant:
+                                                        occupantInfo
+                                                            ?.isFriend ??
+                                                        false,
                                                     onTap:
                                                         isReserved ||
                                                             isFull ||
@@ -578,10 +589,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                     Expanded(
                                       child: Text(
                                         _selectedInviteeUids.isEmpty
-                                            ? (_selectedMats.isEmpty
-                                                  ? 'No mat selected'
-                                                  : _selectionSummary())
-                                            : '${_selectedInviteeUids.length} friend${_selectedInviteeUids.length == 1 ? '' : 's'} selected, so choose $_groupSize mats',
+                                            ? _selectionSummary()
+                                            : '${_selectedInviteeUids.length} friend${_selectedInviteeUids.length == 1 ? '' : 's'} added. ${_selectionSummary()}',
                                         style: textTheme.bodyMedium?.copyWith(
                                           fontSize: 14,
                                           fontWeight: FontWeight.w700,
@@ -658,7 +667,9 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                                     : 'Join Standby Queue')
                                               : _selectedMats.isEmpty
                                               ? 'Select a Mat'
-                                              : 'Reserve ${_selectionSummary()}',
+                                              : _reserveLabel(
+                                                  _selectedMats.length,
+                                                ),
                                           style: textTheme.titleMedium
                                               ?.copyWith(
                                                 fontWeight: FontWeight.w800,
@@ -705,7 +716,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                                     label: Text(
                                       _selectedMats.length != _groupSize
                                           ? 'Select $_groupSize Mats'
-                                          : 'Reserve ${_selectedMats.length} Group Mats',
+                                          : _reserveLabel(_selectedMats.length),
                                     ),
                                   ),
                                 ),
@@ -729,13 +740,16 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
 class _SocialMatOccupancy {
   final Set<int> reservedMatNumbers;
   final Set<String> registeredUserIds;
-  final Map<int, _FriendMatInfo> friendMatsByNumber;
+  final Map<int, _MatOccupantInfo> occupantInfoByNumber;
 
   const _SocialMatOccupancy({
     this.reservedMatNumbers = const <int>{},
     this.registeredUserIds = const <String>{},
-    this.friendMatsByNumber = const <int, _FriendMatInfo>{},
+    this.occupantInfoByNumber = const <int, _MatOccupantInfo>{},
   });
+
+  int get friendCount =>
+      occupantInfoByNumber.values.where((info) => info.isFriend).length;
 
   factory _SocialMatOccupancy.fromReservations({
     required List<Reservation> reservations,
@@ -744,7 +758,7 @@ class _SocialMatOccupancy {
   }) {
     final allReservedMatNumbers = <int>{...reservedMatNumbers};
     final registeredUserIds = <String>{};
-    final friendMatsByNumber = <int, _FriendMatInfo>{};
+    final occupantInfoByNumber = <int, _MatOccupantInfo>{};
 
     for (final reservation in reservations) {
       final userId = reservation.userId.trim();
@@ -758,53 +772,66 @@ class _SocialMatOccupancy {
         registeredUserIds.add(userId);
       }
 
-      if (userId.isEmpty || !friendUids.contains(userId)) {
+      final isFriend = userId.isNotEmpty && friendUids.contains(userId);
+      final rawDisplayName = _occupantDisplayNameForReservation(reservation);
+      if (userId.isEmpty && rawDisplayName.isEmpty) {
         continue;
       }
 
-      friendMatsByNumber[matNumber] = _FriendMatInfo(
+      occupantInfoByNumber[matNumber] = _MatOccupantInfo(
         userId: userId,
-        displayName: _friendDisplayNameForReservation(reservation),
+        displayName: rawDisplayName.isNotEmpty
+            ? rawDisplayName
+            : (isFriend ? 'Friend' : 'Member'),
+        isFriend: isFriend,
       );
     }
 
     return _SocialMatOccupancy(
       reservedMatNumbers: allReservedMatNumbers,
       registeredUserIds: registeredUserIds,
-      friendMatsByNumber: friendMatsByNumber,
+      occupantInfoByNumber: occupantInfoByNumber,
     );
   }
 }
 
-class _FriendMatInfo {
+class _MatOccupantInfo {
   final String userId;
   final String displayName;
+  final bool isFriend;
 
-  const _FriendMatInfo({required this.userId, required this.displayName});
+  const _MatOccupantInfo({
+    required this.userId,
+    required this.displayName,
+    this.isFriend = false,
+  });
 }
 
 class _YogaMatTile extends StatelessWidget {
   final int number;
   final bool reserved;
   final bool selected;
-  final String? friendUid;
-  final String friendName;
+  final String? occupantUid;
+  final String occupantName;
+  final bool isFriendOccupant;
   final VoidCallback? onTap;
 
   const _YogaMatTile({
     required this.number,
     required this.reserved,
     required this.selected,
-    this.friendUid,
-    this.friendName = '',
+    this.occupantUid,
+    this.occupantName = '',
+    this.isFriendOccupant = false,
     required this.onTap,
   });
 
   @override
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
-    final hasFriend = friendName.trim().isNotEmpty;
-    final isFriendMat = reserved && hasFriend;
+    final hasOccupantAvatar =
+        reserved && (occupantUid?.trim().isNotEmpty ?? false);
+    final isFriendMat = hasOccupantAvatar && isFriendOccupant;
     final friendFill = Color.lerp(AppColors.primaryPurple, Colors.white, 0.58)!;
     final fill = isFriendMat
         ? friendFill
@@ -828,11 +855,16 @@ class _YogaMatTile extends StatelessWidget {
       Colors.black,
       0.10,
     )!;
-    final label = isFriendMat
-        ? (friendName.trim().isEmpty
-              ? 'Friend on mat $number'
-              : '$friendName on mat $number')
+    final trimmedOccupantName = occupantName.trim();
+    final label = hasOccupantAvatar
+        ? (trimmedOccupantName.isEmpty
+              ? 'Occupied mat $number'
+              : '$trimmedOccupantName on mat $number')
+        : reserved
+        ? 'Reserved mat $number'
         : 'Mat $number';
+    final numberBadgeColor = colorScheme.surface;
+    final numberBadgeTextColor = colorScheme.onSurface;
 
     return Tooltip(
       message: label,
@@ -876,7 +908,7 @@ class _YogaMatTile extends StatelessWidget {
                 ),
               ),
               Positioned(
-                top: isFriendMat ? 30 : 10,
+                top: hasOccupantAvatar ? 30 : 10,
                 left: 10,
                 right: 10,
                 child: Container(
@@ -889,7 +921,7 @@ class _YogaMatTile extends StatelessWidget {
                 ),
               ),
               Positioned(
-                top: isFriendMat ? 40 : 20,
+                top: hasOccupantAvatar ? 40 : 20,
                 left: 16,
                 right: 16,
                 child: Container(
@@ -913,21 +945,49 @@ class _YogaMatTile extends StatelessWidget {
                   ),
                 ),
               ),
-              if (isFriendMat)
+              if (hasOccupantAvatar)
                 Positioned(
                   top: 8,
-                  left: 0,
-                  right: 0,
-                  child: Center(
-                    child: UserUidAvatar(
-                      uid: friendUid ?? '',
-                      userWholeName: friendName,
-                      radius: 12,
-                      backgroundColor: avatarBackground,
-                      foregroundColor: Colors.white,
-                      borderColor: Colors.white,
-                      borderWidth: 1.5,
+                  left: 8,
+                  child: Container(
+                    width: 22,
+                    height: 22,
+                    alignment: Alignment.center,
+                    decoration: BoxDecoration(
+                      color: numberBadgeColor,
+                      shape: BoxShape.circle,
+                      border: Border.all(
+                        color: Colors.white.withValues(alpha: 0.92),
+                        width: 1.2,
+                      ),
+                      boxShadow: [
+                        BoxShadow(
+                          color: Colors.black.withValues(alpha: 0.16),
+                          blurRadius: 6,
+                          offset: const Offset(0, 2),
+                        ),
+                      ],
                     ),
+                    child: Text(
+                      '$number',
+                      style: TextStyle(
+                        color: numberBadgeTextColor,
+                        fontWeight: FontWeight.w900,
+                        fontSize: 11,
+                      ),
+                    ),
+                  ),
+                ),
+              if (hasOccupantAvatar)
+                Center(
+                  child: UserUidAvatar(
+                    uid: occupantUid ?? '',
+                    userWholeName: occupantName,
+                    radius: 14,
+                    backgroundColor: avatarBackground,
+                    foregroundColor: Colors.white,
+                    borderColor: Colors.white,
+                    borderWidth: 1.5,
                   ),
                 )
               else
@@ -942,21 +1002,6 @@ class _YogaMatTile extends StatelessWidget {
                     ),
                   ),
                 ),
-              Positioned(
-                bottom: isFriendMat ? 12 : 10,
-                left: 6,
-                right: 6,
-                child: Text(
-                  isFriendMat ? '$number' : 'Mat $number',
-                  textAlign: TextAlign.center,
-                  style: TextStyle(
-                    color: foregroundColor.withValues(alpha: 0.96),
-                    fontWeight: FontWeight.w900,
-                    fontSize: isFriendMat ? 18 : 11,
-                    letterSpacing: 0.3,
-                  ),
-                ),
-              ),
               if (selected)
                 Positioned(
                   top: 10,
@@ -969,7 +1014,7 @@ class _YogaMatTile extends StatelessWidget {
                 ),
               if (reserved)
                 Positioned(
-                  top: isFriendMat ? 12 : 10,
+                  top: hasOccupantAvatar ? 12 : 10,
                   right: 10,
                   child: Container(
                     padding: const EdgeInsets.all(3),
@@ -1004,7 +1049,7 @@ class _SummaryPill extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
@@ -1013,11 +1058,11 @@ class _SummaryPill extends StatelessWidget {
       child: Row(
         mainAxisSize: MainAxisSize.min,
         children: [
-          Icon(icon, size: 14, color: colorScheme.primary),
-          const SizedBox(width: 6),
+          Icon(icon, size: 12, color: colorScheme.primary),
+          const SizedBox(width: 5),
           Text(
             label,
-            style: textTheme.labelLarge?.copyWith(
+            style: textTheme.labelMedium?.copyWith(
               color: colorScheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
@@ -1040,7 +1085,7 @@ class _LegendPill extends StatelessWidget {
     final colorScheme = Theme.of(context).colorScheme;
 
     return Container(
-      padding: const EdgeInsets.symmetric(horizontal: 10, vertical: 7),
+      padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 5),
       decoration: BoxDecoration(
         color: colorScheme.surfaceContainerHighest,
         borderRadius: BorderRadius.circular(999),
@@ -1051,14 +1096,14 @@ class _LegendPill extends StatelessWidget {
         children: [
           marker ??
               Container(
-                width: 12,
-                height: 12,
+                width: 10,
+                height: 10,
                 decoration: BoxDecoration(color: color, shape: BoxShape.circle),
               ),
-          const SizedBox(width: 8),
+          const SizedBox(width: 6),
           Text(
             label,
-            style: Theme.of(context).textTheme.labelLarge?.copyWith(
+            style: Theme.of(context).textTheme.labelMedium?.copyWith(
               color: colorScheme.onSurface,
               fontWeight: FontWeight.w700,
             ),
@@ -1075,19 +1120,19 @@ class _LegendAvatarMarker extends StatelessWidget {
   @override
   Widget build(BuildContext context) {
     return Container(
-      width: 16,
-      height: 16,
+      width: 14,
+      height: 14,
       decoration: BoxDecoration(
         shape: BoxShape.circle,
-        color: AppColors.primaryPurple.withValues(alpha: 0.86),
+        color: AppColors.secondaryBlue.withValues(alpha: 0.86),
         border: Border.all(color: Colors.white, width: 1.2),
       ),
-      child: const Icon(Icons.person, size: 9, color: Colors.white),
+      child: const Icon(Icons.person, size: 8, color: Colors.white),
     );
   }
 }
 
-String _friendDisplayNameForReservation(Reservation reservation) {
+String _occupantDisplayNameForReservation(Reservation reservation) {
   final trimmedUserName = reservation.userName.trim();
   if (trimmedUserName.isNotEmpty) {
     return trimmedUserName;
@@ -1098,7 +1143,7 @@ String _friendDisplayNameForReservation(Reservation reservation) {
     return trimmedEmail;
   }
 
-  return 'Friend';
+  return '';
 }
 
 bool _isStaffRole(String role) {

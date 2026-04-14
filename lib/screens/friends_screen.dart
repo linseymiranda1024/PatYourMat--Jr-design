@@ -409,23 +409,10 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   Set<String> _extractUidsFromSubcollection(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
-    final ids = <String>{};
-    for (final doc in docs) {
-      ids.add(doc.id);
-      final data = doc.data();
-      final candidates = [
-        data['uid'],
-        data['user_id'],
-        data['friend_uid'],
-        data['id'],
-      ];
-      for (final candidate in candidates) {
-        if (candidate is String && candidate.trim().isNotEmpty) {
-          ids.add(candidate.trim());
-        }
-      }
-    }
-    return ids;
+    return docs
+        .map((doc) => doc.id.trim())
+        .where((uid) => uid.isNotEmpty)
+        .toSet();
   }
 
   Future<void> _handleAcceptFriendRequestTap({
