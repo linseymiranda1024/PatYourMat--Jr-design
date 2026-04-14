@@ -5,6 +5,7 @@ import 'package:flutter_riverpod/flutter_riverpod.dart';
 import '../db_helpers/db_friends.dart';
 import '../main.dart';
 import '../models/achievement.dart';
+import '../widgets/general/widget_profile_avatar.dart';
 
 class FriendsScreen extends ConsumerStatefulWidget {
   const FriendsScreen({super.key});
@@ -171,6 +172,7 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
                               final allUsers = docs
                                   .where((doc) => doc.id != currentUid)
                                   .map((doc) => _FriendEntry.fromDoc(doc))
+                                  .where((user) => !_isStaffRole(user.role))
                                   .toList();
 
                               final filteredUsers =
@@ -407,23 +409,10 @@ class _FriendsScreenState extends ConsumerState<FriendsScreen> {
   Set<String> _extractUidsFromSubcollection(
     List<QueryDocumentSnapshot<Map<String, dynamic>>> docs,
   ) {
-    final ids = <String>{};
-    for (final doc in docs) {
-      ids.add(doc.id);
-      final data = doc.data();
-      final candidates = [
-        data['uid'],
-        data['user_id'],
-        data['friend_uid'],
-        data['id'],
-      ];
-      for (final candidate in candidates) {
-        if (candidate is String && candidate.trim().isNotEmpty) {
-          ids.add(candidate.trim());
-        }
-      }
-    }
-    return ids;
+    return docs
+        .map((doc) => doc.id.trim())
+        .where((uid) => uid.isNotEmpty)
+        .toSet();
   }
 
   Future<void> _handleAcceptFriendRequestTap({
@@ -659,6 +648,10 @@ class _FriendEntry {
   String get wholeName => '${firstName.trim()} ${lastName.trim()}'.trim();
 }
 
+bool _isStaffRole(String role) {
+  return role.trim().toLowerCase() == 'staff';
+}
+
 class _FriendCard extends StatelessWidget {
   final _FriendEntry user;
   final bool isFriend;
@@ -692,8 +685,8 @@ class _FriendCard extends StatelessWidget {
   Widget build(BuildContext context) {
     final colorScheme = Theme.of(context).colorScheme;
     final textTheme = Theme.of(context).textTheme;
-    final initials = _initials(user.firstName, user.lastName);
     final fullName = user.wholeName;
+    final avatarLabel = fullName.isEmpty ? user.email : fullName;
 
     return Material(
       color: Colors.transparent,
@@ -716,16 +709,12 @@ class _FriendCard extends StatelessWidget {
           ),
           child: Row(
             children: [
-              CircleAvatar(
+              UserUidAvatar(
+                uid: user.uid,
+                userWholeName: avatarLabel,
                 radius: 22,
                 backgroundColor: colorScheme.primary,
-                child: Text(
-                  initials,
-                  style: TextStyle(
-                    color: colorScheme.onPrimary,
-                    fontWeight: FontWeight.w700,
-                  ),
-                ),
+                foregroundColor: colorScheme.onPrimary,
               ),
               const SizedBox(width: 12),
               Expanded(
@@ -864,13 +853,6 @@ class _FriendCard extends StatelessWidget {
       ),
     );
   }
-
-  String _initials(String firstName, String lastName) {
-    final f = firstName.isEmpty ? '' : firstName[0].toUpperCase();
-    final l = lastName.isEmpty ? '' : lastName[0].toUpperCase();
-    final initials = '$f$l';
-    return initials.isEmpty ? '?' : initials;
-  }
 }
 
 class _FriendProfileScreen extends StatelessWidget {
@@ -884,6 +866,7 @@ class _FriendProfileScreen extends StatelessWidget {
     final colorScheme = theme.colorScheme;
     final textTheme = theme.textTheme;
     final fullName = user.wholeName.isEmpty ? 'Member Profile' : user.wholeName;
+    final avatarLabel = user.wholeName.isEmpty ? user.email : user.wholeName;
     final bio = user.bio.trim();
     final unlockedAchievements = Achievement.all
         .where((achievement) => user.achievements.contains(achievement.id))
@@ -934,16 +917,12 @@ class _FriendProfileScreen extends StatelessWidget {
                               width: 2,
                             ),
                           ),
-                          child: CircleAvatar(
+                          child: UserUidAvatar(
+                            uid: user.uid,
+                            userWholeName: avatarLabel,
                             radius: 34,
                             backgroundColor: colorScheme.primary,
-                            child: Text(
-                              _initials(user.firstName, user.lastName),
-                              style: textTheme.headlineSmall?.copyWith(
-                                color: colorScheme.onPrimary,
-                                fontWeight: FontWeight.w800,
-                              ),
-                            ),
+                            foregroundColor: colorScheme.onPrimary,
                           ),
                         ),
                         const SizedBox(width: 16),
@@ -1068,13 +1047,6 @@ class _FriendProfileScreen extends StatelessWidget {
         ),
       ),
     );
-  }
-
-  String _initials(String firstName, String lastName) {
-    final f = firstName.isEmpty ? '' : firstName[0].toUpperCase();
-    final l = lastName.isEmpty ? '' : lastName[0].toUpperCase();
-    final initials = '$f$l';
-    return initials.isEmpty ? '?' : initials;
   }
 }
 

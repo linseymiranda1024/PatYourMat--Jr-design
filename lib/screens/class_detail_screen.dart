@@ -369,8 +369,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         Text(
                                           '${gClass.standbyCount} in standby queue',
                                           style: textTheme.bodySmall?.copyWith(
-                                            color:
-                                                colorScheme.onSurfaceVariant,
+                                            color: colorScheme.onSurfaceVariant,
                                             fontSize: 14,
                                           ),
                                         ),
@@ -381,23 +380,20 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           width: double.infinity,
                                           padding: const EdgeInsets.all(16),
                                           decoration: BoxDecoration(
-                                            color:
-                                                colorScheme
-                                                    .surfaceContainerHigh,
+                                            color: colorScheme
+                                                .surfaceContainerHigh,
                                             borderRadius: BorderRadius.circular(
                                               20,
                                             ),
                                             border: Border.all(
-                                              color:
-                                                  colorScheme.outlineVariant,
+                                              color: colorScheme.outlineVariant,
                                             ),
                                           ),
                                           child: Text(
                                             'You are in the standby queue at position #$queuePosition. When a spot opens, the next person in line is promoted automatically.',
                                             style: textTheme.bodyMedium
                                                 ?.copyWith(
-                                                  color:
-                                                      colorScheme.onSurface,
+                                                  color: colorScheme.onSurface,
                                                   height: 1.4,
                                                 ),
                                           ),
@@ -501,7 +497,31 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                                   isQueued ||
                                                   isFull)
                                               ? null
-                                              : () => _registerForClass(gClass),
+                                              : () {
+                                                  if (gClass.bookingMode ==
+                                                      BookingMode.spot) {
+                                                    _registerForClass(gClass);
+                                                    return;
+                                                  }
+                                                  if (liveFilled >=
+                                                      gClass.capacity) {
+                                                    ScaffoldMessenger.of(
+                                                      context,
+                                                    ).showSnackBar(
+                                                      const SnackBar(
+                                                        content: Text(
+                                                          'Class just filled up',
+                                                        ),
+                                                      ),
+                                                    );
+                                                    return;
+                                                  }
+                                                  context.push(
+                                                    MatSelectionScreen
+                                                        .routeName,
+                                                    extra: gClass.id,
+                                                  );
+                                                },
                                           style: ElevatedButton.styleFrom(
                                             backgroundColor:
                                                 colorScheme.primary,
@@ -522,7 +542,21 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                                       ? 'Registered'
                                                       : isQueued
                                                       ? 'In Standby Queue'
-                                                      : 'Reserve Your Spot',
+                                                      : switch (gClass
+                                                            .bookingMode) {
+                                                          BookingMode.open =>
+                                                            normalizeGymClassType(
+                                                                      gClass
+                                                                          .type,
+                                                                    ) ==
+                                                                    'Dance'
+                                                                ? 'Join The Floor'
+                                                                : 'Join The Field',
+                                                          BookingMode.zone =>
+                                                            'Choose Your Zone',
+                                                          BookingMode.spot =>
+                                                            'Reserve Your Spot',
+                                                        },
                                                   style: const TextStyle(
                                                     fontSize: 18,
                                                     fontWeight: FontWeight.bold,
@@ -540,14 +574,13 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                                 ? null
                                                 : isQueued
                                                 ? () =>
-                                                    _leaveStandbyQueue(gClass)
+                                                      _leaveStandbyQueue(gClass)
                                                 : () =>
-                                                    _joinStandbyQueue(gClass),
+                                                      _joinStandbyQueue(gClass),
                                             icon: Icon(
                                               isQueued
                                                   ? Icons.exit_to_app_rounded
-                                                  : Icons
-                                                        .playlist_add_rounded,
+                                                  : Icons.playlist_add_rounded,
                                             ),
                                             label: Text(
                                               isQueued
@@ -569,53 +602,57 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         ),
                                         const SizedBox(height: 14),
                                       ],
-                                      SizedBox(
-                                        width: double.infinity,
-                                        height: 54,
-                                        child: OutlinedButton.icon(
-                                          onPressed:
-                                              (_isLoading ||
-                                                  isRegistered ||
-                                                  isFull ||
-                                                  isQueued)
-                                              ? null
-                                              : () {
-                                                  if (liveFilled >=
-                                                      gClass.capacity) {
-                                                    ScaffoldMessenger.of(
-                                                      context,
-                                                    ).showSnackBar(
-                                                      const SnackBar(
-                                                        content: Text(
-                                                          'Class just filled up',
+                                      if (gClass.bookingMode ==
+                                          BookingMode.spot)
+                                        SizedBox(
+                                          width: double.infinity,
+                                          height: 54,
+                                          child: OutlinedButton.icon(
+                                            onPressed:
+                                                (_isLoading ||
+                                                    isRegistered ||
+                                                    isFull ||
+                                                    isQueued)
+                                                ? null
+                                                : () {
+                                                    if (liveFilled >=
+                                                        gClass.capacity) {
+                                                      ScaffoldMessenger.of(
+                                                        context,
+                                                      ).showSnackBar(
+                                                        const SnackBar(
+                                                          content: Text(
+                                                            'Class just filled up',
+                                                          ),
                                                         ),
-                                                      ),
+                                                      );
+                                                      return;
+                                                    }
+                                                    context.push(
+                                                      MatSelectionScreen
+                                                          .routeName,
+                                                      extra: gClass.id,
                                                     );
-                                                    return;
-                                                  }
-                                                  context.push(
-                                                    MatSelectionScreen
-                                                        .routeName,
-                                                    extra: gClass.id,
-                                                  );
-                                                },
-                                          icon: const Icon(
-                                            Icons.grid_view_rounded,
-                                          ),
-                                          label: const Text('Choose Your Mat'),
-                                          style: OutlinedButton.styleFrom(
-                                            foregroundColor:
-                                                colorScheme.primary,
-                                            side: BorderSide(
-                                              color: colorScheme.primary,
+                                                  },
+                                            icon: const Icon(
+                                              Icons.grid_view_rounded,
                                             ),
-                                            shape: RoundedRectangleBorder(
-                                              borderRadius:
-                                                  BorderRadius.circular(28),
+                                            label: const Text(
+                                              'Choose Your Spot',
+                                            ),
+                                            style: OutlinedButton.styleFrom(
+                                              foregroundColor:
+                                                  colorScheme.primary,
+                                              side: BorderSide(
+                                                color: colorScheme.primary,
+                                              ),
+                                              shape: RoundedRectangleBorder(
+                                                borderRadius:
+                                                    BorderRadius.circular(28),
+                                              ),
                                             ),
                                           ),
                                         ),
-                                      ),
                                     ],
                                   ),
                                 ),
