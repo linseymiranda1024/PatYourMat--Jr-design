@@ -1,3 +1,7 @@
+import 'package:cloud_firestore/cloud_firestore.dart';
+
+import 'gym_class.dart';
+
 class ReservationStatus {
   static const String confirmed = 'CONFIRMED';
   static const String attended = 'ATTENDED';
@@ -30,6 +34,7 @@ class Reservation {
   final String instructor;
   final String dateTime;
   final String matNumber;
+  final String bookingRole;
   final String status;
   final DateTime date;
   final int durationMinutes;
@@ -43,28 +48,66 @@ class Reservation {
     required this.instructor,
     required this.dateTime,
     required this.matNumber,
+    this.bookingRole = '',
     this.status = ReservationStatus.confirmed,
     required this.date,
     this.durationMinutes = 60,
   });
 
-  factory Reservation.fromMap(Map<String, dynamic> data, {String? id}) {
+  factory Reservation.fromMap(
+    Map<String, dynamic> data, {
+    String? id,
+    GymClass? resolvedClass,
+  }) {
+    final resolvedDate = _resolveReservationDate(
+      data['date'],
+      fallback: resolvedClass?.dateTime,
+    );
+
     return Reservation(
       id: id,
       userId: data['userId']?.toString() ?? '',
       userName: data['userName']?.toString() ?? '',
       userEmail: data['userEmail']?.toString() ?? '',
-      className: data['className']?.toString() ?? '',
-      instructor: data['instructor']?.toString() ?? '',
-      dateTime: data['dateTime']?.toString() ?? '',
+      className: resolvedClass?.title ?? data['className']?.toString() ?? '',
+      instructor:
+          resolvedClass?.instructor ?? data['instructor']?.toString() ?? '',
+      dateTime: resolvedClass != null
+          ? '${resolvedClass.dateText} at ${resolvedClass.timeText}'
+          : data['dateTime']?.toString() ?? '',
       matNumber: data['matNumber']?.toString() ?? '',
+      bookingRole: data['bookingRole']?.toString() ?? '',
       status: normalizeReservationStatus(data['status']?.toString()),
-      date: data['date'] is DateTime
-          ? data['date'] as DateTime
-          : DateTime.now(),
-      durationMinutes: data['durationMinutes'] is num
-          ? (data['durationMinutes'] as num).toInt()
-          : 60,
+      date: resolvedDate,
+      durationMinutes: resolvedClass != null
+          ? _resolveDurationMinutes(resolvedClass.durationMinutes)
+          : _resolveDurationMinutes(data['durationMinutes']),
     );
   }
+}
+
+DateTime _resolveReservationDate(dynamic rawValue, {DateTime? fallback}) {
+  if (rawValue is DateTime) {
+    return rawValue;
+  }
+  if (rawValue is Timestamp) {
+    return rawValue.toDate();
+  }
+  if (rawValue is String) {
+    final parsed = DateTime.tryParse(rawValue);
+    if (parsed != null) {
+      return parsed;
+    }
+  }
+  return fallback ?? DateTime.now();
+}
+
+int _resolveDurationMinutes(dynamic rawValue) {
+  final resolvedValue = switch (rawValue) {
+    final int value => value,
+    final num value => value.toInt(),
+    final String value => int.tryParse(value) ?? 0,
+    _ => 0,
+  };
+  return resolvedValue > 0 ? resolvedValue : 60;
 }

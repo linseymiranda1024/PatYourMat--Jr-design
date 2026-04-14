@@ -27,6 +27,28 @@ class ReservationConfirmationScreen extends ConsumerWidget {
       reservation.id,
     );
     final currentReservation = liveReservation ?? reservation;
+    final assignmentLabel = switch (gymClass.bookingMode) {
+      BookingMode.open =>
+        normalizeGymClassType(gymClass.type) == 'Dance'
+            ? 'Your Floor Spot'
+            : 'Your Field Spot',
+      BookingMode.zone => 'Your Zone Spot',
+      BookingMode.spot => 'Your Spot',
+    };
+    final confirmationSubtitle = switch (gymClass.bookingMode) {
+      BookingMode.open =>
+        normalizeGymClassType(gymClass.type) == 'Dance'
+            ? 'Your place on the studio floor is confirmed'
+            : 'Your place on the field is confirmed',
+      BookingMode.zone => 'Your zone booking has been confirmed',
+      BookingMode.spot => 'Your spot has been reserved',
+    };
+    final arrivalReminder = switch (gymClass.bookingMode) {
+      BookingMode.open =>
+        '• Check the roster and join the floor when you arrive',
+      BookingMode.zone => '• Head to the zone shown above when you arrive',
+      BookingMode.spot => '• Head to the spot shown above when you arrive',
+    };
 
     return Scaffold(
       appBar: AppBar(
@@ -51,7 +73,7 @@ class ReservationConfirmationScreen extends ConsumerWidget {
                 end: Alignment.bottomCenter,
               ),
             ),
-            child: const Column(
+            child: Column(
               children: [
                 Icon(Icons.check_circle, size: 80, color: Colors.white),
                 SizedBox(height: 16),
@@ -65,7 +87,7 @@ class ReservationConfirmationScreen extends ConsumerWidget {
                 ),
                 SizedBox(height: 8),
                 Text(
-                  'Your mat spot has been reserved',
+                  confirmationSubtitle,
                   style: TextStyle(fontSize: 16, color: Colors.white70),
                 ),
               ],
@@ -94,9 +116,15 @@ class ReservationConfirmationScreen extends ConsumerWidget {
                   ),
                   _DetailRow(
                     icon: Icons.place,
-                    label: 'Your Mat',
+                    label: assignmentLabel,
                     value: currentReservation.matNumber,
                   ),
+                  if (currentReservation.bookingRole.trim().isNotEmpty)
+                    _DetailRow(
+                      icon: Icons.tune_rounded,
+                      label: 'Role',
+                      value: currentReservation.bookingRole,
+                    ),
                   _DetailRow(
                     icon: Icons.category_outlined,
                     label: 'Type',
@@ -108,17 +136,17 @@ class ReservationConfirmationScreen extends ConsumerWidget {
                     style: TextStyle(fontSize: 18, fontWeight: FontWeight.bold),
                   ),
                   const SizedBox(height: 12),
-                  const Card(
+                  Card(
                     child: Padding(
-                      padding: EdgeInsets.all(16),
+                      padding: const EdgeInsets.all(16),
                       child: Column(
                         crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Text('• Arrive at least 5 minutes early'),
-                          SizedBox(height: 8),
-                          Text('• Head to the mat shown above when you arrive'),
-                          SizedBox(height: 8),
-                          Text(
+                          const Text('• Arrive at least 5 minutes early'),
+                          const SizedBox(height: 8),
+                          Text(arrivalReminder),
+                          const SizedBox(height: 8),
+                          const Text(
                             '• Cancel at least 2 hours in advance to avoid penalty',
                           ),
                         ],

@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:rxdart/rxdart.dart';
 
 import '../models/achievement.dart';
 import '../models/gym_class.dart';
@@ -40,6 +41,7 @@ class DBReservations {
   static const String _registrationsCollection = 'registrations';
   static const String _standbyQueueCollection = 'standby_queue';
   static const String _rosterField = 'roster';
+  static const int _whereInChunkSize = 10;
 
   static DocumentReference<Map<String, dynamic>> _userRegistrationRef(
     String userId,
@@ -75,12 +77,14 @@ class DBReservations {
     String userId,
     GymClass gymClass, {
     String? matNumber,
+    String? bookingRole,
   }) async {
     try {
       return await _registerForClassTransaction(
         userId,
         gymClass,
         requestedMatNumber: matNumber,
+        bookingRole: bookingRole,
       );
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
@@ -93,6 +97,7 @@ class DBReservations {
     required GymClass gymClass,
     required List<String> selectedMatNumbers,
     required List<String> inviteeUids,
+    String? hostBookingRole,
   }) async {
     try {
       return await _db.runTransaction<GroupReservationResult>((
@@ -159,12 +164,14 @@ class DBReservations {
           userEmail: hostProfileData['email']?.toString() ?? '',
           gymClass: gymClass,
           matNumber: normalizedHostMat,
+          bookingRole: hostBookingRole,
         );
         final hostRosterData = _buildRosterData(
           userId: hostUserId,
           userName: _buildUserName(hostProfileData),
           userEmail: hostProfileData['email']?.toString() ?? '',
           matNumber: normalizedHostMat,
+          bookingRole: hostBookingRole,
         );
 
         transaction.set(hostRegistrationRef, hostRegistrationData);
@@ -509,41 +516,46 @@ class DBReservations {
         .collection(_userProfilesCollection)
         .doc(userId)
         .collection(_registrationsCollection)
-        .orderBy('date', descending: false)
         .snapshots()
-        .asyncMap((snapshot) async {
-          final reservations = <Reservation>[];
-          for (final doc in snapshot.docs) {
-            final data = doc.data();
-            final classId = data['classId'] as String?;
-            int durationMinutes = 60;
-
-            if (classId != null && classId.isNotEmpty) {
-              try {
-                final classSnap = await _classRef(classId).get();
-                final classData = classSnap.data();
-                if (classData != null) {
-                  durationMinutes = resolveClassDurationMinutes(
-                    _asInt(classData['durationMinutes']),
-                  );
-                }
-              } catch (_) {
-                // Fall back to default duration if class not found
-              }
-            }
-
-            reservations.add(
-              Reservation.fromMap({
-                ...data,
-                'userId': data['userId'] ?? userId,
-                'durationMinutes': durationMinutes,
-                'date': data['date'] is Timestamp
-                    ? (data['date'] as Timestamp).toDate()
-                    : DateTime.now(),
-              }, id: doc.id),
-            );
+        .switchMap((snapshot) {
+          final registrationDocs = snapshot.docs;
+          if (registrationDocs.isEmpty) {
+            return Stream.value(const <Reservation>[]);
           }
-          return reservations;
+
+          final classIds = registrationDocs
+              .map((doc) => _reservationClassId(doc.data(), fallbackId: doc.id))
+              .where((classId) => classId.isNotEmpty)
+              .toSet();
+
+          return _watchClassesByIds(classIds).map((classesById) {
+            final reservations = registrationDocs.map((doc) {
+              final data = doc.data();
+              final classId = _reservationClassId(data, fallbackId: doc.id);
+              return Reservation.fromMap(
+                {
+                  ...data,
+                  'userId': data['userId'] ?? userId,
+                  'classId': classId,
+                },
+                id: classId.isEmpty ? doc.id : classId,
+                resolvedClass: classesById[classId],
+              );
+            }).toList();
+
+            reservations.sort((left, right) {
+              final dateCompare = left.date.compareTo(right.date);
+              if (dateCompare != 0) {
+                return dateCompare;
+              }
+
+              return _matSortValue(
+                left.matNumber,
+              ).compareTo(_matSortValue(right.matNumber));
+            });
+
+            return reservations;
+          });
         });
   }
 
@@ -552,59 +564,21 @@ class DBReservations {
   ) {
     return _classRef(classId).snapshots().asyncMap((doc) async {
       final classData = doc.data() ?? <String, dynamic>{};
-      final classDurationMinutes = resolveClassDurationMinutes(
-        _asInt(classData['durationMinutes']),
-      );
-      final classTitle = classData['title']?.toString() ?? '';
-      final classInstructor = classData['instructor']?.toString() ?? '';
-      final classType = normalizeGymClassType(
-        classData['type']?.toString() ?? '',
-      );
-      final classDateTime = classData['dateTime'] is Timestamp
-          ? (classData['dateTime'] as Timestamp).toDate()
-          : DateTime.now();
-
-      // Calculate formatted date and time strings
-      final months = [
-        'Jan',
-        'Feb',
-        'Mar',
-        'Apr',
-        'May',
-        'Jun',
-        'Jul',
-        'Aug',
-        'Sep',
-        'Oct',
-        'Nov',
-        'Dec',
-      ];
-      final weekdays = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-      final classDateText =
-          '${weekdays[classDateTime.weekday - 1]}, ${months[classDateTime.month - 1]} ${classDateTime.day}';
-      final hour = classDateTime.hour > 12
-          ? classDateTime.hour - 12
-          : (classDateTime.hour == 0 ? 12 : classDateTime.hour);
-      final amPm = classDateTime.hour >= 12 ? 'PM' : 'AM';
-      final minute = classDateTime.minute.toString().padLeft(2, '0');
-      final classTimeText = '$hour:$minute $amPm';
+      final resolvedClass = doc.exists ? GymClass.fromFirestore(doc) : null;
 
       final rosterReservations = _reservationsFromRoster(
         classId,
         classData[_rosterField],
-        classDurationMinutes: classDurationMinutes,
-        classTitle: classTitle,
-        classInstructor: classInstructor,
-        classType: classType,
-        classDateTime: classDateTime,
-        classDateText: classDateText,
-        classTimeText: classTimeText,
+        resolvedClass: resolvedClass,
       );
       if (rosterReservations.isNotEmpty) {
         return _sortReservations(rosterReservations);
       }
 
-      final legacyReservations = await _loadLegacyClassReservations(classId);
+      final legacyReservations = await _loadLegacyClassReservations(
+        classId,
+        resolvedClass: resolvedClass,
+      );
       if (legacyReservations.isNotEmpty) {
         return _sortReservations(legacyReservations);
       }
@@ -808,6 +782,7 @@ class DBReservations {
     String userId,
     GymClass gymClass, {
     String? requestedMatNumber,
+    String? bookingRole,
   }) {
     final classRef = _classRef(gymClass.id);
     final userProfileRef = _db.collection(_userProfilesCollection).doc(userId);
@@ -851,12 +826,14 @@ class DBReservations {
         userEmail: userProfileData['email']?.toString() ?? '',
         gymClass: gymClass,
         matNumber: selectedMatNumber,
+        bookingRole: bookingRole,
       );
       final rosterData = _buildRosterData(
         userId: userId,
         userName: _buildUserName(userProfileData),
         userEmail: userProfileData['email']?.toString() ?? '',
         matNumber: selectedMatNumber,
+        bookingRole: bookingRole,
       );
       final nextFilled = occupiedCount + 1;
       transaction.set(userRegistrationRef, registrationData);
@@ -880,18 +857,16 @@ class DBReservations {
     required String userEmail,
     required GymClass gymClass,
     required String matNumber,
+    String? bookingRole,
   }) {
     return {
       'userId': userId,
       'userName': userName,
       'userEmail': userEmail,
       'classId': gymClass.id,
-      'className': gymClass.title,
-      'instructor': gymClass.instructor,
-      'dateTime': '${gymClass.dateText} at ${gymClass.timeText}',
-      'date': Timestamp.fromDate(gymClass.dateTime),
-      'type': normalizeGymClassType(gymClass.type),
       'matNumber': matNumber,
+      if (bookingRole != null && bookingRole.trim().isNotEmpty)
+        'bookingRole': bookingRole.trim(),
       'status': ReservationStatus.confirmed,
       'createdAt': FieldValue.serverTimestamp(),
     };
@@ -902,60 +877,64 @@ class DBReservations {
     required String userName,
     required String userEmail,
     required String matNumber,
+    String? bookingRole,
   }) {
     return {
       'userId': userId,
       'userName': userName,
       'userEmail': userEmail,
       'matNumber': matNumber,
+      if (bookingRole != null && bookingRole.trim().isNotEmpty)
+        'bookingRole': bookingRole.trim(),
       'status': ReservationStatus.confirmed,
       'createdAt': FieldValue.serverTimestamp(),
     };
   }
 
   static Reservation _reservationFromDocument(
-    DocumentSnapshot<Map<String, dynamic>> doc,
-  ) {
+    DocumentSnapshot<Map<String, dynamic>> doc, {
+    required String reservationId,
+    String fallbackUserId = '',
+    GymClass? resolvedClass,
+  }) {
     final data = doc.data() ?? <String, dynamic>{};
-    return Reservation.fromMap({
-      ...data,
-      'userId': data['userId'] ?? doc.reference.parent.parent?.id ?? '',
-      'date': data['date'] is Timestamp
-          ? (data['date'] as Timestamp).toDate()
-          : DateTime.now(),
-    }, id: doc.id);
+    final classId = _reservationClassId(data, fallbackId: reservationId);
+    final resolvedUserId =
+        data['userId']?.toString() ??
+        (fallbackUserId.isNotEmpty
+            ? fallbackUserId
+            : doc.reference.parent.parent?.id ?? '');
+
+    return Reservation.fromMap(
+      {...data, 'userId': resolvedUserId, 'classId': classId},
+      id: reservationId,
+      resolvedClass: resolvedClass,
+    );
   }
 
   static Future<List<Reservation>> _loadLegacyClassReservations(
-    String classId,
-  ) async {
+    String classId, {
+    GymClass? resolvedClass,
+  }) async {
     final classDocs = await _classRegistrationsCollection(classId).get();
     if (classDocs.docs.isNotEmpty) {
-      return classDocs.docs.map(_reservationFromDocument).toList();
-    }
-
-    try {
-      final userProfiles = await _db.collection(_userProfilesCollection).get();
-      if (userProfiles.docs.isEmpty) {
-        return const <Reservation>[];
-      }
-
-      final registrationDocs = await Future.wait(
-        userProfiles.docs.map(
-          (profileDoc) => profileDoc.reference
-              .collection(_registrationsCollection)
-              .doc(classId)
-              .get(),
-        ),
-      );
-
-      return registrationDocs
-          .where((doc) => doc.exists)
-          .map(_reservationFromDocument)
+      return classDocs.docs
+          .map(
+            (doc) => _reservationFromDocument(
+              doc,
+              reservationId: classId,
+              fallbackUserId: doc.id,
+              resolvedClass: resolvedClass,
+            ),
+          )
           .toList();
-    } on FirebaseException catch (e) {
-      throw Exception(_friendlyFirestoreError(e));
     }
+
+    // Do not scan every user's private registration subcollection here.
+    // Members are not permitted to read other users' user_profiles/*/registrations
+    // documents under current Firestore rules, so that fallback breaks the invite
+    // sheet and social occupancy streams for classes without a roster mirror.
+    return const <Reservation>[];
   }
 
   static Future<void> _sendGroupInviteResponseNotification({
@@ -973,9 +952,10 @@ class DBReservations {
         .doc(inviteeUid)
         .get();
     final inviteeData = inviteeProfile.data() ?? <String, dynamic>{};
-    final inviteeName = _buildUserName(inviteeData).trim().isEmpty
-        ? 'A friend'
-        : _buildUserName(inviteeData).trim();
+    final inviteeName = resolveUserDisplayName(
+      inviteeData,
+      fallback: 'A friend',
+    );
 
     await _db
         .collection(_userProfilesCollection)
@@ -1157,7 +1137,10 @@ class DBReservations {
     return parsed;
   }
 
-  static String _buildUserName(Map<String, dynamic> userProfileData) {
+  static String resolveUserDisplayName(
+    Map<String, dynamic> userProfileData, {
+    String fallback = 'Member',
+  }) {
     final firstName = userProfileData['first_name']?.toString().trim() ?? '';
     final lastName = userProfileData['last_name']?.toString().trim() ?? '';
     final fullName = [
@@ -1168,19 +1151,22 @@ class DBReservations {
       return fullName;
     }
 
-    return userProfileData['email']?.toString() ?? '';
+    final email = userProfileData['email']?.toString().trim() ?? '';
+    if (email.isNotEmpty) {
+      return email;
+    }
+
+    return fallback;
+  }
+
+  static String _buildUserName(Map<String, dynamic> userProfileData) {
+    return resolveUserDisplayName(userProfileData);
   }
 
   static List<Reservation> _reservationsFromRoster(
     String classId,
     dynamic rawRoster, {
-    int classDurationMinutes = 60,
-    String classTitle = '',
-    String classInstructor = '',
-    String classType = '',
-    DateTime? classDateTime,
-    String classDateText = '',
-    String classTimeText = '',
+    GymClass? resolvedClass,
   }) {
     if (rawRoster is! Map) {
       return const <Reservation>[];
@@ -1203,30 +1189,20 @@ class DBReservations {
       final matNumber = data['matNumber']?.toString() ?? '';
       final status = data['status']?.toString() ?? ReservationStatus.confirmed;
 
-      // Use class data for fields that were previously duplicated
-      final resolvedClassName = data['className'] ?? classTitle;
-      final resolvedInstructor = data['instructor'] ?? classInstructor;
-      final resolvedType = data['type'] ?? classType;
-      // Always use class document's dateTime for consistency
-      final resolvedDateTime = '${classDateText} at ${classTimeText}';
-      final resolvedDate = classDateTime ?? DateTime.now();
-
       reservations.add(
-        Reservation.fromMap({
-          ...data,
-          'userId': userId,
-          'userName': userName,
-          'userEmail': userEmail,
-          'classId': classId,
-          'className': resolvedClassName,
-          'instructor': resolvedInstructor,
-          'dateTime': resolvedDateTime,
-          'date': Timestamp.fromDate(resolvedDate),
-          'type': resolvedType,
-          'matNumber': matNumber,
-          'status': status,
-          'durationMinutes': classDurationMinutes,
-        }, id: classId),
+        Reservation.fromMap(
+          {
+            ...data,
+            'userId': userId,
+            'userName': userName,
+            'userEmail': userEmail,
+            'classId': classId,
+            'matNumber': matNumber,
+            'status': status,
+          },
+          id: classId,
+          resolvedClass: resolvedClass,
+        ),
       );
     });
     return reservations;
@@ -1260,6 +1236,72 @@ class DBReservations {
 
   static String _rosterAttendedAtField(String userId) =>
       '${_rosterEntryField(userId)}.attendedAt';
+
+  static Stream<Map<String, GymClass>> _watchClassesByIds(
+    Iterable<String> classIds,
+  ) {
+    final normalizedIds =
+        classIds
+            .map((classId) => classId.trim())
+            .where((classId) => classId.isNotEmpty)
+            .toSet()
+            .toList()
+          ..sort();
+    if (normalizedIds.isEmpty) {
+      return Stream.value(const <String, GymClass>{});
+    }
+
+    final classQueryStreams = _chunkedIds(normalizedIds, _whereInChunkSize)
+        .map(
+          (chunk) => _db
+              .collection(_classesCollection)
+              .where(FieldPath.documentId, whereIn: chunk)
+              .snapshots(),
+        )
+        .toList();
+
+    if (classQueryStreams.length == 1) {
+      return classQueryStreams.first.map(
+        (snapshot) => _classMapFromSnapshots([snapshot]),
+      );
+    }
+
+    return Rx.combineLatestList<QuerySnapshot<Map<String, dynamic>>>(
+      classQueryStreams,
+    ).map(_classMapFromSnapshots);
+  }
+
+  static Map<String, GymClass> _classMapFromSnapshots(
+    Iterable<QuerySnapshot<Map<String, dynamic>>> snapshots,
+  ) {
+    final classesById = <String, GymClass>{};
+    for (final snapshot in snapshots) {
+      for (final doc in snapshot.docs) {
+        classesById[doc.id] = GymClass.fromFirestore(doc);
+      }
+    }
+    return classesById;
+  }
+
+  static List<List<String>> _chunkedIds(List<String> ids, int chunkSize) {
+    final chunks = <List<String>>[];
+    for (var index = 0; index < ids.length; index += chunkSize) {
+      final end = min(index + chunkSize, ids.length);
+      chunks.add(ids.sublist(index, end));
+    }
+    return chunks;
+  }
+
+  static String _reservationClassId(
+    Map<String, dynamic> data, {
+    required String fallbackId,
+  }) {
+    final classId = data['classId']?.toString().trim() ?? '';
+    if (classId.isNotEmpty) {
+      return classId;
+    }
+    return fallbackId.trim();
+  }
 
   static String? _pickRandomAvailableMat(
     int capacity,

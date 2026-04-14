@@ -2,8 +2,11 @@ import 'package:cloud_firestore/cloud_firestore.dart';
 
 enum ClassStatus { open, full, standby }
 
+enum BookingMode { spot, open, zone }
+
 const List<String> gymClassTypes = <String>[
   'Yoga',
+  'Soccer',
   'Sport',
   'Pilates',
   'HIIT',
@@ -33,7 +36,9 @@ String normalizeGymClassType(String? type) {
     'spin': 'Cardio',
     'other': 'Recovery',
     'boxing': 'Sport',
-    'soccer': 'Sport',
+    'soccer': 'Soccer',
+    'football': 'Soccer',
+    'futsal': 'Soccer',
   };
 
   final legacyMatch = legacyAliases[trimmed.toLowerCase()];
@@ -44,11 +49,59 @@ String normalizeGymClassType(String? type) {
   return 'Recovery';
 }
 
+BookingMode inferBookingModeFromType(String? type) {
+  switch (normalizeGymClassType(type)) {
+    case 'Dance':
+    case 'Sport':
+    case 'Soccer':
+      return BookingMode.open;
+    case 'HIIT':
+    case 'Strength':
+    case 'Cardio':
+      return BookingMode.zone;
+    case 'Yoga':
+    case 'Pilates':
+    case 'Mobility':
+    case 'Meditation':
+    case 'Recovery':
+      return BookingMode.spot;
+  }
+  return BookingMode.spot;
+}
+
+BookingMode bookingModeFromRaw(String? rawValue, {String? classType}) {
+  switch ((rawValue ?? '').trim().toLowerCase()) {
+    case 'spot':
+      return BookingMode.spot;
+    case 'open':
+    case 'roster':
+      return BookingMode.open;
+    case 'zone':
+      return BookingMode.zone;
+    default:
+      return inferBookingModeFromType(classType);
+  }
+}
+
+extension BookingModeX on BookingMode {
+  String get storageValue {
+    switch (this) {
+      case BookingMode.spot:
+        return 'SPOT';
+      case BookingMode.open:
+        return 'OPEN';
+      case BookingMode.zone:
+        return 'ZONE';
+    }
+  }
+}
+
 class GymClass {
   final String id;
   final String title;
   final String description;
   final String type;
+  final BookingMode bookingMode;
   final String instructor;
   final DateTime dateTime;
   final int durationMinutes;
@@ -66,6 +119,7 @@ class GymClass {
     required this.title,
     required this.description,
     required this.type,
+    BookingMode? bookingMode,
     required this.instructor,
     required this.dateTime,
     required this.durationMinutes,
@@ -78,7 +132,8 @@ class GymClass {
     this.recurrenceIntervalWeeks = 1,
     this.recurrenceIndex = 0,
     ClassStatus? status,
-  }) : recurrenceSeriesId =
+  }) : bookingMode = bookingMode ?? inferBookingModeFromType(type),
+       recurrenceSeriesId =
            (recurrenceSeriesId == null || recurrenceSeriesId.trim().isEmpty)
            ? id
            : recurrenceSeriesId.trim();
@@ -94,6 +149,10 @@ class GymClass {
         description: data['description'] ?? '',
         type: normalizeGymClassType(
           data['type'] as String? ?? data['category'] as String?,
+        ),
+        bookingMode: bookingModeFromRaw(
+          data['bookingMode']?.toString(),
+          classType: data['type'] as String? ?? data['category'] as String?,
         ),
         instructor: data['instructor'] ?? 'Unknown Instructor',
         dateTime: data['dateTime'] is Timestamp
@@ -121,6 +180,7 @@ class GymClass {
         title: 'Error Loading Class',
         description: '',
         type: 'Recovery',
+        bookingMode: BookingMode.spot,
         instructor: '',
         dateTime: DateTime.now(),
         durationMinutes: 0,
@@ -137,6 +197,7 @@ class GymClass {
       'title': title,
       'description': description,
       'type': normalizeGymClassType(type),
+      'bookingMode': bookingMode.storageValue,
       'instructor': instructor,
       'dateTime': Timestamp.fromDate(dateTime),
       'durationMinutes': durationMinutes,
@@ -158,6 +219,7 @@ class GymClass {
     String? title,
     String? description,
     String? type,
+    BookingMode? bookingMode,
     String? instructor,
     DateTime? dateTime,
     int? durationMinutes,
@@ -175,6 +237,7 @@ class GymClass {
       title: title ?? this.title,
       description: description ?? this.description,
       type: type ?? this.type,
+      bookingMode: bookingMode ?? this.bookingMode,
       instructor: instructor ?? this.instructor,
       dateTime: dateTime ?? this.dateTime,
       durationMinutes: durationMinutes ?? this.durationMinutes,
