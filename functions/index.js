@@ -163,6 +163,25 @@ function buildClassMetadataUpdate({
   };
 }
 
+function chunkArray(values, chunkSize) {
+  const chunks = [];
+  for (let index = 0; index < values.length; index += chunkSize) {
+    chunks.push(values.slice(index, index + chunkSize));
+  }
+  return chunks;
+}
+
+async function deleteDocumentRefsInBatches(documentRefs) {
+  const refsToDelete = documentRefs.filter(Boolean);
+  for (const refsChunk of chunkArray(refsToDelete, 450)) {
+    const batch = db.batch();
+    for (const ref of refsChunk) {
+      batch.delete(ref);
+    }
+    await batch.commit();
+  }
+}
+
 exports.registerForClass = onCall(async (request) => {
   const auth = request.auth;
   if (!auth) {
@@ -313,6 +332,51 @@ exports.registerForClass = onCall(async (request) => {
     );
   }
 });
+
+exports.cleanupDeletedClassData = onDocumentDeleted(
+    "classes/{classId}",
+    async (event) => {
+      const classId = toTrimmedString(event.params.classId);
+      if (!classId) {
+        return;
+      }
+
+      try {
+        const classRef = db.collection("classes").doc(classId);
+        const userProfilesSnapshot = await db.collection("user_profiles").get();
+        const userRegistrationRefs = userProfilesSnapshot.docs.map((userDoc) =>
+          userDoc.ref.collection("registrations").doc(classId),
+        );
+        const userRegistrationDocs = userRegistrationRefs.length > 0 ?
+          await db.getAll(...userRegistrationRefs) :
+          [];
+        const classRegistrationsSnapshot = await classRef
+            .collection("registrations")
+            .get();
+        const standbyQueueSnapshot = await classRef
+            .collection("standby_queue")
+            .get();
+
+        const refsToDelete = [
+          ...userRegistrationDocs
+              .filter((doc) => doc.exists)
+              .map((doc) => doc.ref),
+          ...classRegistrationsSnapshot.docs.map((doc) => doc.ref),
+          ...standbyQueueSnapshot.docs.map((doc) => doc.ref),
+        ];
+
+        await deleteDocumentRefsInBatches(refsToDelete);
+
+        if (refsToDelete.length > 0) {
+          console.log(
+              `Cleaned ${refsToDelete.length} orphaned docs for deleted class ${classId}.`,
+          );
+        }
+      } catch (error) {
+        console.error("Error cleaning deleted class data:", error);
+      }
+    },
+);
 
 exports.promoteFromStandbyQueue = onDocumentDeleted(
     "classes/{classId}/registrations/{userId}",
