@@ -22,6 +22,60 @@ class NotificationsScreen extends ConsumerStatefulWidget {
 
 class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
   final Set<String> _busyNotificationIds = <String>{};
+  bool _isClearing = false;
+
+  Future<void> _clearAllNotifications(String uid) async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: const Text('Clear notifications?'),
+        content: const Text(
+          'This will permanently remove your notification history. Pending invites or requests will be deleted.',
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: const Text('Keep Notifications'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: TextButton.styleFrom(
+              foregroundColor: Theme.of(context).colorScheme.error,
+              textStyle: const TextStyle(fontWeight: FontWeight.bold),
+            ),
+            child: const Text('Clear All'),
+          ),
+        ],
+      ),
+    );
+
+    if (confirmed != true) return;
+
+    setState(() => _isClearing = true);
+    try {
+      final collection = FirebaseFirestore.instance
+          .collection('user_profiles')
+          .doc(uid)
+          .collection('notifications');
+
+      final snapshot = await collection.get();
+      final batch = FirebaseFirestore.instance.batch();
+      for (final doc in snapshot.docs) {
+        batch.delete(doc.reference);
+      }
+      await batch.commit();
+    } catch (error) {
+      if (mounted) {
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Failed to clear notifications: $error')),
+        );
+      }
+    } finally {
+      if (mounted) {
+        setState(() => _isClearing = false);
+      }
+    }
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -89,13 +143,34 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        const Text(
-                          'Notifications',
-                          style: TextStyle(
-                            color: AppColors.headerOnBrand,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
+                        Row(
+                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
+                          children: [
+                            const Text(
+                              'Notifications',
+                              style: TextStyle(
+                                color: AppColors.headerOnBrand,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            if (firestoreNotifications.isNotEmpty)
+                              _isClearing
+                                  ? const SizedBox(
+                                      width: 24,
+                                      height: 24,
+                                      child: CircularProgressIndicator(
+                                        strokeWidth: 2,
+                                        color: AppColors.headerOnBrand,
+                                      ),
+                                    )
+                                  : IconButton(
+                                      onPressed: () => _clearAllNotifications(currentUid),
+                                      icon: const Icon(Icons.clear_all_rounded, color: AppColors.headerOnBrand),
+                                      tooltip: 'Clear All',
+                                      visualDensity: VisualDensity.compact,
+                                    ),
+                          ],
                         ),
                         const SizedBox(height: 8),
                         Text(
@@ -138,27 +213,52 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
                               const SizedBox(height: 12),
                           itemBuilder: (context, index) {
                             final notification = notifications[index];
-                            return _NotificationCard(
+                            final card = _NotificationCard(
                               notification: notification,
-                              isBusy: _busyNotificationIds.contains(
-                                notification.id,
-                              ),
+                              isBusy: _busyNotificationIds.contains(notification.id),
                               onAccept: notification.canAccept
                                   ? () => _handleNotificationAction(
-                                      notification,
-                                      accept: true,
-                                      currentUid: currentUid,
-                                      currentName: currentName,
-                                    )
+                                        notification,
+                                        accept: true,
+                                        currentUid: currentUid,
+                                        currentName: currentName,
+                                      )
                                   : null,
                               onDecline: notification.canDecline
                                   ? () => _handleNotificationAction(
-                                      notification,
-                                      accept: false,
-                                      currentUid: currentUid,
-                                      currentName: currentName,
-                                    )
+                                        notification,
+                                        accept: false,
+                                        currentUid: currentUid,
+                                        currentName: currentName,
+                                      )
                                   : null,
+                            );
+
+                            if (notification.id == null) {
+                              return card;
+                            }
+
+                            return Dismissible(
+                              key: Key(notification.id!),
+                              direction: DismissDirection.endToStart,
+                              onDismissed: (_) {
+                                FirebaseFirestore.instance
+                                    .collection('user_profiles')
+                                    .doc(currentUid)
+                                    .collection('notifications')
+                                    .doc(notification.id)
+                                    .delete();
+                              },
+                              background: Container(
+                                decoration: BoxDecoration(
+                                  color: colorScheme.errorContainer,
+                                  borderRadius: BorderRadius.circular(24),
+                                ),
+                                alignment: Alignment.centerRight,
+                                padding: const EdgeInsets.only(right: 24),
+                                child: Icon(Icons.delete_outline, color: colorScheme.onErrorContainer),
+                              ),
+                              child: card,
                             );
                           },
                         ),
