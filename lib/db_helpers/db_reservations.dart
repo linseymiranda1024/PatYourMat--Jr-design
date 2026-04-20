@@ -1,12 +1,14 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 
 import '../models/achievement.dart';
 import '../models/gym_class.dart';
 import '../models/reservation.dart';
 import '../util/date_time/util_attendance.dart';
+import '../util/date_time/util_no_show_penalty.dart';
 
 class CheckInResult {
   final List<String> achievements;
@@ -43,6 +45,22 @@ class _StandbyQueueSnapshot {
   bool get hasEntries => count > 0 && frontUserId != null;
 
   int get countAfterFrontRemoval => count > 0 ? count - 1 : 0;
+}
+
+class _OverdueNoShowCandidate {
+  final String classId;
+  final DocumentReference<Map<String, dynamic>> userRegistrationRef;
+  final DocumentReference<Map<String, dynamic>> classRef;
+  final DateTime classEnd;
+  final bool hasRosterEntry;
+
+  const _OverdueNoShowCandidate({
+    required this.classId,
+    required this.userRegistrationRef,
+    required this.classRef,
+    required this.classEnd,
+    required this.hasRosterEntry,
+  });
 }
 
 class DBReservations {
@@ -91,6 +109,9 @@ class DBReservations {
     String? bookingRole,
   }) async {
     try {
+      final penaltyState = await syncMemberNoShows(userId);
+      _throwIfRegistrationBlocked(penaltyState);
+
       final standbyQueue = await _loadStandbyQueueSnapshot(gymClass.id);
       if (standbyQueue.hasEntries && standbyQueue.frontUserId != userId) {
         throw Exception('Standby queue has priority for the next open spot.');
@@ -117,6 +138,9 @@ class DBReservations {
     String? hostBookingRole,
   }) async {
     try {
+      final penaltyState = await syncMemberNoShows(hostUserId);
+      _throwIfRegistrationBlocked(penaltyState);
+
       final standbyQueue = await _loadStandbyQueueSnapshot(gymClass.id);
       if (standbyQueue.hasEntries) {
         throw Exception('Standby queue has priority for the next open spot.');
@@ -274,6 +298,9 @@ class DBReservations {
         .doc(notificationId);
 
     try {
+      final penaltyState = await syncMemberNoShows(userId);
+      _throwIfRegistrationBlocked(penaltyState);
+
       final notificationSnap = await notificationRef.get();
       if (!notificationSnap.exists) {
         throw Exception('Invite not found.');
@@ -428,6 +455,9 @@ class DBReservations {
 
   static Future<void> joinStandbyQueue(String userId, GymClass gymClass) async {
     try {
+      final penaltyState = await syncMemberNoShows(userId);
+      _throwIfRegistrationBlocked(penaltyState);
+
       final userProfileRef = _db
           .collection(_userProfilesCollection)
           .doc(userId);
@@ -493,6 +523,94 @@ class DBReservations {
           ),
         });
       });
+    } on FirebaseException catch (e) {
+      throw Exception(_friendlyFirestoreError(e));
+    }
+  }
+
+  static Future<NoShowPenaltyState> syncMemberNoShows(
+    String userId, {
+    DateTime? now,
+  }) async {
+    final normalizedUserId = userId.trim();
+    if (normalizedUserId.isEmpty) {
+      return const NoShowPenaltyState(noShowCount: 0, penaltyUntil: null);
+    }
+
+    final referenceNow = now ?? DateTime.now();
+    final userProfileRef = _db
+        .collection(_userProfilesCollection)
+        .doc(normalizedUserId);
+
+    try {
+      final profileSnap = await userProfileRef.get();
+      final profileData = profileSnap.data() ?? <String, dynamic>{};
+      final currentPenaltyState = NoShowPenaltyState(
+        noShowCount: _asInt(profileData['no_show_count']),
+        penaltyUntil: _resolveOptionalDateTime(
+          profileData['no_show_penalty_until'],
+        ),
+      );
+
+      final registrationsSnapshot = await userProfileRef
+          .collection(_registrationsCollection)
+          .get();
+      final overdueCandidates = await _loadOverdueNoShowCandidates(
+        normalizedUserId,
+        registrationsSnapshot.docs,
+        now: referenceNow,
+      );
+
+      final nextPenaltyState = resolveNoShowPenaltyState(
+        currentNoShowCount: currentPenaltyState.noShowCount,
+        currentPenaltyUntil: currentPenaltyState.penaltyUntil,
+        newlyRecordedNoShowTimes: overdueCandidates.map(
+          (candidate) => candidate.classEnd,
+        ),
+        now: referenceNow,
+      );
+
+      final shouldUpdateProfile =
+          overdueCandidates.isNotEmpty ||
+          currentPenaltyState.noShowCount != nextPenaltyState.noShowCount ||
+          !_sameDateTime(
+            currentPenaltyState.penaltyUntil,
+            nextPenaltyState.penaltyUntil,
+          );
+      if (!shouldUpdateProfile) {
+        return nextPenaltyState;
+      }
+
+      final batch = _db.batch();
+      for (final candidate in overdueCandidates) {
+        batch.set(candidate.userRegistrationRef, <String, dynamic>{
+          'status': ReservationStatus.noShow,
+          'noShowAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (candidate.hasRosterEntry) {
+          batch.update(candidate.classRef, <String, dynamic>{
+            _rosterStatusField(normalizedUserId): ReservationStatus.noShow,
+            _rosterNoShowAtField(normalizedUserId):
+                FieldValue.serverTimestamp(),
+          });
+        }
+      }
+
+      final profileUpdates = <String, dynamic>{
+        'no_show_count': nextPenaltyState.noShowCount,
+      };
+      if (nextPenaltyState.penaltyUntil != null) {
+        profileUpdates['no_show_penalty_until'] = Timestamp.fromDate(
+          nextPenaltyState.penaltyUntil!,
+        );
+      } else {
+        profileUpdates['no_show_penalty_until'] = FieldValue.delete();
+      }
+      batch.set(userProfileRef, profileUpdates, SetOptions(merge: true));
+
+      await batch.commit();
+      return nextPenaltyState;
     } on FirebaseException catch (e) {
       throw Exception(_friendlyFirestoreError(e));
     }
@@ -1410,6 +1528,111 @@ class DBReservations {
 
   static String _rosterAttendedAtField(String userId) =>
       '${_rosterEntryField(userId)}.attendedAt';
+
+  static String _rosterNoShowAtField(String userId) =>
+      '${_rosterEntryField(userId)}.noShowAt';
+
+  static Future<List<_OverdueNoShowCandidate>> _loadOverdueNoShowCandidates(
+    String userId,
+    List<QueryDocumentSnapshot<Map<String, dynamic>>> registrationDocs, {
+    required DateTime now,
+  }) async {
+    if (registrationDocs.isEmpty) {
+      return const <_OverdueNoShowCandidate>[];
+    }
+
+    final classIds = registrationDocs
+        .map((doc) => _reservationClassId(doc.data(), fallbackId: doc.id))
+        .where((classId) => classId.isNotEmpty)
+        .toSet()
+        .toList();
+    final classSnapshots = await Future.wait(
+      classIds.map((classId) => _classRef(classId).get()),
+    );
+    final classDocsById = <String, DocumentSnapshot<Map<String, dynamic>>>{
+      for (final doc in classSnapshots) doc.id: doc,
+    };
+
+    final overdueCandidates = <_OverdueNoShowCandidate>[];
+    for (final doc in registrationDocs) {
+      final data = doc.data();
+      if (normalizeReservationStatus(data['status']?.toString()) !=
+          ReservationStatus.confirmed) {
+        continue;
+      }
+
+      final classId = _reservationClassId(data, fallbackId: doc.id);
+      final classDoc = classDocsById[classId];
+      final classData = classDoc?.data() ?? <String, dynamic>{};
+      final classStart =
+          _resolveOptionalDateTime(classData['dateTime']) ??
+          _resolveOptionalDateTime(data['date']) ??
+          _resolveOptionalDateTime(data['dateTime']);
+      if (classStart == null) {
+        continue;
+      }
+
+      final classEnd = attendanceWindowCloses(
+        classStart,
+        durationMinutes: _asInt(
+          classData['durationMinutes'] ?? data['durationMinutes'],
+        ),
+      );
+      if (!now.isAfter(classEnd)) {
+        continue;
+      }
+
+      final roster = classData[_rosterField];
+      final hasRosterEntry = roster is Map && roster.containsKey(userId);
+      overdueCandidates.add(
+        _OverdueNoShowCandidate(
+          classId: classId,
+          userRegistrationRef: doc.reference,
+          classRef: _classRef(classId),
+          classEnd: classEnd,
+          hasRosterEntry: hasRosterEntry,
+        ),
+      );
+    }
+
+    overdueCandidates.sort(
+      (left, right) => left.classEnd.compareTo(right.classEnd),
+    );
+    return overdueCandidates;
+  }
+
+  static DateTime? _resolveOptionalDateTime(dynamic rawValue) {
+    if (rawValue is Timestamp) {
+      return rawValue.toDate();
+    }
+    if (rawValue is DateTime) {
+      return rawValue;
+    }
+    if (rawValue is String) {
+      return DateTime.tryParse(rawValue);
+    }
+    return null;
+  }
+
+  static bool _sameDateTime(DateTime? left, DateTime? right) {
+    if (left == null || right == null) {
+      return left == right;
+    }
+    return left.isAtSameMomentAs(right);
+  }
+
+  static void _throwIfRegistrationBlocked(NoShowPenaltyState penaltyState) {
+    if (!penaltyState.isBlocked()) {
+      return;
+    }
+
+    throw Exception(_registrationBlockedMessage(penaltyState.penaltyUntil!));
+  }
+
+  static String _registrationBlockedMessage(DateTime penaltyUntil) {
+    final formattedDate = DateFormat.yMMMMd().format(penaltyUntil.toLocal());
+    return 'You cannot sign up for classes until $formattedDate because you reached 3 no-shows.';
+  }
 
   static Stream<Map<String, GymClass>> _watchClassesByIds(
     Iterable<String> classIds,

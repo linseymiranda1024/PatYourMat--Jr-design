@@ -1,4 +1,5 @@
 import 'dart:async';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/legacy.dart';
 import 'package:firebase_auth/firebase_auth.dart';
@@ -37,6 +38,11 @@ class ReservationsNotifier extends ChangeNotifier {
           _reservations = [];
           Future.microtask(() => notifyListeners());
         },
+      );
+      unawaited(
+        DBReservations.syncMemberNoShows(user.uid)
+            .then<void>((_) {})
+            .catchError((_) {}),
       );
       return;
     }

@@ -20,6 +20,7 @@ import 'package:flutter/material.dart';
 // App relative file imports
 import '../db_helpers/db_user_profile.dart';
 import '../models/user_profile.dart';
+import '../util/date_time/util_no_show_penalty.dart';
 import 'provider_auth.dart';
 
 //////////////////////////////////////////////////////////////////////////
@@ -156,6 +157,21 @@ class ProviderUserProfile extends ChangeNotifier {
     _userProfile.darkModeEnabled = value;
     notifyListeners();
   }
+
+  int get noShowCount => _userProfile.noShowCount;
+  set noShowCount(int value) {
+    _userProfile.noShowCount = value;
+    notifyListeners();
+  }
+
+  DateTime? get noShowPenaltyUntil => _userProfile.noShowPenaltyUntil;
+  set noShowPenaltyUntil(DateTime? value) {
+    _userProfile.noShowPenaltyUntil = value;
+    notifyListeners();
+  }
+
+  bool get hasActiveNoShowPenalty =>
+      isNoShowPenaltyActive(_userProfile.noShowPenaltyUntil);
 
   int get accountCreationTime => _userProfile.accountCreationTime;
   set accountCreation(int value) {

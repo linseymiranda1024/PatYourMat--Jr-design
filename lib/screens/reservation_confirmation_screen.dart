@@ -149,6 +149,10 @@ class ReservationConfirmationScreen extends ConsumerWidget {
                           const Text(
                             '• Cancel at least 2 hours in advance to avoid penalty',
                           ),
+                          const SizedBox(height: 8),
+                          const Text(
+                            '• 3 no-shows pause class sign-ups for 1 month',
+                          ),
                         ],
                       ),
                     ),

@@ -77,6 +77,78 @@ GymClass? resolveFavoriteClass(
   return matchingClasses.last;
 }
 
+class AttendanceSummaryData {
+  final int attendedCount;
+  final int noShowCount;
+  final int totalCompletedCount;
+  final double? attendanceRate;
+  final List<MapEntry<String, int>> categoryBreakdown;
+
+  const AttendanceSummaryData({
+    required this.attendedCount,
+    required this.noShowCount,
+    required this.totalCompletedCount,
+    required this.attendanceRate,
+    required this.categoryBreakdown,
+  });
+
+  bool get hasHistory => totalCompletedCount > 0;
+
+  String? get topCategory =>
+      categoryBreakdown.isEmpty ? null : categoryBreakdown.first.key;
+}
+
+AttendanceSummaryData summarizeAttendance(
+  List<Reservation> reservations, {
+  Map<String, int> categoryAttendance = const <String, int>{},
+  DateTime? now,
+}) {
+  final previousReservations = previousMemberReservations(
+    reservations,
+    now: now,
+  );
+  var attendedCount = 0;
+  var noShowCount = 0;
+
+  for (final reservation in previousReservations) {
+    final status = effectiveReservationStatus(
+      rawStatus: reservation.status,
+      classStart: reservation.date,
+      durationMinutes: reservation.durationMinutes,
+      now: now,
+    );
+    if (status == ReservationStatus.attended) {
+      attendedCount += 1;
+    } else if (status == ReservationStatus.noShow) {
+      noShowCount += 1;
+    }
+  }
+
+  final sortedCategoryBreakdown = categoryAttendance.entries
+      .where((entry) => entry.value > 0)
+      .toList()
+    ..sort((left, right) {
+      final countCompare = right.value.compareTo(left.value);
+      if (countCompare != 0) {
+        return countCompare;
+      }
+      return left.key.compareTo(right.key);
+    });
+
+  final totalCompletedCount = previousReservations.length;
+  final attendanceRate = totalCompletedCount == 0
+      ? null
+      : attendedCount / totalCompletedCount;
+
+  return AttendanceSummaryData(
+    attendedCount: attendedCount,
+    noShowCount: noShowCount,
+    totalCompletedCount: totalCompletedCount,
+    attendanceRate: attendanceRate,
+    categoryBreakdown: sortedCategoryBreakdown,
+  );
+}
+
 class ProfileScreen extends ConsumerStatefulWidget {
   const ProfileScreen({super.key});
 
@@ -118,6 +190,12 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
                 reservations: reservations,
                 thisMonthCount: thisMonthCount,
               ),
+              if (profile.hasActiveNoShowPenalty) ...[
+                const SizedBox(height: 20),
+                _buildNoShowPenaltySection(context, profile),
+              ],
+              const SizedBox(height: 20),
+              _buildAttendanceSummarySection(context, profile, reservations),
               const SizedBox(height: 20),
               _buildFavoritesSection(context, profile, gymClasses),
               const SizedBox(height: 20),
@@ -323,6 +401,70 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
     );
   }
 
+  Widget _buildNoShowPenaltySection(
+    BuildContext context,
+    ProviderUserProfile profile,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+    final penaltyUntil = profile.noShowPenaltyUntil;
+    final penaltyLabel = penaltyUntil == null
+        ? 'This lockout will lift after your penalty window ends.'
+        : 'Sign-ups reopen on ${DateFormat.yMMMMd().format(penaltyUntil.toLocal())}.';
+
+    return Container(
+      width: double.infinity,
+      padding: const EdgeInsets.all(18),
+      decoration: BoxDecoration(
+        color: colorScheme.errorContainer,
+        borderRadius: BorderRadius.circular(24),
+        border: Border.all(color: colorScheme.error.withValues(alpha: 0.18)),
+      ),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Icon(
+            Icons.event_busy_outlined,
+            color: colorScheme.onErrorContainer,
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  'Class sign-ups are paused',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onErrorContainer,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Your account reached 3 no-shows, so new class bookings and standby joins are locked for 1 month.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onErrorContainer,
+                    height: 1.4,
+                  ),
+                ),
+                const SizedBox(height: 8),
+                Text(
+                  penaltyLabel,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onErrorContainer.withValues(
+                      alpha: 0.86,
+                    ),
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   Widget _buildStatsSection({
     required BuildContext context,
     required List<Reservation> reservations,
@@ -373,6 +515,148 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
           },
         ),
       ],
+    );
+  }
+
+  Widget _buildAttendanceSummarySection(
+    BuildContext context,
+    ProviderUserProfile profile,
+    List<Reservation> reservations,
+  ) {
+    final summary = summarizeAttendance(
+      reservations,
+      categoryAttendance: profile.categoryAttendance,
+    );
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+
+    return _buildSectionCard(
+      context: context,
+      title: 'Attendance Summary',
+      subtitle: 'A quick look at your completed class history and check-in habits.',
+      child: !summary.hasHistory
+          ? Container(
+              width: double.infinity,
+              padding: const EdgeInsets.all(20),
+              decoration: BoxDecoration(
+                color: colorScheme.surface,
+                borderRadius: BorderRadius.circular(18),
+                border: Border.all(color: colorScheme.outlineVariant),
+              ),
+              child: Text(
+                'Your attendance summary will appear after your first completed class.',
+                style: textTheme.bodyMedium?.copyWith(
+                  height: 1.45,
+                  color: colorScheme.onSurfaceVariant,
+                ),
+              ),
+            )
+          : Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                LayoutBuilder(
+                  builder: (context, constraints) {
+                    final compact = constraints.maxWidth < 460;
+                    final tiles = <Widget>[
+                      _buildAttendanceMetricCard(
+                        context: context,
+                        label: 'Attended',
+                        value: '${summary.attendedCount}',
+                        icon: Icons.check_circle_outline,
+                        accent: AppColors.success,
+                      ),
+                      _buildAttendanceMetricCard(
+                        context: context,
+                        label: 'No-Shows',
+                        value: '${summary.noShowCount}',
+                        icon: Icons.event_busy_outlined,
+                        accent: AppColors.error,
+                      ),
+                      _buildAttendanceMetricCard(
+                        context: context,
+                        label: 'Attendance Rate',
+                        value: _formatAttendanceRate(summary.attendanceRate),
+                        icon: Icons.query_stats,
+                        accent: AppColors.deepPurple,
+                      ),
+                    ];
+
+                    if (compact) {
+                      return Column(
+                        children: tiles
+                            .map(
+                              (tile) => Padding(
+                                padding: const EdgeInsets.only(bottom: 10),
+                                child: tile,
+                              ),
+                            )
+                            .toList(),
+                      );
+                    }
+
+                    return Row(
+                      children: [
+                        for (var index = 0; index < tiles.length; index++) ...[
+                          Expanded(child: tiles[index]),
+                          if (index != tiles.length - 1)
+                            const SizedBox(width: 10),
+                        ],
+                      ],
+                    );
+                  },
+                ),
+                const SizedBox(height: 18),
+                Container(
+                  width: double.infinity,
+                  padding: const EdgeInsets.all(16),
+                  decoration: BoxDecoration(
+                    color: colorScheme.surface,
+                    borderRadius: BorderRadius.circular(18),
+                    border: Border.all(color: colorScheme.outlineVariant),
+                  ),
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Text(
+                        summary.topCategory == null
+                            ? 'Class Type Breakdown'
+                            : 'Most Attended: ${summary.topCategory}',
+                        style: textTheme.titleSmall?.copyWith(
+                          fontWeight: FontWeight.w800,
+                          color: colorScheme.onSurface,
+                        ),
+                      ),
+                      const SizedBox(height: 6),
+                      Text(
+                        summary.categoryBreakdown.isEmpty
+                            ? 'Checked-in class types will appear here once your attendance starts building.'
+                            : 'Your attended classes by category.',
+                        style: textTheme.bodySmall?.copyWith(
+                          color: colorScheme.onSurfaceVariant,
+                          height: 1.35,
+                        ),
+                      ),
+                      if (summary.categoryBreakdown.isNotEmpty) ...[
+                        const SizedBox(height: 14),
+                        Wrap(
+                          spacing: 10,
+                          runSpacing: 10,
+                          children: summary.categoryBreakdown
+                              .take(6)
+                              .map(
+                                (entry) => _buildAttendanceCategoryChip(
+                                  context,
+                                  entry,
+                                ),
+                              )
+                              .toList(),
+                        ),
+                      ],
+                    ],
+                  ),
+                ),
+              ],
+            ),
     );
   }
 
@@ -795,6 +1079,116 @@ class _ProfileScreenState extends ConsumerState<ProfileScreen> {
         ],
       ),
     );
+  }
+
+  Widget _buildAttendanceMetricCard({
+    required BuildContext context,
+    required String label,
+    required String value,
+    required IconData icon,
+    required Color accent,
+  }) {
+    final isDark = Theme.of(context).brightness == Brightness.dark;
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: accent.withValues(alpha: isDark ? 0.16 : 0.08),
+        borderRadius: BorderRadius.circular(18),
+        border: Border.all(
+          color: accent.withValues(alpha: isDark ? 0.28 : 0.16),
+        ),
+      ),
+      child: Row(
+        children: [
+          Container(
+            padding: const EdgeInsets.all(10),
+            decoration: BoxDecoration(
+              color: accent.withValues(alpha: isDark ? 0.20 : 0.12),
+              borderRadius: BorderRadius.circular(14),
+            ),
+            child: Icon(icon, color: accent, size: 20),
+          ),
+          const SizedBox(width: 12),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              children: [
+                Text(
+                  value,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.titleLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 2),
+                Text(
+                  label,
+                  style: textTheme.bodySmall?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                    fontWeight: FontWeight.w600,
+                  ),
+                ),
+              ],
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  Widget _buildAttendanceCategoryChip(
+    BuildContext context,
+    MapEntry<String, int> entry,
+  ) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 10),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainerHighest,
+        borderRadius: BorderRadius.circular(999),
+      ),
+      child: Row(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            entry.key,
+            style: textTheme.labelLarge?.copyWith(
+              fontWeight: FontWeight.w700,
+              color: colorScheme.onSurface,
+            ),
+          ),
+          const SizedBox(width: 8),
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+            decoration: BoxDecoration(
+              color: colorScheme.primary.withValues(alpha: 0.12),
+              borderRadius: BorderRadius.circular(999),
+            ),
+            child: Text(
+              '${entry.value}',
+              style: textTheme.labelMedium?.copyWith(
+                fontWeight: FontWeight.w800,
+                color: colorScheme.primary,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
+  String _formatAttendanceRate(double? attendanceRate) {
+    if (attendanceRate == null) {
+      return '--';
+    }
+    return '${(attendanceRate * 100).round()}%';
   }
 
   Widget _buildUpcomingReservationsSection(

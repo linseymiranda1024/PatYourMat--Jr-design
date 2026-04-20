@@ -12,6 +12,7 @@ void main() {
       instructor: 'Taylor',
       dateTime: 'Mon, Mar 24 at 8:00 AM',
       matNumber: 'Mat #1',
+      status: ReservationStatus.attended,
       date: DateTime(2026, 3, 24, 8),
       durationMinutes: 60,
     ),
@@ -58,6 +59,52 @@ void main() {
     final previous = previousMemberReservations(reservations, now: now);
 
     expect(previous.map((reservation) => reservation.id), ['past-1']);
+  });
+
+  test('attendance summary counts attended, no-shows, and categories', () {
+    final summary = summarizeAttendance(
+      [
+        ...reservations,
+        Reservation(
+          id: 'past-2',
+          className: 'Late Ride',
+          instructor: 'Jordan',
+          dateTime: 'Sun, Mar 23 at 7:00 PM',
+          matNumber: 'Mat #5',
+          status: ReservationStatus.noShow,
+          date: DateTime(2026, 3, 23, 19),
+          durationMinutes: 45,
+        ),
+      ],
+      categoryAttendance: const {'Yoga': 4, 'Cardio': 2, 'Dance': 4},
+      now: now,
+    );
+
+    expect(summary.attendedCount, 1);
+    expect(summary.noShowCount, 1);
+    expect(summary.totalCompletedCount, 2);
+    expect(summary.attendanceRate, 0.5);
+    expect(
+      summary.categoryBreakdown.map((entry) => '${entry.key}:${entry.value}'),
+      ['Dance:4', 'Yoga:4', 'Cardio:2'],
+    );
+    expect(summary.topCategory, 'Dance');
+  });
+
+  test('attendance summary is empty when there is no completed history', () {
+    final summary = summarizeAttendance(
+      reservations
+          .where((reservation) => reservation.id!.startsWith('future'))
+          .toList(),
+      now: now,
+    );
+
+    expect(summary.hasHistory, isFalse);
+    expect(summary.attendedCount, 0);
+    expect(summary.noShowCount, 0);
+    expect(summary.totalCompletedCount, 0);
+    expect(summary.attendanceRate, isNull);
+    expect(summary.categoryBreakdown, isEmpty);
   });
 
   test(

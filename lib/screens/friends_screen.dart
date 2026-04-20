@@ -1028,16 +1028,20 @@ class _FriendProfileScreen extends StatelessWidget {
                         ),
                       )
                     else
-                      Wrap(
-                        spacing: 12,
-                        runSpacing: 12,
-                        children: unlockedAchievements
-                            .map(
-                              (achievement) => _FriendAchievementBadge(
-                                achievement: achievement,
-                              ),
-                            )
-                            .toList(),
+                      SingleChildScrollView(
+                        scrollDirection: Axis.horizontal,
+                        child: Row(
+                          children: unlockedAchievements
+                              .map(
+                                (achievement) => Padding(
+                                  padding: const EdgeInsets.only(right: 10),
+                                  child: _FriendAchievementBadge(
+                                    achievement: achievement,
+                                  ),
+                                ),
+                              )
+                              .toList(),
+                        ),
                       ),
                   ],
                 ),
@@ -1061,19 +1065,19 @@ class _FriendAchievementBadge extends StatelessWidget {
     final textTheme = Theme.of(context).textTheme;
 
     return Container(
-      width: 150,
-      padding: const EdgeInsets.all(16),
+      width: 188,
+      padding: const EdgeInsets.all(12),
       decoration: BoxDecoration(
         color: colorScheme.surface,
-        borderRadius: BorderRadius.circular(20),
+        borderRadius: BorderRadius.circular(18),
         border: Border.all(color: colorScheme.outlineVariant),
       ),
-      child: Column(
-        crossAxisAlignment: CrossAxisAlignment.start,
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.center,
         children: [
           Container(
-            width: 52,
-            height: 52,
+            width: 40,
+            height: 40,
             decoration: BoxDecoration(
               color: achievement.color.withValues(alpha: 0.12),
               shape: BoxShape.circle,
@@ -1084,23 +1088,36 @@ class _FriendAchievementBadge extends StatelessWidget {
             child: Icon(
               achievement.iconData,
               color: achievement.color,
-              size: 24,
+              size: 18,
             ),
           ),
-          const SizedBox(height: 12),
-          Text(
-            achievement.title,
-            style: textTheme.titleSmall?.copyWith(
-              fontWeight: FontWeight.w800,
-              color: colorScheme.onSurface,
-            ),
-          ),
-          const SizedBox(height: 6),
-          Text(
-            achievement.description,
-            style: textTheme.bodySmall?.copyWith(
-              color: colorScheme.onSurfaceVariant,
-              height: 1.4,
+          const SizedBox(width: 10),
+          Expanded(
+            child: Column(
+              crossAxisAlignment: CrossAxisAlignment.start,
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Text(
+                  achievement.title,
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.labelLarge?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 3),
+                Text(
+                  achievement.description,
+                  maxLines: 2,
+                  overflow: TextOverflow.ellipsis,
+                  style: textTheme.bodySmall?.copyWith(
+                    fontSize: 11,
+                    color: colorScheme.onSurfaceVariant,
+                    height: 1.25,
+                  ),
+                ),
+              ],
             ),
           ),
         ],

@@ -11,6 +11,8 @@
 // Flutter external package imports
 import 'package:cloud_firestore/cloud_firestore.dart';
 
+import '../util/date_time/util_no_show_penalty.dart';
+
 // Enum definition for account creation status
 enum AccountCreationStep {
   ACC_STEP_ONBOARDING_PROFILE_CONTACT_INFO,
@@ -49,6 +51,8 @@ class UserProfile {
   bool _pushNotificationsEnabled = true;
   bool _standbyAlertsEnabled = true;
   bool _darkModeEnabled = false;
+  int _noShowCount = 0;
+  DateTime? _noShowPenaltyUntil;
   UserRole _role = UserRole.MEMBER;
   PermissionLevel _permissionLevel = PermissionLevel.PRODUCTION;
   int _accountCreationTime = 0;
@@ -104,6 +108,8 @@ class UserProfile {
     _pushNotificationsEnabled = true;
     _standbyAlertsEnabled = true;
     _darkModeEnabled = false;
+    _noShowCount = 0;
+    _noShowPenaltyUntil = null;
     _role = UserRole.MEMBER;
     _permissionLevel = PermissionLevel.PRODUCTION;
     _accountCreationTime = 0;
@@ -138,6 +144,10 @@ class UserProfile {
     pushNotificationsEnabled = jsonObject["push_notifications_enabled"] ?? true;
     standbyAlertsEnabled = jsonObject["standby_alerts_enabled"] ?? true;
     darkModeEnabled = jsonObject["dark_mode_enabled"] ?? false;
+    noShowCount = jsonObject["no_show_count"] ?? 0;
+    noShowPenaltyUntil = _parseOptionalDateTime(
+      jsonObject["no_show_penalty_until"],
+    );
     uid = firebaseUid;
     role = _getRoleFromString(
       jsonObject["role"] ?? _getStringFromRole(UserRole.MEMBER),
@@ -177,6 +187,8 @@ class UserProfile {
   set pushNotificationsEnabled(bool value) => _pushNotificationsEnabled = value;
   set standbyAlertsEnabled(bool value) => _standbyAlertsEnabled = value;
   set darkModeEnabled(bool value) => _darkModeEnabled = value;
+  set noShowCount(int value) => _noShowCount = value < 0 ? 0 : value;
+  set noShowPenaltyUntil(DateTime? value) => _noShowPenaltyUntil = value;
   set role(UserRole value) => _role = value;
 
   set permissionLevel(PermissionLevel value) => _permissionLevel = value;
@@ -204,6 +216,10 @@ class UserProfile {
   bool get pushNotificationsEnabled => _pushNotificationsEnabled;
   bool get standbyAlertsEnabled => _standbyAlertsEnabled;
   bool get darkModeEnabled => _darkModeEnabled;
+  int get noShowCount => _noShowCount;
+  DateTime? get noShowPenaltyUntil => _noShowPenaltyUntil;
+  bool get hasActiveNoShowPenalty =>
+      isNoShowPenaltyActive(_noShowPenaltyUntil);
   UserRole get role => _role;
 
   PermissionLevel get permissionLevel => _permissionLevel;
@@ -304,6 +320,19 @@ class UserProfile {
     return parsedMap;
   }
 
+  DateTime? _parseOptionalDateTime(dynamic rawValue) {
+    if (rawValue is Timestamp) {
+      return rawValue.toDate();
+    }
+    if (rawValue is DateTime) {
+      return rawValue;
+    }
+    if (rawValue is String) {
+      return DateTime.tryParse(rawValue);
+    }
+    return null;
+  }
+
   ////////////////////////////////////////////////////////////////////////
   // Converts to JSON for saving to noSQL database
   ////////////////////////////////////////////////////////////////////////
@@ -330,6 +359,10 @@ class UserProfile {
     jsonObject["push_notifications_enabled"] = pushNotificationsEnabled;
     jsonObject["standby_alerts_enabled"] = standbyAlertsEnabled;
     jsonObject["dark_mode_enabled"] = darkModeEnabled;
+    jsonObject["no_show_count"] = noShowCount;
+    if (noShowPenaltyUntil != null) {
+      jsonObject["no_show_penalty_until"] = noShowPenaltyUntil;
+    }
     jsonObject["role"] = _getStringFromRole(role);
     jsonObject["permission_level"] = _getStringFromPermissionLevel(
       permissionLevel,
