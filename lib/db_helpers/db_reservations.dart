@@ -114,6 +114,7 @@ class DBReservations {
     required GymClass gymClass,
     required List<String> selectedMatNumbers,
     required List<String> inviteeUids,
+    String inviteMessage = '',
     String? hostBookingRole,
   }) async {
     try {
@@ -231,6 +232,7 @@ class DBReservations {
             'class_time': Timestamp.fromDate(gymClass.dateTime),
             'host_mat_number': normalizedHostMat,
             'reserved_mat_number': inviteeMatNumber,
+            'invite_message': inviteMessage,
             'invite_status': 'pending',
             'created_at': FieldValue.serverTimestamp(),
           });

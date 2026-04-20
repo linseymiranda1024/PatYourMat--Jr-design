@@ -635,6 +635,7 @@ class _NotificationItem {
     final classTime = _timestampToDateTime(data['class_time']);
     final inviteStatus = (data['invite_status'] ?? '').toString();
     final hostMatNumber = (data['host_mat_number'] ?? '').toString().trim();
+    final inviteMessage = (data['invite_message'] ?? '').toString().trim();
     final reservedMatNumber = (data['reserved_mat_number'] ?? '')
         .toString()
         .trim();
@@ -652,7 +653,9 @@ class _NotificationItem {
         id: doc.id,
         type: type,
         title: baseTitle,
-        message: baseMessage,
+        message: inviteMessage.isNotEmpty
+            ? '$baseMessage\n\n"$inviteMessage"'
+            : baseMessage,
         timeLabel: _relativeLabel(createdAt),
         icon: Icons.group_add,
         color: const Color(0xFF2563EB),

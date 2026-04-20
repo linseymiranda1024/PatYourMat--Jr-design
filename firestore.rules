@@ -83,7 +83,12 @@ service cloud.firestore {
 
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);
-        allow create: if signedIn();
+        allow create: if signedIn() && 
+          // Ensure the sender is actually the person logged in
+          request.resource.data.from_uid == request.auth.uid &&
+          // Only allow specific notification types to be created by users
+          (request.resource.data.type == 'group_invite' || 
+           request.resource.data.type == 'friend_request');
         allow update, delete: if isOwner(userId);
       }
 

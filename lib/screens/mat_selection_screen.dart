@@ -64,6 +64,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
   final List<int> _selectedMats = <int>[];
   bool _isSubmitting = false;
   final Set<String> _selectedInviteeUids = <String>{};
+  String _inviteMessage = '';
   String _selectedRole = '';
   String _selectedZoneId = '';
 
@@ -139,6 +140,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
               gymClass: gClass,
               selectedMatNumbers: matNumbers,
               inviteeUids: _selectedInviteeUids.toList(),
+              inviteMessage: _inviteMessage,
               hostBookingRole: bookingRole,
             );
         reservedMat = groupResult.hostMatNumber;
@@ -212,7 +214,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
       return;
     }
 
-    final selectedInvitees = await showModalBottomSheet<List<_InviteFriend>>(
+    final selection = await showModalBottomSheet<_InviteSelection>(
       context: context,
       isScrollControlled: true,
       showDragHandle: true,
@@ -220,17 +222,19 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         currentUid: currentUid,
         classId: widget.classId,
         initiallySelectedUids: _selectedInviteeUids,
+        initialMessage: _inviteMessage,
       ),
     );
 
-    if (!mounted || selectedInvitees == null) {
+    if (!mounted || selection == null) {
       return;
     }
 
     setState(() {
       _selectedInviteeUids
         ..clear()
-        ..addAll(selectedInvitees.map((friend) => friend.uid));
+        ..addAll(selection.invitees.map((friend) => friend.uid));
+      _inviteMessage = selection.message;
       final maxSelections = _groupSize;
       if (_selectedMats.length > maxSelections) {
         _selectedMats.removeRange(maxSelections, _selectedMats.length);
@@ -2295,11 +2299,13 @@ class _GroupInviteSheet extends StatefulWidget {
   final String currentUid;
   final String classId;
   final Set<String> initiallySelectedUids;
+  final String initialMessage;
 
   const _GroupInviteSheet({
     required this.currentUid,
     required this.classId,
     this.initiallySelectedUids = const <String>{},
+    this.initialMessage = '',
   });
 
   @override
@@ -2310,7 +2316,14 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
   late final Set<String> _selectedUids = <String>{
     ...widget.initiallySelectedUids,
   };
+  late final _messageController = TextEditingController(text: widget.initialMessage);
   final Map<String, _InviteFriend> _friendsById = <String, _InviteFriend>{};
+
+  @override
+  void dispose() {
+    _messageController.dispose();
+    super.dispose();
+  }
 
   Stream<Map<String, Map<String, dynamic>>> _friendProfilesStream(
     List<String> friendIds,
@@ -2434,6 +2447,23 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
                 color: colorScheme.onSurfaceVariant,
                 height: 1.4,
               ),
+            ),
+            const SizedBox(height: 16),
+            TextField(
+              controller: _messageController,
+              decoration: InputDecoration(
+                labelText: 'Add a note (optional)',
+                hintText: 'e.g. Hope to see you there!',
+                prefixIcon: const Icon(Icons.chat_bubble_outline_rounded),
+                filled: true,
+                fillColor: colorScheme.surfaceContainerHighest,
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(16),
+                  borderSide: BorderSide.none,
+                ),
+              ),
+              maxLines: 2,
+              style: textTheme.bodyMedium,
             ),
             const SizedBox(height: 18),
             SizedBox(
@@ -2631,12 +2661,14 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
               width: double.infinity,
               child: FilledButton(
                 onPressed: () {
-                  Navigator.of(context).pop(
-                    _selectedUids
-                        .map((uid) => _friendsById[uid])
-                        .whereType<_InviteFriend>()
-                        .toList(),
-                  );
+                  final invitees = _selectedUids
+                      .map((uid) => _friendsById[uid])
+                      .whereType<_InviteFriend>()
+                      .toList();
+                  Navigator.of(context).pop(_InviteSelection(
+                    invitees: invitees,
+                    message: _messageController.text.trim(),
+                  ));
                 },
                 child: Text(
                   _selectedUids.isEmpty
@@ -2650,4 +2682,10 @@ class _GroupInviteSheetState extends State<_GroupInviteSheet> {
       ),
     );
   }
+}
+
+class _InviteSelection {
+  final List<_InviteFriend> invitees;
+  final String message;
+  const _InviteSelection({required this.invitees, required this.message});
 }
