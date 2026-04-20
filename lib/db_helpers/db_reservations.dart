@@ -1,6 +1,7 @@
 import 'dart:math';
 
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:flutter/foundation.dart';
 import 'package:intl/intl.dart';
 import 'package:rxdart/rxdart.dart';
 
@@ -66,13 +67,27 @@ class _OverdueNoShowCandidate {
 }
 
 class DBReservations {
-  static final FirebaseFirestore _db = FirebaseFirestore.instance;
+  static FirebaseFirestore _db = FirebaseFirestore.instance;
   static const String _userProfilesCollection = 'user_profiles';
   static const String _classesCollection = 'classes';
   static const String _registrationsCollection = 'registrations';
   static const String _standbyQueueCollection = 'standby_queue';
   static const String _rosterField = 'roster';
   static const int _whereInChunkSize = 10;
+
+  @visibleForTesting
+  static void useFirestoreInstance(FirebaseFirestore firestore) {
+    _db = firestore;
+  }
+
+  @visibleForTesting
+  static void resetFirestoreInstance() {
+    try {
+      _db = FirebaseFirestore.instance;
+    } catch (_) {
+      // Tests may override the Firestore instance without initializing Firebase.
+    }
+  }
 
   static DocumentReference<Map<String, dynamic>> _userRegistrationRef(
     String userId,
