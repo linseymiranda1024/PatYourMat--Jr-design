@@ -1,8 +1,14 @@
+import 'dart:typed_data';
+
 import 'package:flutter/material.dart';
 import 'package:flutter_riverpod/flutter_riverpod.dart';
+import 'package:image_picker/image_picker.dart';
 import 'package:intl/intl.dart';
+
+import '../../db_helpers/db_gym_class.dart';
 import '../../main.dart';
 import '../../models/gym_class.dart';
+import '../../util/classes/class_visuals.dart';
 
 class ScreenCreateClass extends ConsumerStatefulWidget {
   static const routeName = '/staff/create-class';
@@ -15,7 +21,10 @@ class ScreenCreateClass extends ConsumerStatefulWidget {
 }
 
 class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
+  static const int _maxClassPhotos = 4;
+
   final _formKey = GlobalKey<FormState>();
+  final ImagePicker _imagePicker = ImagePicker();
   final _titleController = TextEditingController();
   final _descriptionController = TextEditingController();
   final _instructorController = TextEditingController();
@@ -28,6 +37,9 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   DateTime _selectedDate = DateTime.now();
   TimeOfDay _selectedTime = TimeOfDay.now();
   String _selectedType = gymClassTypes.first;
+  late String _selectedIconKey;
+  List<String> _existingImageUrls = <String>[];
+  final List<_PendingClassPhoto> _pendingPhotos = <_PendingClassPhoto>[];
   bool _isSubmitting = false;
   bool _repeatClass = false;
   bool get _isEditing => widget.existingClass != null;
@@ -48,6 +60,7 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   @override
   void initState() {
     super.initState();
+    _selectedIconKey = defaultGymClassIconKeyForType(_selectedType);
     final existingClass = widget.existingClass;
     if (existingClass == null) {
       return;
@@ -63,6 +76,8 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     _selectedType = gymClassTypes.contains(normalizedType)
         ? normalizedType
         : gymClassTypes.first;
+    _selectedIconKey = existingClass.iconKey;
+    _existingImageUrls = List<String>.from(existingClass.imageUrls);
     _selectedDate = existingClass.dateTime;
     _selectedTime = TimeOfDay.fromDateTime(existingClass.dateTime);
     _repeatClass = existingClass.isRecurring;
@@ -89,6 +104,9 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
 
   int get _occurrenceCount =>
       int.tryParse(_occurrenceCountController.text.trim()) ?? 1;
+
+  int get _remainingPhotoSlots =>
+      _maxClassPhotos - _existingImageUrls.length - _pendingPhotos.length;
 
   Future<void> _pickDate() async {
     final today = DateTime.now();
@@ -150,6 +168,73 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     return null;
   }
 
+  Future<void> _pickClassImages() async {
+    if (_remainingPhotoSlots <= 0) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('You can add up to 4 class photos.'),
+        ),
+      );
+      return;
+    }
+
+    final pickedFiles = await _imagePicker.pickMultiImage(
+      maxWidth: 1600,
+      imageQuality: 85,
+    );
+    if (pickedFiles.isEmpty) {
+      return;
+    }
+
+    final limitedFiles = pickedFiles.take(_remainingPhotoSlots).toList();
+    final uploadedPhotos = <_PendingClassPhoto>[];
+
+    for (final file in limitedFiles) {
+      final bytes = await file.readAsBytes();
+      uploadedPhotos.add(
+        _PendingClassPhoto(name: file.name, bytes: bytes),
+      );
+    }
+
+    if (!mounted) {
+      return;
+    }
+
+    setState(() {
+      _pendingPhotos.addAll(uploadedPhotos);
+    });
+
+    if (pickedFiles.length > limitedFiles.length) {
+      ScaffoldMessenger.of(context).showSnackBar(
+        const SnackBar(
+          content: Text('Only the first 4 class photos were kept.'),
+        ),
+      );
+    }
+  }
+
+  Future<List<String>> _uploadPendingClassImages() async {
+    if (_pendingPhotos.isEmpty) {
+      return const <String>[];
+    }
+
+    final titleSeed = _titleController.text.trim().isEmpty
+        ? _selectedType
+        : _titleController.text.trim();
+    final uploadedUrls = <String>[];
+
+    for (var index = 0; index < _pendingPhotos.length; index++) {
+      final photo = _pendingPhotos[index];
+      final imageUrl = await DBGymClass.uploadClassImage(
+        imageBytes: photo.bytes,
+        imageId: '$titleSeed-${photo.name}-$index',
+      );
+      uploadedUrls.add(imageUrl);
+    }
+
+    return uploadedUrls;
+  }
+
   Future<void> _submitClass() async {
     if (_isSubmitting) return;
     final isValid = _formKey.currentState?.validate() ?? false;
@@ -178,12 +263,15 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
     final repeatEveryWeeks = !_isEditing && _repeatClass
         ? _repeatEveryWeeks
         : 1;
+    final uploadedImageUrls = await _uploadPendingClassImages();
 
     final classToSave = GymClass(
       id: existingClass?.id ?? '',
       title: _titleController.text.trim(),
       description: _descriptionController.text.trim(),
       type: _selectedType,
+      iconKey: _selectedIconKey,
+      imageUrls: <String>[..._existingImageUrls, ...uploadedImageUrls],
       instructor: _instructorController.text.trim(),
       dateTime: _selectedDateTime,
       durationMinutes: int.tryParse(_durationController.text.trim()) ?? 60,
@@ -328,12 +416,120 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
                       .toList(),
                   onChanged: (value) {
                     if (value == null) return;
-                    setState(() => _selectedType = value);
+                    setState(() {
+                      final previousType = _selectedType;
+                      final previousDefault = defaultGymClassIconKeyForType(
+                        previousType,
+                      );
+                      _selectedType = value;
+                      if (_selectedIconKey == previousDefault) {
+                        _selectedIconKey = defaultGymClassIconKeyForType(value);
+                      }
+                    });
                   },
                   validator: (value) => value == null || value.isEmpty
                       ? 'Please select a class type'
                       : null,
                 ),
+                const SizedBox(height: 20),
+                Text(
+                  'Home Screen Icon',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Choose the icon members will see on the home class cards.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                Wrap(
+                  spacing: 12,
+                  runSpacing: 12,
+                  children: gymClassVisualOptions.map((option) {
+                    final isSelected = option.key == _selectedIconKey;
+                    return _ClassIconChoiceChip(
+                      option: option,
+                      selected: isSelected,
+                      onTap: () {
+                        setState(() {
+                          _selectedIconKey = option.key;
+                        });
+                      },
+                    );
+                  }).toList(),
+                ),
+                const SizedBox(height: 20),
+                Text(
+                  'Class Photos',
+                  style: textTheme.titleMedium?.copyWith(
+                    fontWeight: FontWeight.w800,
+                    color: colorScheme.onSurface,
+                  ),
+                ),
+                const SizedBox(height: 6),
+                Text(
+                  'Add up to 4 photos to show on the class detail screen header.',
+                  style: textTheme.bodyMedium?.copyWith(
+                    color: colorScheme.onSurfaceVariant,
+                  ),
+                ),
+                const SizedBox(height: 12),
+                OutlinedButton.icon(
+                  onPressed: _isSubmitting ? null : _pickClassImages,
+                  icon: const Icon(Icons.add_photo_alternate_outlined),
+                  label: Text(
+                    _remainingPhotoSlots > 0
+                        ? 'Add Photos ($_remainingPhotoSlots left)'
+                        : 'Photo Limit Reached',
+                  ),
+                ),
+                const SizedBox(height: 12),
+                if (_existingImageUrls.isNotEmpty || _pendingPhotos.isNotEmpty)
+                  Wrap(
+                    spacing: 12,
+                    runSpacing: 12,
+                    children: [
+                      for (var index = 0; index < _existingImageUrls.length; index++)
+                        _ClassImagePreview(
+                          imageProvider: NetworkImage(_existingImageUrls[index]),
+                          onRemove: () {
+                            setState(() {
+                              _existingImageUrls.removeAt(index);
+                            });
+                          },
+                        ),
+                      for (var index = 0; index < _pendingPhotos.length; index++)
+                        _ClassImagePreview(
+                          imageProvider: MemoryImage(_pendingPhotos[index].bytes),
+                          label: 'New',
+                          onRemove: () {
+                            setState(() {
+                              _pendingPhotos.removeAt(index);
+                            });
+                          },
+                        ),
+                    ],
+                  )
+                else
+                  Container(
+                    padding: const EdgeInsets.all(16),
+                    decoration: BoxDecoration(
+                      color: colorScheme.surfaceContainer,
+                      borderRadius: BorderRadius.circular(18),
+                      border: Border.all(color: colorScheme.outlineVariant),
+                    ),
+                    child: Text(
+                      'No class photos added yet.',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ),
                 const SizedBox(height: 24),
                 Divider(color: colorScheme.outlineVariant),
                 const SizedBox(height: 20),
@@ -655,6 +851,13 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
   }
 }
 
+class _PendingClassPhoto {
+  final String name;
+  final Uint8List bytes;
+
+  const _PendingClassPhoto({required this.name, required this.bytes});
+}
+
 class _SchedulePickerCard extends StatelessWidget {
   final String label;
   final String value;
@@ -706,6 +909,130 @@ class _SchedulePickerCard extends StatelessWidget {
           ],
         ),
       ),
+    );
+  }
+}
+
+class _ClassIconChoiceChip extends StatelessWidget {
+  final GymClassVisualOption option;
+  final bool selected;
+  final VoidCallback onTap;
+
+  const _ClassIconChoiceChip({
+    required this.option,
+    required this.selected,
+    required this.onTap,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    return Material(
+      color: Colors.transparent,
+      child: InkWell(
+        onTap: onTap,
+        borderRadius: BorderRadius.circular(20),
+        child: Ink(
+          width: 104,
+          padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 14),
+          decoration: BoxDecoration(
+            borderRadius: BorderRadius.circular(20),
+            gradient: LinearGradient(colors: option.colors),
+            border: Border.all(
+              color: selected ? colorScheme.primary : Colors.transparent,
+              width: 2,
+            ),
+            boxShadow: selected
+                ? [
+                    BoxShadow(
+                      blurRadius: 14,
+                      offset: const Offset(0, 8),
+                      color: option.colors.last.withValues(alpha: 0.28),
+                    ),
+                  ]
+                : null,
+          ),
+          child: Column(
+            children: [
+              Icon(option.icon, color: Colors.white, size: 28),
+              const SizedBox(height: 10),
+              Text(
+                option.label,
+                textAlign: TextAlign.center,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ],
+          ),
+        ),
+      ),
+    );
+  }
+}
+
+class _ClassImagePreview extends StatelessWidget {
+  final ImageProvider imageProvider;
+  final VoidCallback onRemove;
+  final String? label;
+
+  const _ClassImagePreview({
+    required this.imageProvider,
+    required this.onRemove,
+    this.label,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    return Stack(
+      children: [
+        ClipRRect(
+          borderRadius: BorderRadius.circular(18),
+          child: Image(
+            image: imageProvider,
+            width: 110,
+            height: 110,
+            fit: BoxFit.cover,
+          ),
+        ),
+        if (label != null)
+          Positioned(
+            left: 8,
+            top: 8,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 8, vertical: 4),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.55),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                label!,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                  fontSize: 12,
+                ),
+              ),
+            ),
+          ),
+        Positioned(
+          top: 6,
+          right: 6,
+          child: Material(
+            color: Colors.black.withValues(alpha: 0.5),
+            shape: const CircleBorder(),
+            child: InkWell(
+              customBorder: const CircleBorder(),
+              onTap: onRemove,
+              child: const Padding(
+                padding: EdgeInsets.all(6),
+                child: Icon(Icons.close_rounded, color: Colors.white, size: 18),
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 }

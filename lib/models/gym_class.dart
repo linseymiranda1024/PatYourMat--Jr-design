@@ -18,6 +18,18 @@ const List<String> gymClassTypes = <String>[
   'Recovery',
 ];
 
+const List<String> gymClassIconKeys = <String>[
+  'lotus',
+  'soccer',
+  'flame',
+  'dumbbell',
+  'heart',
+  'dance',
+  'stretch',
+  'meditate',
+  'spark',
+];
+
 String normalizeGymClassType(String? type) {
   final trimmed = type?.trim() ?? '';
   if (trimmed.isEmpty) {
@@ -47,6 +59,59 @@ String normalizeGymClassType(String? type) {
   }
 
   return 'Recovery';
+}
+
+String defaultGymClassIconKeyForType(String? type) {
+  switch (normalizeGymClassType(type)) {
+    case 'Yoga':
+    case 'Pilates':
+      return 'lotus';
+    case 'Soccer':
+    case 'Sport':
+      return 'soccer';
+    case 'HIIT':
+      return 'flame';
+    case 'Strength':
+      return 'dumbbell';
+    case 'Cardio':
+      return 'heart';
+    case 'Dance':
+      return 'dance';
+    case 'Mobility':
+      return 'stretch';
+    case 'Meditation':
+      return 'meditate';
+    case 'Recovery':
+      return 'spark';
+  }
+  return 'spark';
+}
+
+String normalizeGymClassIconKey(String? key, {String? classType}) {
+  final trimmed = key?.trim() ?? '';
+  if (trimmed.isEmpty) {
+    return defaultGymClassIconKeyForType(classType);
+  }
+
+  for (final option in gymClassIconKeys) {
+    if (option.toLowerCase() == trimmed.toLowerCase()) {
+      return option;
+    }
+  }
+
+  return defaultGymClassIconKeyForType(classType);
+}
+
+List<String> normalizeGymClassImageUrls(dynamic rawValue) {
+  if (rawValue is! List) {
+    return const <String>[];
+  }
+
+  final urls = rawValue
+      .map((value) => value?.toString().trim() ?? '')
+      .where((value) => value.isNotEmpty)
+      .toList();
+  return urls.toSet().toList();
 }
 
 BookingMode inferBookingModeFromType(String? type) {
@@ -101,6 +166,8 @@ class GymClass {
   final String title;
   final String description;
   final String type;
+  final String iconKey;
+  final List<String> imageUrls;
   final BookingMode bookingMode;
   final String instructor;
   final DateTime dateTime;
@@ -119,6 +186,8 @@ class GymClass {
     required this.title,
     required this.description,
     required this.type,
+    String? iconKey,
+    List<String>? imageUrls,
     BookingMode? bookingMode,
     required this.instructor,
     required this.dateTime,
@@ -132,7 +201,11 @@ class GymClass {
     this.recurrenceIntervalWeeks = 1,
     this.recurrenceIndex = 0,
     ClassStatus? status,
-  }) : bookingMode = bookingMode ?? inferBookingModeFromType(type),
+  }) : iconKey = normalizeGymClassIconKey(iconKey, classType: type),
+       imageUrls = List<String>.unmodifiable(
+         normalizeGymClassImageUrls(imageUrls),
+       ),
+       bookingMode = bookingMode ?? inferBookingModeFromType(type),
        recurrenceSeriesId =
            (recurrenceSeriesId == null || recurrenceSeriesId.trim().isEmpty)
            ? id
@@ -150,6 +223,11 @@ class GymClass {
         type: normalizeGymClassType(
           data['type'] as String? ?? data['category'] as String?,
         ),
+        iconKey: normalizeGymClassIconKey(
+          data['iconKey'] as String?,
+          classType: data['type'] as String? ?? data['category'] as String?,
+        ),
+        imageUrls: normalizeGymClassImageUrls(data['imageUrls']),
         bookingMode: bookingModeFromRaw(
           data['bookingMode']?.toString(),
           classType: data['type'] as String? ?? data['category'] as String?,
@@ -180,6 +258,8 @@ class GymClass {
         title: 'Error Loading Class',
         description: '',
         type: 'Recovery',
+        iconKey: defaultGymClassIconKeyForType('Recovery'),
+        imageUrls: const <String>[],
         bookingMode: BookingMode.spot,
         instructor: '',
         dateTime: DateTime.now(),
@@ -197,6 +277,8 @@ class GymClass {
       'title': title,
       'description': description,
       'type': normalizeGymClassType(type),
+      'iconKey': iconKey,
+      'imageUrls': imageUrls,
       'bookingMode': bookingMode.storageValue,
       'instructor': instructor,
       'dateTime': Timestamp.fromDate(dateTime),
@@ -219,6 +301,8 @@ class GymClass {
     String? title,
     String? description,
     String? type,
+    String? iconKey,
+    List<String>? imageUrls,
     BookingMode? bookingMode,
     String? instructor,
     DateTime? dateTime,
@@ -237,6 +321,8 @@ class GymClass {
       title: title ?? this.title,
       description: description ?? this.description,
       type: type ?? this.type,
+      iconKey: iconKey ?? this.iconKey,
+      imageUrls: imageUrls ?? this.imageUrls,
       bookingMode: bookingMode ?? this.bookingMode,
       instructor: instructor ?? this.instructor,
       dateTime: dateTime ?? this.dateTime,

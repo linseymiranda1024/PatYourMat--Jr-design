@@ -8,9 +8,11 @@ import '../db_helpers/db_reservations.dart';
 import '../main.dart';
 import '../models/gym_class.dart' as model;
 import '../theme/app_colors.dart';
+import '../util/classes/class_visuals.dart';
 import 'class_detail_screen.dart';
 
 const String homeTodayFilterKey = '__today__';
+const String homeFavoritesFilterKey = '__favorites__';
 
 const Map<String, List<String>> _homeTypeKeywords = <String, List<String>>{
   'Yoga': <String>['yoga', 'flow', 'vinyasa', 'yin'],
@@ -77,6 +79,7 @@ List<model.GymClass> filterHomeClasses({
   required List<model.GymClass> classes,
   required String searchQuery,
   required String? selectedFilterKey,
+  Set<String> favoriteClassIds = const <String>{},
   DateTime? now,
 }) {
   final normalizedQuery = searchQuery.trim().toLowerCase();
@@ -102,6 +105,10 @@ List<model.GymClass> filterHomeClasses({
       return classDate.year == currentDate.year &&
           classDate.month == currentDate.month &&
           classDate.day == currentDate.day;
+    }
+
+    if (selectedFilterKey == homeFavoritesFilterKey) {
+      return favoriteClassIds.contains(gymClass.favoriteKey);
     }
 
     return homeFilterTagsForClass(gymClass).contains(selectedFilterKey);
@@ -175,6 +182,11 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
   @override
   Widget build(BuildContext context) {
     final gymClassProvider = ref.watch(providerGymClass);
+    final favoriteClassIds = ref.watch(
+      providerUserProfile.select(
+        (profile) => profile.favoriteClassIds.toSet(),
+      ),
+    );
     final classes = gymClassProvider.classes;
     final upcomingClasses = upcomingHomeClasses(classes);
     final typeFilterKeys = homeFilterTypeKeys(classes);
@@ -182,6 +194,7 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
       classes: classes,
       searchQuery: _searchQuery,
       selectedFilterKey: _selectedFilterKey,
+      favoriteClassIds: favoriteClassIds,
     );
     final theme = Theme.of(context);
     final colorScheme = theme.colorScheme;
@@ -259,6 +272,13 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                       label: 'Today',
                       onTap: () => _toggleFilter(homeTodayFilterKey),
                     ),
+                    const SizedBox(width: 10),
+                    _FilterChip(
+                      selected: _selectedFilterKey == homeFavoritesFilterKey,
+                      icon: Icons.favorite_rounded,
+                      label: 'Favorites',
+                      onTap: () => _toggleFilter(homeFavoritesFilterKey),
+                    ),
                     for (final typeKey in typeFilterKeys) ...[
                       const SizedBox(width: 10),
                       _FilterChip(
@@ -300,6 +320,8 @@ class _HomeScreenState extends ConsumerState<HomeScreen> {
                                 ClassCard(
                                   classId: c.id,
                                   title: c.title,
+                                  classType: c.type,
+                                  iconKey: c.iconKey,
                                   instructor: c.instructor,
                                   dateText: c.dateText,
                                   timeText: c.timeText,
@@ -540,6 +562,8 @@ class _HomeEmptyState extends StatelessWidget {
 class ClassCard extends StatelessWidget {
   final String classId;
   final String title;
+  final String classType;
+  final String iconKey;
   final String instructor;
   final String dateText;
   final String timeText;
@@ -554,6 +578,8 @@ class ClassCard extends StatelessWidget {
     super.key,
     required this.classId,
     required this.title,
+    required this.classType,
+    required this.iconKey,
     required this.instructor,
     required this.dateText,
     required this.timeText,
@@ -578,6 +604,10 @@ class ClassCard extends StatelessWidget {
         final liveFilled = liveClass?.filled ?? filled;
         final liveCapacity = liveClass?.capacity ?? capacity;
         final liveStandbyCount = liveClass?.standbyCount ?? standbyCount;
+        final visual = gymClassVisualForKey(
+          liveClass?.iconKey ?? iconKey,
+          classType: liveClass?.type ?? classType,
+        );
         final currentUserId = FirebaseAuth.instance.currentUser?.uid ?? '';
 
         return StreamBuilder<bool>(
@@ -620,16 +650,45 @@ class ClassCard extends StatelessWidget {
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
                       Row(
+                        crossAxisAlignment: CrossAxisAlignment.start,
                         children: [
-                          Expanded(
-                            child: Text(
-                              title,
-                              style: textTheme.headlineSmall?.copyWith(
-                                fontSize: 28,
-                                fontWeight: FontWeight.w800,
-                              ),
+                          Container(
+                            width: 56,
+                            height: 56,
+                            decoration: BoxDecoration(
+                              gradient: LinearGradient(colors: visual.colors),
+                              borderRadius: BorderRadius.circular(18),
+                            ),
+                            child: Icon(
+                              visual.icon,
+                              color: Colors.white,
+                              size: 28,
                             ),
                           ),
+                          const SizedBox(width: 14),
+                          Expanded(
+                            child: Column(
+                              crossAxisAlignment: CrossAxisAlignment.start,
+                              children: [
+                                Text(
+                                  title,
+                                  style: textTheme.headlineSmall?.copyWith(
+                                    fontSize: 28,
+                                    fontWeight: FontWeight.w800,
+                                  ),
+                                ),
+                                const SizedBox(height: 4),
+                                Text(
+                                  liveClass?.type ?? classType,
+                                  style: textTheme.labelLarge?.copyWith(
+                                    color: colorScheme.onSurfaceVariant,
+                                    fontWeight: FontWeight.w700,
+                                  ),
+                                ),
+                              ],
+                            ),
+                          ),
+                          const SizedBox(width: 12),
                           _StatusPill(
                             text: statusUi.label,
                             accent: statusUi.accent,
@@ -710,13 +769,13 @@ class ClassCard extends StatelessWidget {
                               ),
                             ),
                           ),
-                          const SizedBox(width: 14),
+                          const SizedBox(width: 16),
                           Text(
                             '$liveFilled/$liveCapacity',
                             style: textTheme.bodyLarge?.copyWith(
                               fontSize: 16,
-                              fontWeight: FontWeight.w700,
                               color: colorScheme.onSurfaceVariant,
+                              fontWeight: FontWeight.w700,
                             ),
                           ),
                         ],

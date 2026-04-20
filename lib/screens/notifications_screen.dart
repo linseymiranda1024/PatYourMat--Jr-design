@@ -69,102 +69,148 @@ class _NotificationsScreenState extends ConsumerState<NotificationsScreen> {
             ...scheduleNotifications,
           ]..sort((a, b) => b.sortDate.compareTo(a.sortDate));
 
-          return Container(
-            color: colorScheme.surface,
-            child: Column(
-              children: [
-                Padding(
-                  padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
-                  child: Container(
-                    width: double.infinity,
-                    padding: const EdgeInsets.all(20),
-                    decoration: BoxDecoration(
-                      borderRadius: BorderRadius.circular(28),
-                      gradient: LinearGradient(
-                        begin: Alignment.topLeft,
-                        end: Alignment.bottomRight,
-                        colors: heroGradient,
+          return StreamBuilder<QuerySnapshot<Map<String, dynamic>>>(
+            stream: FirebaseFirestore.instance
+                .collectionGroup('pending_group_invites')
+                .where('inviter_uid', isEqualTo: currentUid)
+                .snapshots(),
+            builder: (context, pendingSnapshot) {
+              final sentPendingInvites =
+                  pendingSnapshot.data?.docs
+                      .map(_SentGroupInviteItem.fromFirestoreDoc)
+                      .whereType<_SentGroupInviteItem>()
+                      .toList() ??
+                  const <_SentGroupInviteItem>[];
+              sentPendingInvites.sort(
+                (a, b) => a.expiresAt.compareTo(b.expiresAt),
+              );
+
+              final totalActiveCount =
+                  notifications.length + sentPendingInvites.length;
+              final hasContent = totalActiveCount > 0;
+
+              return Container(
+                color: colorScheme.surface,
+                child: Column(
+                  children: [
+                    Padding(
+                      padding: const EdgeInsets.fromLTRB(16, 16, 16, 10),
+                      child: Container(
+                        width: double.infinity,
+                        padding: const EdgeInsets.all(20),
+                        decoration: BoxDecoration(
+                          borderRadius: BorderRadius.circular(28),
+                          gradient: LinearGradient(
+                            begin: Alignment.topLeft,
+                            end: Alignment.bottomRight,
+                            colors: heroGradient,
+                          ),
+                        ),
+                        child: Column(
+                          crossAxisAlignment: CrossAxisAlignment.start,
+                          children: [
+                            const Text(
+                              'Notifications',
+                              style: TextStyle(
+                                color: AppColors.headerOnBrand,
+                                fontSize: 28,
+                                fontWeight: FontWeight.w800,
+                              ),
+                            ),
+                            const SizedBox(height: 8),
+                            Text(
+                              totalActiveCount == 0
+                                  ? 'You are all caught up.'
+                                  : isStaff
+                                  ? '$totalActiveCount active update${totalActiveCount == 1 ? '' : 's'} for your classes.'
+                                  : '$totalActiveCount active update${totalActiveCount == 1 ? '' : 's'} for your schedule.',
+                              style: const TextStyle(
+                                color: AppColors.headerOnBrandMuted,
+                                fontSize: 15,
+                                fontWeight: FontWeight.w500,
+                              ),
+                            ),
+                          ],
+                        ),
                       ),
                     ),
-                    child: Column(
-                      crossAxisAlignment: CrossAxisAlignment.start,
-                      children: [
-                        const Text(
-                          'Notifications',
-                          style: TextStyle(
-                            color: AppColors.headerOnBrand,
-                            fontSize: 28,
-                            fontWeight: FontWeight.w800,
-                          ),
-                        ),
-                        const SizedBox(height: 8),
-                        Text(
-                          notifications.isEmpty
-                              ? 'You are all caught up.'
-                              : isStaff
-                              ? '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your classes.'
-                              : '${notifications.length} active update${notifications.length == 1 ? '' : 's'} for your schedule.',
-                          style: const TextStyle(
-                            color: AppColors.headerOnBrandMuted,
-                            fontSize: 15,
-                            fontWeight: FontWeight.w500,
-                          ),
-                        ),
-                      ],
-                    ),
-                  ),
-                ),
-                Expanded(
-                  child: snapshot.hasError
-                      ? const Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: Text(
-                              'Unable to load notifications right now.',
-                            ),
-                          ),
-                        )
-                      : notifications.isEmpty
-                      ? Center(
-                          child: Padding(
-                            padding: EdgeInsets.all(24),
-                            child: _NotificationEmptyState(isStaff: isStaff),
-                          ),
-                        )
-                      : ListView.separated(
-                          padding: const EdgeInsets.fromLTRB(16, 8, 16, 24),
-                          itemCount: notifications.length,
-                          separatorBuilder: (_, __) =>
-                              const SizedBox(height: 12),
-                          itemBuilder: (context, index) {
-                            final notification = notifications[index];
-                            return _NotificationCard(
-                              notification: notification,
-                              isBusy: _busyNotificationIds.contains(
-                                notification.id,
+                    Expanded(
+                      child: snapshot.hasError
+                          ? const Center(
+                              child: Padding(
+                                padding: EdgeInsets.all(24),
+                                child: Text(
+                                  'Unable to load notifications right now.',
+                                ),
                               ),
-                              onAccept: notification.canAccept
-                                  ? () => _handleNotificationAction(
-                                      notification,
-                                      accept: true,
-                                      currentUid: currentUid,
-                                      currentName: currentName,
-                                    )
-                                  : null,
-                              onDecline: notification.canDecline
-                                  ? () => _handleNotificationAction(
-                                      notification,
-                                      accept: false,
-                                      currentUid: currentUid,
-                                      currentName: currentName,
-                                    )
-                                  : null,
-                            );
-                          },
-                        ),
+                            )
+                          : !hasContent
+                          ? Center(
+                              child: Padding(
+                                padding: const EdgeInsets.all(24),
+                                child: _NotificationEmptyState(isStaff: isStaff),
+                              ),
+                            )
+                          : ListView(
+                              padding: const EdgeInsets.fromLTRB(
+                                16,
+                                8,
+                                16,
+                                24,
+                              ),
+                              children: [
+                                if (sentPendingInvites.isNotEmpty)
+                                  _PendingGroupInviteSection(
+                                    invites: sentPendingInvites,
+                                  ),
+                                if (sentPendingInvites.isNotEmpty &&
+                                    notifications.isNotEmpty)
+                                  const SizedBox(height: 20),
+                                if (notifications.isNotEmpty)
+                                  ...[
+                                    _SectionLabel(
+                                      label: isStaff
+                                          ? 'Class Updates'
+                                          : 'Incoming Updates',
+                                    ),
+                                    const SizedBox(height: 12),
+                                    for (var index = 0;
+                                        index < notifications.length;
+                                        index++) ...[
+                                      _NotificationCard(
+                                        notification: notifications[index],
+                                        isBusy: _busyNotificationIds.contains(
+                                          notifications[index].id,
+                                        ),
+                                        onAccept: notifications[index].canAccept
+                                            ? () => _handleNotificationAction(
+                                                notifications[index],
+                                                accept: true,
+                                                currentUid: currentUid,
+                                                currentName: currentName,
+                                              )
+                                            : null,
+                                        onDecline: notifications[index]
+                                                .canDecline
+                                            ? () => _handleNotificationAction(
+                                                notifications[index],
+                                                accept: false,
+                                                currentUid: currentUid,
+                                                currentName: currentName,
+                                              )
+                                            : null,
+                                      ),
+                                      if (index != notifications.length - 1)
+                                        const SizedBox(height: 12),
+                                    ],
+                                  ],
+                              ],
+                            ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              );
+            },
           );
         },
       ),
@@ -492,6 +538,196 @@ class _NotificationEmptyState extends StatelessWidget {
   }
 }
 
+class _SectionLabel extends StatelessWidget {
+  final String label;
+
+  const _SectionLabel({required this.label});
+
+  @override
+  Widget build(BuildContext context) {
+    final textTheme = Theme.of(context).textTheme;
+    final colorScheme = Theme.of(context).colorScheme;
+    return Text(
+      label,
+      style: textTheme.titleMedium?.copyWith(
+        fontWeight: FontWeight.w800,
+        color: colorScheme.onSurface,
+      ),
+    );
+  }
+}
+
+class _PendingGroupInviteSection extends StatelessWidget {
+  final List<_SentGroupInviteItem> invites;
+
+  const _PendingGroupInviteSection({required this.invites});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(16),
+      decoration: BoxDecoration(
+        color: colorScheme.surfaceContainer,
+        borderRadius: BorderRadius.circular(24),
+        boxShadow: [
+          BoxShadow(
+            blurRadius: 14,
+            offset: const Offset(0, 8),
+            color: Colors.black.withValues(alpha: 0.08),
+          ),
+        ],
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          const _SectionLabel(label: 'Pending Group Invites'),
+          const SizedBox(height: 6),
+          Text(
+            'These are the invites you sent that are still waiting on a response.',
+            style: textTheme.bodyMedium?.copyWith(
+              color: colorScheme.onSurfaceVariant,
+              height: 1.35,
+            ),
+          ),
+          const SizedBox(height: 16),
+          for (var index = 0; index < invites.length; index++) ...[
+            _PendingGroupInviteCard(invite: invites[index]),
+            if (index != invites.length - 1) const SizedBox(height: 12),
+          ],
+        ],
+      ),
+    );
+  }
+}
+
+class _PendingGroupInviteCard extends StatelessWidget {
+  final _SentGroupInviteItem invite;
+
+  const _PendingGroupInviteCard({required this.invite});
+
+  @override
+  Widget build(BuildContext context) {
+    final colorScheme = Theme.of(context).colorScheme;
+    final textTheme = Theme.of(context).textTheme;
+
+    return Container(
+      padding: const EdgeInsets.all(14),
+      decoration: BoxDecoration(
+        color: colorScheme.surface,
+        borderRadius: BorderRadius.circular(20),
+        border: Border.all(color: colorScheme.outlineVariant),
+      ),
+      child: Column(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Row(
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                width: 42,
+                height: 42,
+                decoration: BoxDecoration(
+                  color: const Color(0xFFF59E0B).withValues(alpha: 0.14),
+                  borderRadius: BorderRadius.circular(14),
+                ),
+                child: const Icon(
+                  Icons.group_outlined,
+                  color: Color(0xFFF59E0B),
+                ),
+              ),
+              const SizedBox(width: 12),
+              Expanded(
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      invite.friendName,
+                      style: textTheme.titleMedium?.copyWith(
+                        fontWeight: FontWeight.w800,
+                        color: colorScheme.onSurface,
+                      ),
+                    ),
+                    const SizedBox(height: 4),
+                    Text(
+                      'Invite sent for ${invite.className}',
+                      style: textTheme.bodyMedium?.copyWith(
+                        color: colorScheme.onSurfaceVariant,
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            ],
+          ),
+          const SizedBox(height: 12),
+          Text(
+            invite.detailsLabel,
+            style: textTheme.labelMedium?.copyWith(
+              color: colorScheme.onSurface,
+              fontWeight: FontWeight.w700,
+            ),
+          ),
+          const SizedBox(height: 10),
+          _StatusChip(
+            label: 'Waiting • ${invite.expiresLabel}',
+            color: const Color(0xFFF59E0B),
+          ),
+        ],
+      ),
+    );
+  }
+}
+
+class _SentGroupInviteItem {
+  final String friendName;
+  final String className;
+  final String detailsLabel;
+  final String expiresLabel;
+  final DateTime expiresAt;
+
+  const _SentGroupInviteItem({
+    required this.friendName,
+    required this.className,
+    required this.detailsLabel,
+    required this.expiresLabel,
+    required this.expiresAt,
+  });
+
+  static _SentGroupInviteItem? fromFirestoreDoc(
+    QueryDocumentSnapshot<Map<String, dynamic>> doc,
+  ) {
+    final data = doc.data();
+    final status = (data['status'] ?? '').toString().trim().toLowerCase();
+    final expiresAt = _timestampToDateTime(data['expires_at']);
+    if (status != 'pending' || expiresAt == null || !expiresAt.isAfter(DateTime.now())) {
+      return null;
+    }
+
+    final className = (data['class_name'] ?? 'this class').toString();
+    final classTime = _timestampToDateTime(data['class_time']);
+    final reservedMatNumber = (data['reserved_mat_number'] ?? '')
+        .toString()
+        .trim();
+    final friendName = (data['invitee_name'] ?? 'A friend').toString().trim();
+
+    final details = [
+      if (classTime != null) DateFormat.MMMd().add_jm().format(classTime),
+      if (reservedMatNumber.isNotEmpty) 'Held mat: $reservedMatNumber',
+    ];
+
+    return _SentGroupInviteItem(
+      friendName: friendName.isEmpty ? 'A friend' : friendName,
+      className: className,
+      detailsLabel: details.join('  •  '),
+      expiresLabel: _expiresInLabel(expiresAt),
+      expiresAt: expiresAt,
+    );
+  }
+}
+
 class _NotificationItem {
   final String? id;
   final String type;
@@ -534,6 +770,7 @@ class _NotificationItem {
         _timestampToDateTime(data['created_at']) ?? DateTime.now();
     final classTime = _timestampToDateTime(data['class_time']);
     final inviteStatus = (data['invite_status'] ?? '').toString();
+    final inviteExpiresAt = _timestampToDateTime(data['invite_expires_at']);
     final hostMatNumber = (data['host_mat_number'] ?? '').toString().trim();
     final reservedMatNumber = (data['reserved_mat_number'] ?? '')
         .toString()
@@ -542,11 +779,18 @@ class _NotificationItem {
     final baseMessage = (data['message'] ?? '').toString();
     final fromName = (data['from_name'] ?? 'Someone').toString();
     if (type == 'group_invite') {
-      final isPending = inviteStatus == 'pending';
+      final isExpired =
+          inviteStatus == 'expired' ||
+          (inviteStatus == 'pending' &&
+              inviteExpiresAt != null &&
+              !inviteExpiresAt.isAfter(DateTime.now()));
+      final isPending = inviteStatus == 'pending' && !isExpired;
       final details = [
         if (classTime != null) DateFormat.MMMd().add_jm().format(classTime),
         if (reservedMatNumber.isNotEmpty) 'Your mat: $reservedMatNumber',
         if (hostMatNumber.isNotEmpty) 'Host mat: $hostMatNumber',
+        if (isPending && inviteExpiresAt != null)
+          'Expires ${DateFormat.jm().format(inviteExpiresAt)}',
       ];
       return _NotificationItem(
         id: doc.id,
@@ -562,6 +806,8 @@ class _NotificationItem {
         canDecline: isPending,
         inviteStatusBadge: isPending
             ? null
+            : isExpired
+            ? 'Expired'
             : inviteStatus == 'accepted'
             ? 'Accepted'
             : 'Declined',
@@ -848,7 +1094,21 @@ DateTime? _timestampToDateTime(dynamic value) {
   if (value is Timestamp) {
     return value.toDate();
   }
+  if (value is DateTime) {
+    return value;
+  }
   return null;
+}
+
+String _expiresInLabel(DateTime expiresAt) {
+  final remaining = expiresAt.difference(DateTime.now());
+  if (remaining.inMinutes <= 1) {
+    return 'Expires in under a minute';
+  }
+  if (remaining.inHours < 1) {
+    return 'Expires in ${remaining.inMinutes} min';
+  }
+  return 'Expires at ${DateFormat.jm().format(expiresAt)}';
 }
 
 String _relativeLabel(DateTime? dateTime) {
