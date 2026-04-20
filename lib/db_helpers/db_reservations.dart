@@ -50,6 +50,7 @@ class _StandbyQueueSnapshot {
 class _OverdueNoShowCandidate {
   final String classId;
   final DocumentReference<Map<String, dynamic>> userRegistrationRef;
+  final DocumentReference<Map<String, dynamic>> classRegistrationRef;
   final DocumentReference<Map<String, dynamic>> classRef;
   final DateTime classEnd;
   final bool hasRosterEntry;
@@ -57,6 +58,7 @@ class _OverdueNoShowCandidate {
   const _OverdueNoShowCandidate({
     required this.classId,
     required this.userRegistrationRef,
+    required this.classRegistrationRef,
     required this.classRef,
     required this.classEnd,
     required this.hasRosterEntry,
@@ -584,6 +586,11 @@ class DBReservations {
       final batch = _db.batch();
       for (final candidate in overdueCandidates) {
         batch.set(candidate.userRegistrationRef, <String, dynamic>{
+          'status': ReservationStatus.noShow,
+          'noShowAt': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        batch.set(candidate.classRegistrationRef, <String, dynamic>{
           'status': ReservationStatus.noShow,
           'noShowAt': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
@@ -1588,6 +1595,7 @@ class DBReservations {
         _OverdueNoShowCandidate(
           classId: classId,
           userRegistrationRef: doc.reference,
+          classRegistrationRef: _classRegistrationRef(classId, userId),
           classRef: _classRef(classId),
           classEnd: classEnd,
           hasRosterEntry: hasRosterEntry,
