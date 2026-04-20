@@ -72,8 +72,10 @@ class DBReservations {
   static const String _classesCollection = 'classes';
   static const String _registrationsCollection = 'registrations';
   static const String _standbyQueueCollection = 'standby_queue';
+  static const String _pendingGroupInvitesCollection = 'pending_group_invites';
   static const String _rosterField = 'roster';
   static const int _whereInChunkSize = 10;
+  static const Duration _groupInviteLifetime = Duration(minutes: 10);
 
   @visibleForTesting
   static void useFirestoreInstance(FirebaseFirestore firestore) {
@@ -119,6 +121,19 @@ class DBReservations {
     return _db.collection(_classesCollection).doc(classId);
   }
 
+  static CollectionReference<Map<String, dynamic>> _pendingGroupInvitesRef(
+    String classId,
+  ) {
+    return _classRef(classId).collection(_pendingGroupInvitesCollection);
+  }
+
+  static DocumentReference<Map<String, dynamic>> _pendingGroupInviteRef(
+    String classId,
+    String inviteeUid,
+  ) {
+    return _pendingGroupInvitesRef(classId).doc(inviteeUid);
+  }
+
   static Future<String?> registerForClass(
     String userId,
     GymClass gymClass, {
@@ -126,6 +141,7 @@ class DBReservations {
     String? bookingRole,
   }) async {
     try {
+      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(userId);
       _throwIfRegistrationBlocked(penaltyState);
 
@@ -133,7 +149,6 @@ class DBReservations {
       if (standbyQueue.hasEntries && standbyQueue.frontUserId != userId) {
         throw Exception('Standby queue has priority for the next open spot.');
       }
-
       return await _registerForClassTransaction(
         userId,
         gymClass,
@@ -155,6 +170,7 @@ class DBReservations {
     String? hostBookingRole,
   }) async {
     try {
+      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(hostUserId);
       _throwIfRegistrationBlocked(penaltyState);
 
@@ -162,7 +178,6 @@ class DBReservations {
       if (standbyQueue.hasEntries) {
         throw Exception('Standby queue has priority for the next open spot.');
       }
-
       return await _db.runTransaction<GroupReservationResult>((
         transaction,
       ) async {
@@ -252,11 +267,27 @@ class DBReservations {
         for (var i = 0; i < eligibleInvitees.length; i++) {
           final inviteeUid = eligibleInvitees[i];
           final inviteeMatNumber = assignedMats[i + 1];
+          final inviteeProfileRef = _db
+              .collection(_userProfilesCollection)
+              .doc(inviteeUid);
+          final inviteeProfileSnap = await transaction.get(inviteeProfileRef);
+          final inviteeProfileData =
+              inviteeProfileSnap.data() ?? <String, dynamic>{};
+          final inviteeName = _buildUserName(inviteeProfileData);
+          final notificationId = _db
+              .collection(_userProfilesCollection)
+              .doc(inviteeUid)
+              .collection('notifications')
+              .doc()
+              .id;
           final notificationRef = _db
               .collection(_userProfilesCollection)
               .doc(inviteeUid)
               .collection('notifications')
-              .doc();
+              .doc(notificationId);
+          final expiresAt = Timestamp.fromDate(
+            DateTime.now().add(_groupInviteLifetime),
+          );
 
           transaction.set(notificationRef, <String, dynamic>{
             'title': 'Group class invite',
@@ -273,8 +304,24 @@ class DBReservations {
             'host_mat_number': normalizedHostMat,
             'reserved_mat_number': inviteeMatNumber,
             'invite_status': 'pending',
+            'invite_expires_at': expiresAt,
             'created_at': FieldValue.serverTimestamp(),
           });
+          transaction.set(
+            _pendingGroupInviteRef(gymClass.id, inviteeUid),
+            <String, dynamic>{
+              'invitee_uid': inviteeUid,
+              'inviter_uid': hostUserId,
+              'notification_id': notificationId,
+              'invitee_name': inviteeName,
+              'reserved_mat_number': inviteeMatNumber,
+              'class_name': gymClass.title,
+              'class_time': Timestamp.fromDate(gymClass.dateTime),
+              'status': 'pending',
+              'expires_at': expiresAt,
+              'created_at': FieldValue.serverTimestamp(),
+            },
+          );
         }
 
         final nextReservedMats = <String>{...reservedMats, ...assignedMats};
@@ -324,6 +371,11 @@ class DBReservations {
       }
 
       final notificationData = notificationSnap.data() ?? <String, dynamic>{};
+      await _expirePendingInviteIfNeeded(
+        userId: userId,
+        notificationId: notificationId,
+        notificationData: notificationData,
+      );
       final inviteStatus =
           notificationData['invite_status']?.toString() ?? 'pending';
       if (inviteStatus != 'pending') {
@@ -355,6 +407,7 @@ class DBReservations {
           'is_read': true,
           'responded_at': FieldValue.serverTimestamp(),
         }, SetOptions(merge: true));
+        await _clearPendingGroupInviteRecord(classId, userId);
 
         await _sendGroupInviteResponseNotification(
           inviterUid: notificationData['from_uid']?.toString() ?? '',
@@ -389,6 +442,7 @@ class DBReservations {
         'is_read': true,
         'responded_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      await _clearPendingGroupInviteRecord(classId, userId);
 
       await _sendGroupInviteResponseNotification(
         inviterUid: notificationData['from_uid']?.toString() ?? '',
@@ -420,6 +474,11 @@ class DBReservations {
       }
 
       final notificationData = notificationSnap.data() ?? <String, dynamic>{};
+      await _expirePendingInviteIfNeeded(
+        userId: userId,
+        notificationId: notificationId,
+        notificationData: notificationData,
+      );
       final inviteStatus =
           notificationData['invite_status']?.toString() ?? 'pending';
       if (inviteStatus != 'pending') {
@@ -442,6 +501,7 @@ class DBReservations {
         'is_read': true,
         'responded_at': FieldValue.serverTimestamp(),
       }, SetOptions(merge: true));
+      await _clearPendingGroupInviteRecord(classId, userId);
 
       await _sendGroupInviteResponseNotification(
         inviterUid: notificationData['from_uid']?.toString() ?? '',
@@ -472,9 +532,9 @@ class DBReservations {
 
   static Future<void> joinStandbyQueue(String userId, GymClass gymClass) async {
     try {
+      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(userId);
       _throwIfRegistrationBlocked(penaltyState);
-
       final userProfileRef = _db
           .collection(_userProfilesCollection)
           .doc(userId);
@@ -1332,6 +1392,195 @@ class DBReservations {
     });
   }
 
+  static Future<void> _clearPendingGroupInviteRecord(
+    String classId,
+    String inviteeUid,
+  ) async {
+    final cleanClassId = classId.trim();
+    final cleanInviteeUid = inviteeUid.trim();
+    if (cleanClassId.isEmpty || cleanInviteeUid.isEmpty) {
+      return;
+    }
+
+    await _pendingGroupInviteRef(cleanClassId, cleanInviteeUid).delete();
+  }
+
+  static Future<void> _expirePendingInviteIfNeeded({
+    required String userId,
+    required String notificationId,
+    required Map<String, dynamic> notificationData,
+  }) async {
+    final inviteStatus =
+        notificationData['invite_status']?.toString().trim().toLowerCase() ??
+        'pending';
+    if (inviteStatus != 'pending') {
+      return;
+    }
+
+    if (!_isInviteExpired(notificationData['invite_expires_at'])) {
+      return;
+    }
+
+    final classId = notificationData['class_id']?.toString().trim() ?? '';
+    await _expireSinglePendingGroupInvite(
+      classId: classId,
+      inviteeUid: userId,
+      notificationId: notificationId,
+      reservedMatNumber:
+          notificationData['reserved_mat_number']?.toString().trim() ?? '',
+    );
+    throw Exception(
+      'This invite expired after 10 minutes. Ask your friend to send a new one.',
+    );
+  }
+
+  static Future<void> _expirePendingGroupInvitesForClass(String classId) async {
+    final cleanClassId = classId.trim();
+    if (cleanClassId.isEmpty) {
+      return;
+    }
+
+    final expiredInviteSnaps = await _pendingGroupInvitesRef(cleanClassId)
+        .where(
+          'expires_at',
+          isLessThanOrEqualTo: Timestamp.fromDate(DateTime.now()),
+        )
+        .get();
+    if (expiredInviteSnaps.docs.isEmpty) {
+      return;
+    }
+
+    await _db.runTransaction((transaction) async {
+      final classRef = _classRef(cleanClassId);
+      final classSnap = await transaction.get(classRef);
+      if (!classSnap.exists) {
+        for (final inviteDoc in expiredInviteSnaps.docs) {
+          transaction.set(inviteDoc.reference, <String, dynamic>{
+            'status': 'expired',
+            'expired_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+        return;
+      }
+
+      final classData = classSnap.data() as Map<String, dynamic>;
+      final reservedMats = _parseReservedMats(classData['reservedMats']);
+      final matsToRelease = <String>{};
+
+      for (final inviteDoc in expiredInviteSnaps.docs) {
+        final data = inviteDoc.data();
+        final status = data['status']?.toString().trim().toLowerCase() ?? '';
+        if (status != 'pending') {
+          continue;
+        }
+        final inviteeUid =
+            data['invitee_uid']?.toString().trim() ?? inviteDoc.id;
+        final notificationId = data['notification_id']?.toString().trim() ?? '';
+        final reservedMatNumber =
+            data['reserved_mat_number']?.toString().trim() ?? '';
+
+        if (reservedMatNumber.isNotEmpty &&
+            reservedMats.contains(reservedMatNumber)) {
+          matsToRelease.add(reservedMatNumber);
+        }
+
+        transaction.set(inviteDoc.reference, <String, dynamic>{
+          'status': 'expired',
+          'expired_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+
+        if (inviteeUid.isNotEmpty && notificationId.isNotEmpty) {
+          final notificationRef = _db
+              .collection(_userProfilesCollection)
+              .doc(inviteeUid)
+              .collection('notifications')
+              .doc(notificationId);
+          transaction.set(notificationRef, <String, dynamic>{
+            'invite_status': 'expired',
+            'expired_at': FieldValue.serverTimestamp(),
+          }, SetOptions(merge: true));
+        }
+      }
+
+      if (matsToRelease.isNotEmpty) {
+        reservedMats.removeAll(matsToRelease);
+        final capacity = _asInt(classData['capacity']);
+        final nextFilled = reservedMats.length.clamp(0, capacity);
+        transaction.update(classRef, <String, dynamic>{
+          'filled': nextFilled,
+          'registeredCount': nextFilled,
+          'status': nextFilled >= capacity
+              ? ClassStatus.full.name
+              : ClassStatus.open.name,
+          'reservedMats': FieldValue.arrayRemove(matsToRelease.toList()),
+        });
+      }
+    });
+  }
+
+  static Future<void> _expireSinglePendingGroupInvite({
+    required String classId,
+    required String inviteeUid,
+    required String notificationId,
+    required String reservedMatNumber,
+  }) async {
+    final cleanClassId = classId.trim();
+    final cleanInviteeUid = inviteeUid.trim();
+    if (cleanClassId.isEmpty || cleanInviteeUid.isEmpty) {
+      return;
+    }
+
+    final pendingInviteRef = _pendingGroupInviteRef(
+      cleanClassId,
+      cleanInviteeUid,
+    );
+    final classRef = _classRef(cleanClassId);
+    final notificationRef = _db
+        .collection(_userProfilesCollection)
+        .doc(cleanInviteeUid)
+        .collection('notifications')
+        .doc(notificationId);
+
+    await _db.runTransaction((transaction) async {
+      final pendingInviteSnap = await transaction.get(pendingInviteRef);
+      final classSnap = await transaction.get(classRef);
+
+      if (pendingInviteSnap.exists) {
+        transaction.set(pendingInviteRef, <String, dynamic>{
+          'status': 'expired',
+          'expired_at': FieldValue.serverTimestamp(),
+        }, SetOptions(merge: true));
+      }
+
+      transaction.set(notificationRef, <String, dynamic>{
+        'invite_status': 'expired',
+        'expired_at': FieldValue.serverTimestamp(),
+      }, SetOptions(merge: true));
+
+      if (!classSnap.exists || reservedMatNumber.trim().isEmpty) {
+        return;
+      }
+
+      final classData = classSnap.data() as Map<String, dynamic>;
+      final reservedMats = _parseReservedMats(classData['reservedMats']);
+      if (!reservedMats.contains(reservedMatNumber)) {
+        return;
+      }
+
+      reservedMats.remove(reservedMatNumber);
+      final capacity = _asInt(classData['capacity']);
+      final nextFilled = reservedMats.length.clamp(0, capacity);
+      transaction.update(classRef, <String, dynamic>{
+        'filled': nextFilled,
+        'registeredCount': nextFilled,
+        'status': nextFilled >= capacity
+            ? ClassStatus.full.name
+            : ClassStatus.open.name,
+        'reservedMats': FieldValue.arrayRemove([reservedMatNumber]),
+      });
+    });
+  }
+
   static List<String> _normalizeGroupMatNumbers({
     required List<String> selectedMatNumbers,
     required int expectedCount,
@@ -1378,6 +1627,24 @@ class DBReservations {
     if (value is int) return value;
     if (value is num) return value.toInt();
     return 0;
+  }
+
+  static bool _isInviteExpired(dynamic rawTimestamp) {
+    final inviteExpiresAt = _timestampToDateTime(rawTimestamp);
+    if (inviteExpiresAt == null) {
+      return false;
+    }
+    return !inviteExpiresAt.isAfter(DateTime.now());
+  }
+
+  static DateTime? _timestampToDateTime(dynamic rawTimestamp) {
+    if (rawTimestamp is Timestamp) {
+      return rawTimestamp.toDate();
+    }
+    if (rawTimestamp is DateTime) {
+      return rawTimestamp;
+    }
+    return null;
   }
 
   static Set<String> _parseReservedMats(dynamic rawValue) {

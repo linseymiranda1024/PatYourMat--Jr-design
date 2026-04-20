@@ -11,6 +11,7 @@ import '../models/reservation.dart';
 import '../providers/provider_user_profile.dart';
 import '../theme/app_colors.dart';
 import '../util/date_time/util_attendance.dart';
+import '../util/classes/class_visuals.dart';
 import 'mat_selection_screen.dart';
 import 'reservation_confirmation_screen.dart';
 
@@ -31,6 +32,7 @@ class ClassDetailScreen extends ConsumerStatefulWidget {
 
 class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
   bool _isLoading = false;
+  int _heroPageIndex = 0;
 
   Future<void> _registerForClass(GymClass gClass) async {
     setState(() => _isLoading = true);
@@ -147,6 +149,10 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
         final colorScheme = Theme.of(context).colorScheme;
         final textTheme = Theme.of(context).textTheme;
         final isDark = Theme.of(context).brightness == Brightness.dark;
+        final visual = gymClassVisualForKey(
+          gClass.iconKey,
+          classType: gClass.type,
+        );
 
         final reservations = ref.watch(reservationsProvider).reservations;
         Reservation? currentReservation;
@@ -222,15 +228,28 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                 return Scaffold(
                   body: Stack(
                     children: [
+                      _ClassHeroHeader(
+                        gymClass: gClass,
+                        visual: visual,
+                        currentPage: _heroPageIndex,
+                        onPageChanged: (page) {
+                          if (_heroPageIndex == page) {
+                            return;
+                          }
+                          setState(() {
+                            _heroPageIndex = page;
+                          });
+                        },
+                      ),
                       Container(
-                        height: 220,
-                        decoration: const BoxDecoration(
+                        height: 300,
+                        decoration: BoxDecoration(
                           gradient: LinearGradient(
                             begin: Alignment.topCenter,
                             end: Alignment.bottomCenter,
                             colors: [
-                              AppColors.gradientStart,
-                              AppColors.gradientEnd,
+                              Colors.black.withValues(alpha: 0.18),
+                              Colors.transparent,
                             ],
                           ),
                         ),
@@ -264,6 +283,22 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                       ),
                                     ),
                                   ),
+                                  const SizedBox(width: 12),
+                                  Container(
+                                    width: 44,
+                                    height: 44,
+                                    decoration: BoxDecoration(
+                                      gradient: LinearGradient(
+                                        colors: visual.colors,
+                                      ),
+                                      borderRadius: BorderRadius.circular(14),
+                                    ),
+                                    child: Icon(
+                                      visual.icon,
+                                      color: Colors.white,
+                                      size: 22,
+                                    ),
+                                  ),
                                   IconButton(
                                     icon: Icon(
                                       isFavorite
@@ -294,7 +329,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 child: SingleChildScrollView(
                                   padding: const EdgeInsets.fromLTRB(
                                     20,
-                                    24,
+                                    28,
                                     20,
                                     40,
                                   ),
@@ -713,6 +748,148 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               ],
             ),
           ),
+        ],
+      ),
+    );
+  }
+}
+
+class _ClassHeroHeader extends StatelessWidget {
+  final GymClass gymClass;
+  final GymClassVisualOption visual;
+  final int currentPage;
+  final ValueChanged<int> onPageChanged;
+
+  const _ClassHeroHeader({
+    required this.gymClass,
+    required this.visual,
+    required this.currentPage,
+    required this.onPageChanged,
+  });
+
+  @override
+  Widget build(BuildContext context) {
+    final imageUrls = gymClass.imageUrls;
+    final safePage = imageUrls.isEmpty
+        ? 0
+        : currentPage.clamp(0, imageUrls.length - 1);
+
+    if (imageUrls.isEmpty) {
+      return Container(
+        height: 300,
+        decoration: BoxDecoration(
+          gradient: LinearGradient(
+            begin: Alignment.topLeft,
+            end: Alignment.bottomRight,
+            colors: visual.colors,
+          ),
+        ),
+        child: Center(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            children: [
+              Icon(visual.icon, size: 74, color: Colors.white),
+              const SizedBox(height: 16),
+              Text(
+                gymClass.type,
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontSize: 18,
+                  fontWeight: FontWeight.w700,
+                  letterSpacing: 0.3,
+                ),
+              ),
+            ],
+          ),
+        ),
+      );
+    }
+
+    return SizedBox(
+      height: 300,
+      child: Stack(
+        fit: StackFit.expand,
+        children: [
+          PageView.builder(
+            itemCount: imageUrls.length,
+            onPageChanged: onPageChanged,
+            itemBuilder: (context, index) {
+              return Stack(
+                fit: StackFit.expand,
+                children: [
+                  Image.network(
+                    imageUrls[index],
+                    fit: BoxFit.cover,
+                    errorBuilder: (context, error, stackTrace) {
+                      return Container(
+                        decoration: BoxDecoration(
+                          gradient: LinearGradient(colors: visual.colors),
+                        ),
+                        child: Icon(
+                          visual.icon,
+                          color: Colors.white,
+                          size: 72,
+                        ),
+                      );
+                    },
+                  ),
+                  Container(
+                    decoration: BoxDecoration(
+                      gradient: LinearGradient(
+                        begin: Alignment.topCenter,
+                        end: Alignment.bottomCenter,
+                        colors: [
+                          Colors.black.withValues(alpha: 0.14),
+                          Colors.black.withValues(alpha: 0.32),
+                        ],
+                      ),
+                    ),
+                  ),
+                ],
+              );
+            },
+          ),
+          Positioned(
+            left: 20,
+            bottom: 20,
+            child: Container(
+              padding: const EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              decoration: BoxDecoration(
+                color: Colors.black.withValues(alpha: 0.42),
+                borderRadius: BorderRadius.circular(999),
+              ),
+              child: Text(
+                imageUrls.length == 1
+                    ? 'Class preview'
+                    : 'Photo ${safePage + 1} of ${imageUrls.length}',
+                style: const TextStyle(
+                  color: Colors.white,
+                  fontWeight: FontWeight.w700,
+                ),
+              ),
+            ),
+          ),
+          if (imageUrls.length > 1)
+            Positioned(
+              right: 20,
+              bottom: 22,
+              child: Row(
+                children: List<Widget>.generate(imageUrls.length, (index) {
+                  final isActive = index == safePage;
+                  return Container(
+                    width: isActive ? 18 : 8,
+                    height: 8,
+                    margin: const EdgeInsets.only(left: 6),
+                    decoration: BoxDecoration(
+                      color: isActive
+                          ? Colors.white
+                          : Colors.white.withValues(alpha: 0.45),
+                      borderRadius: BorderRadius.circular(999),
+                    ),
+                  );
+                }),
+              ),
+            ),
         ],
       ),
     );

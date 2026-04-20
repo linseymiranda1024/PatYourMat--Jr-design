@@ -177,7 +177,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text(
-              'Confirmed ${matNumbers.length} spot${matNumbers.length == 1 ? '' : 's'} and sent $inviteCount invite${inviteCount == 1 ? '' : 's'}.$skippedText',
+              'Confirmed ${matNumbers.length} spot${matNumbers.length == 1 ? '' : 's'} and sent $inviteCount invite${inviteCount == 1 ? '' : 's'}. Invites expire after 10 minutes.$skippedText',
             ),
           ),
         );

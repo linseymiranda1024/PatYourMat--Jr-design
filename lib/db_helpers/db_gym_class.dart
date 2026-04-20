@@ -1,9 +1,11 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:firebase_storage/firebase_storage.dart';
 import '../models/gym_class.dart';
 
 class DBGymClass {
   static FirebaseFirestore _db = FirebaseFirestore.instance;
+  static FirebaseStorage _storage = FirebaseStorage.instance;
   static const String _collection = 'classes';
 
   @visibleForTesting
@@ -12,9 +14,15 @@ class DBGymClass {
   }
 
   @visibleForTesting
+  static void useStorageInstance(FirebaseStorage storage) {
+    _storage = storage;
+  }
+
+  @visibleForTesting
   static void resetFirestoreInstance() {
     try {
       _db = FirebaseFirestore.instance;
+      _storage = FirebaseStorage.instance;
     } catch (_) {
       // Tests may override the Firestore instance without initializing Firebase.
     }
@@ -94,5 +102,30 @@ class DBGymClass {
 
   static Future<void> deleteClass(String id) async {
     await _db.collection(_collection).doc(id).delete();
+  }
+
+  static Future<String> uploadClassImage({
+    required Uint8List imageBytes,
+    required String imageId,
+  }) async {
+    final cleanImageId = _sanitizeStorageSegment(imageId);
+    final ref = _storage.ref().child(
+      'classes/images/$cleanImageId-${DateTime.now().microsecondsSinceEpoch}.jpg',
+    );
+    await ref.putData(
+      imageBytes,
+      SettableMetadata(contentType: 'image/jpeg'),
+    );
+    return ref.getDownloadURL();
+  }
+
+  static String _sanitizeStorageSegment(String value) {
+    final sanitized = value
+        .trim()
+        .toLowerCase()
+        .replaceAll(RegExp(r'[^a-z0-9]+'), '-')
+        .replaceAll(RegExp(r'-+'), '-')
+        .replaceAll(RegExp(r'^-|-$'), '');
+    return sanitized.isEmpty ? 'class-image' : sanitized;
   }
 }
