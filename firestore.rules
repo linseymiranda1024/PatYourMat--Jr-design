@@ -17,20 +17,6 @@ service cloud.firestore {
       return signedIn() && currentUserProfile().data.role == 'Staff';
     }
 
-    function pendingGroupInviteExpiryFieldsOnly() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
-        'status',
-        'expired_at'
-      ]);
-    }
-
-    function groupInviteExpirationOnly() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
-        'invite_status',
-        'expired_at'
-      ]);
-    }
-
     function classReservationFieldsOnly() {
       return request.resource.data.diff(resource.data).changedKeys().hasOnly([
         'filled',
@@ -43,26 +29,10 @@ service cloud.firestore {
       ]);
     }
 
-    function staffAttendanceProfileFieldsOnly() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
-        'achievements',
-        'category_attendance',
-      ]);
-    }
-
-    function staffAttendanceRegistrationFieldsOnly() {
-      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
-        'status',
-        'attendedAt',
-        'noShowAt',
-      ]);
-    }
-
     match /user_profiles/{userId} {
       allow read: if signedIn();
       allow create, delete: if isOwner(userId);
-      allow update: if isOwner(userId) ||
-        (isStaff() && staffAttendanceProfileFieldsOnly());
+      allow update: if isOwner(userId) || isStaff();
 
       match /friends/{friendId} {
         allow read, update: if isOwner(userId);
@@ -98,15 +68,14 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);
         allow create: if signedIn();
-        allow update: if isOwner(userId) || isStaff() || groupInviteExpirationOnly();
+        allow update: if isOwner(userId) || isStaff();
         allow delete: if isOwner(userId);
       }
 
       match /registrations/{classId} {
         allow read: if isOwner(userId) || isStaff();
         allow create, delete: if isOwner(userId);
-        allow update: if isOwner(userId) ||
-          (isStaff() && staffAttendanceRegistrationFieldsOnly());
+        allow update: if isOwner(userId) || isStaff();
       }
     }
 
@@ -118,7 +87,7 @@ service cloud.firestore {
       match /registrations/{userId} {
         allow read: if signedIn();
         allow create, delete: if isOwner(userId);
-        allow update: if isStaff() && staffAttendanceRegistrationFieldsOnly();
+        allow update: if isStaff();
       }
 
       match /standby_queue/{userId} {
@@ -130,7 +99,7 @@ service cloud.firestore {
       match /pending_group_invites/{inviteeUid} {
         allow read: if signedIn();
         allow create: if signedIn();
-        allow update: if isStaff() || (signedIn() && pendingGroupInviteExpiryFieldsOnly());
+        allow update: if isStaff() || isOwner(inviteeUid);
         allow delete: if signedIn();
       }
     }

@@ -141,7 +141,6 @@ class DBReservations {
     String? bookingRole,
   }) async {
     try {
-      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(userId);
       _throwIfRegistrationBlocked(penaltyState);
 
@@ -170,7 +169,6 @@ class DBReservations {
     String? hostBookingRole,
   }) async {
     try {
-      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(hostUserId);
       _throwIfRegistrationBlocked(penaltyState);
 
@@ -532,7 +530,6 @@ class DBReservations {
 
   static Future<void> joinStandbyQueue(String userId, GymClass gymClass) async {
     try {
-      await _expirePendingGroupInvitesForClass(gymClass.id);
       final penaltyState = await syncMemberNoShows(userId);
       _throwIfRegistrationBlocked(penaltyState);
       final userProfileRef = _db
