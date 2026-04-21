@@ -22,7 +22,7 @@ service firebase.storage {
       allow write, delete: if isOwner(userId);
     }
 
-    match /classes/images/{fileName} {
+    match /classes/images/{allPaths=**} {
       allow read: if isSignedIn();
       allow write, delete: if isStaff();
     }

@@ -26,6 +26,13 @@ service cloud.firestore {
       ]);
     }
 
+    function groupInviteExpirationOnly() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'invite_status',
+        'expired_at'
+      ]);
+    }
+
     function classReservationFieldsOnly() {
       return request.resource.data.diff(resource.data).changedKeys().hasOnly([
         'filled',
@@ -93,7 +100,7 @@ service cloud.firestore {
       match /notifications/{notificationId} {
         allow read: if isOwner(userId);
         allow create: if signedIn();
-        allow update: if isOwner(userId) || isStaff();
+        allow update: if isOwner(userId) || isStaff() || groupInviteExpirationOnly();
         allow delete: if isOwner(userId);
       }
 
