@@ -9,9 +9,19 @@ service firebase.storage {
       return isSignedIn() && request.auth.uid == userId;
     }
 
+    function isStaff() {
+      return isSignedIn() && 
+             firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff';
+    }
+
     match /users/{userId}/profile_picture/{fileName} {
       allow read: if isSignedIn();
       allow write, delete: if isOwner(userId);
+    }
+
+    match /classes/images/{fileName} {
+      allow read: if isSignedIn();
+      allow write, delete: if isStaff();
     }
 
     match /{allPaths=**} {

@@ -254,38 +254,39 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       _isSubmitting = true;
     });
 
-    final existingClass = widget.existingClass;
-    final capacity = int.tryParse(_capacityController.text.trim()) ?? 20;
-    final filled = existingClass == null
-        ? 0
-        : existingClass.filled.clamp(0, capacity);
-    final occurrenceCount = !_isEditing && _repeatClass ? _occurrenceCount : 1;
-    final repeatEveryWeeks = !_isEditing && _repeatClass
-        ? _repeatEveryWeeks
-        : 1;
-    final uploadedImageUrls = await _uploadPendingClassImages();
-
-    final classToSave = GymClass(
-      id: existingClass?.id ?? '',
-      title: _titleController.text.trim(),
-      description: _descriptionController.text.trim(),
-      type: _selectedType,
-      iconKey: _selectedIconKey,
-      imageUrls: <String>[..._existingImageUrls, ...uploadedImageUrls],
-      instructor: _instructorController.text.trim(),
-      dateTime: _selectedDateTime,
-      durationMinutes: int.tryParse(_durationController.text.trim()) ?? 60,
-      location: _locationController.text.trim(),
-      capacity: capacity,
-      filled: filled,
-      recurrenceSeriesId: existingClass?.recurrenceSeriesId,
-      recurrenceCount: existingClass?.recurrenceCount ?? occurrenceCount,
-      recurrenceIntervalWeeks:
-          existingClass?.recurrenceIntervalWeeks ?? repeatEveryWeeks,
-      recurrenceIndex: existingClass?.recurrenceIndex ?? 0,
-    );
-
     try {
+      final existingClass = widget.existingClass;
+      final capacity = int.tryParse(_capacityController.text.trim()) ?? 20;
+      final filled = existingClass == null
+          ? 0
+          : existingClass.filled.clamp(0, capacity);
+      final occurrenceCount = !_isEditing && _repeatClass ? _occurrenceCount : 1;
+      final repeatEveryWeeks = !_isEditing && _repeatClass
+          ? _repeatEveryWeeks
+          : 1;
+
+      final uploadedImageUrls = await _uploadPendingClassImages();
+
+      final classToSave = GymClass(
+        id: existingClass?.id ?? '',
+        title: _titleController.text.trim(),
+        description: _descriptionController.text.trim(),
+        type: _selectedType,
+        iconKey: _selectedIconKey,
+        imageUrls: <String>[..._existingImageUrls, ...uploadedImageUrls],
+        instructor: _instructorController.text.trim(),
+        dateTime: _selectedDateTime,
+        durationMinutes: int.tryParse(_durationController.text.trim()) ?? 60,
+        location: _locationController.text.trim(),
+        capacity: capacity,
+        filled: filled,
+        recurrenceSeriesId: existingClass?.recurrenceSeriesId,
+        recurrenceCount: existingClass?.recurrenceCount ?? occurrenceCount,
+        recurrenceIntervalWeeks:
+            existingClass?.recurrenceIntervalWeeks ?? repeatEveryWeeks,
+        recurrenceIndex: existingClass?.recurrenceIndex ?? 0,
+      );
+
       if (_isEditing) {
         await ref.read(providerGymClass).updateClass(classToSave);
       } else {
@@ -299,6 +300,11 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
       }
       if (!mounted) return;
       Navigator.of(context).pop();
+    } catch (e) {
+      if (!mounted) return;
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('Failed to save class: $e')),
+      );
     } finally {
       if (mounted) {
         setState(() {
