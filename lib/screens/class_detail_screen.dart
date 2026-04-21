@@ -823,6 +823,57 @@ class _ClassHeroGalleryState extends State<_ClassHeroGallery> {
           ),
         ),
         if (imageUrls.length > 1) ...[
+          // Navigation Arrows for Demo
+          Positioned(
+            left: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Opacity(
+                opacity: _currentPage > 0 ? 1.0 : 0.0,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_back_ios_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                  onPressed: _currentPage > 0
+                      ? () {
+                          _pageController.previousPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      : null,
+                ),
+              ),
+            ),
+          ),
+          Positioned(
+            right: 8,
+            top: 0,
+            bottom: 0,
+            child: Center(
+              child: Opacity(
+                opacity: _currentPage < imageUrls.length - 1 ? 1.0 : 0.0,
+                child: IconButton(
+                  icon: const Icon(
+                    Icons.arrow_forward_ios_rounded,
+                    color: Colors.white,
+                    size: 32,
+                  ),
+                  onPressed: _currentPage < imageUrls.length - 1
+                      ? () {
+                          _pageController.nextPage(
+                            duration: const Duration(milliseconds: 300),
+                            curve: Curves.easeInOut,
+                          );
+                        }
+                      : null,
+                ),
+              ),
+            ),
+          ),
           Positioned(
             bottom: 48, // Adjusted for the rounded corner overlap
             left: 0,
