@@ -11,7 +11,9 @@ service firebase.storage {
 
     function isStaff() {
       return isSignedIn() && 
-             firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff';
+             firestore.exists(/databases/(default)/documents/user_profiles/$(request.auth.uid)) &&
+             (firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff' ||
+              firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.allow_class_creation == true);
     }
 
     match /users/{userId}/profile_picture/{fileName} {

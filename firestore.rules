@@ -14,7 +14,10 @@ service cloud.firestore {
     }
 
     function isStaff() {
-      return signedIn() && currentUserProfile().data.role == 'Staff';
+      return signedIn() && 
+             exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid)) &&
+             (currentUserProfile().data.role == 'Staff' || 
+              (currentUserProfile().data.get('allow_class_creation', false) == true));
     }
 
     function classReservationFieldsOnly() {
