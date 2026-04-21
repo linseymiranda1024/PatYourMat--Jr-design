@@ -13,7 +13,8 @@ service firebase.storage {
       return isSignedIn() && 
              firestore.exists(/databases/(default)/documents/user_profiles/$(request.auth.uid)) &&
              (firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff' ||
-              firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.get('allow_class_creation', false) == true);
+              ('allow_class_creation' in firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data &&
+               firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.allow_class_creation == true));
     }
 
     match /users/{userId}/profile_picture/{fileName} {
