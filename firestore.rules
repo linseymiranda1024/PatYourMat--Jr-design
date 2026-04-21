@@ -14,11 +14,11 @@ service cloud.firestore {
     }
 
     function isStaff() {
+      let profilePath = ['databases', database, 'documents', 'user_profiles', request.auth.uid];
       return signedIn() && 
-             exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid)) &&
-             (currentUserProfile().data.role == 'Staff' || 
-              ('allow_class_creation' in currentUserProfile().data && 
-               currentUserProfile().data.allow_class_creation == true));
+             exists(profilePath) &&
+             (get(profilePath).data.role == 'Staff' || 
+              get(profilePath).data.get('allow_class_creation', false) == true);
     }
 
     function pendingGroupInviteExpiryFieldsOnly() {

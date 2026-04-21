@@ -10,11 +10,12 @@ service firebase.storage {
     }
 
     function isStaff() {
+      let profilePath = ['databases', '(default)', 'documents', 'user_profiles', request.auth.uid];
       return isSignedIn() && 
-             firestore.exists(/databases/(default)/documents/user_profiles/$(request.auth.uid)) &&
-             (firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff' ||
-              ('allow_class_creation' in firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data &&
-               firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.allow_class_creation == true));
+             firestore.exists(profilePath) &&
+             (firestore.get(profilePath).data.role == 'Staff' ||
+              ('allow_class_creation' in firestore.get(profilePath).data &&
+               firestore.get(profilePath).data.allow_class_creation == true));
     }
 
     match /users/{userId}/profile_picture/{fileName} {
