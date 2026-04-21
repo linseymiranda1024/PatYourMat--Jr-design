@@ -266,7 +266,26 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
           ? _repeatEveryWeeks
           : 1;
 
-      final uploadedImageUrls = await _uploadPendingClassImages();
+      List<String> uploadedImageUrls;
+      try {
+        uploadedImageUrls = await _uploadPendingClassImages();
+      } on FirebaseException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Photo Upload Error (${e.code}): ${e.message ?? 'Unknown error occurred'}',
+            ),
+          ),
+        );
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Photo Upload Error: $e')),
+        );
+        return;
+      }
 
       final classToSave = GymClass(
         id: existingClass?.id ?? '',
@@ -288,33 +307,36 @@ class _ScreenCreateClassState extends ConsumerState<ScreenCreateClass> {
         recurrenceIndex: existingClass?.recurrenceIndex ?? 0,
       );
 
-      if (_isEditing) {
-        await ref.read(providerGymClass).updateClass(classToSave);
-      } else {
-        await ref
-            .read(providerGymClass)
-            .addClass(
-              classToSave,
-              occurrenceCount: occurrenceCount,
-              repeatEveryWeeks: repeatEveryWeeks,
-            );
+      try {
+        if (_isEditing) {
+          await ref.read(providerGymClass).updateClass(classToSave);
+        } else {
+          await ref.read(providerGymClass).addClass(
+                classToSave,
+                occurrenceCount: occurrenceCount,
+                repeatEveryWeeks: repeatEveryWeeks,
+              );
+        }
+      } on FirebaseException catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text(
+              'Class Save Error (${e.code}): ${e.message ?? 'Unknown error occurred'}',
+            ),
+          ),
+        );
+        return;
+      } catch (e) {
+        if (!mounted) return;
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('Class Save Error: $e')),
+        );
+        return;
       }
+
       if (!mounted) return;
       Navigator.of(context).pop();
-    } on FirebaseException catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text(
-            'Firebase Error (${e.code}): ${e.message ?? 'Unknown error occurred'}',
-          ),
-        ),
-      );
-    } catch (e) {
-      if (!mounted) return;
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('Failed to save class: $e')),
-      );
     } finally {
       if (mounted) {
         setState(() {
