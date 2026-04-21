@@ -29,6 +29,15 @@ service cloud.firestore {
       ]);
     }
 
+    function ownerNoShowRegistrationUpdate(userId) {
+      return isOwner(userId) &&
+        request.resource.data.diff(resource.data).affectedKeys().hasOnly([
+          'status',
+          'noShowAt',
+        ]) &&
+        request.resource.data.status == 'NO-SHOW';
+    }
+
     match /user_profiles/{userId} {
       allow read: if signedIn();
       allow create, delete: if isOwner(userId);
@@ -86,8 +95,9 @@ service cloud.firestore {
 
       match /registrations/{userId} {
         allow read: if signedIn();
-        allow create, delete: if isOwner(userId);
-        allow update: if isStaff();
+        allow create: if isOwner(userId) || isStaff();
+        allow delete: if isOwner(userId);
+        allow update: if isStaff() || ownerNoShowRegistrationUpdate(userId);
       }
 
       match /standby_queue/{userId} {

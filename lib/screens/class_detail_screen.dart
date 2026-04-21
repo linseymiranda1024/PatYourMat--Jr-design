@@ -200,6 +200,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
               builder: (context, queueSnapshot) {
                 final queuePosition = queueSnapshot.data;
                 final isQueued = queuePosition != null;
+                final hasOpenCapacity = liveFilled < gClass.capacity;
+                final canClaimStandbySpot =
+                    isQueued && queuePosition == 1 && hasOpenCapacity;
                 final statusHeadline = isRegistered
                     ? (statusPresentation.headline ?? 'You are registered')
                     : isQueued
@@ -238,7 +241,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                         leading: Padding(
                           padding: const EdgeInsets.only(left: 12),
                           child: CircleAvatar(
-                            backgroundColor: Colors.black.withValues(alpha: 0.3),
+                            backgroundColor: Colors.black.withValues(
+                              alpha: 0.3,
+                            ),
                             child: IconButton(
                               icon: const Icon(
                                 Icons.arrow_back,
@@ -252,8 +257,9 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                           Padding(
                             padding: const EdgeInsets.only(right: 12),
                             child: CircleAvatar(
-                              backgroundColor:
-                                  Colors.black.withValues(alpha: 0.3),
+                              backgroundColor: Colors.black.withValues(
+                                alpha: 0.3,
+                              ),
                               child: IconButton(
                                 icon: Icon(
                                   isFavorite
@@ -265,9 +271,7 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                 ),
                                 onPressed: () => ref
                                     .read(providerUserProfile)
-                                    .toggleFavoriteClass(
-                                      gClass.favoriteKey,
-                                    ),
+                                    .toggleFavoriteClass(gClass.favoriteKey),
                               ),
                             ),
                           ),
@@ -528,26 +532,28 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                   width: double.infinity,
                                   height: 60,
                                   child: ElevatedButton(
-                                    onPressed: (_isLoading ||
+                                    onPressed:
+                                        (_isLoading ||
                                             isRegistered ||
-                                            isQueued ||
-                                            isFull)
+                                            (!canClaimStandbySpot &&
+                                                (isQueued || isFull)))
                                         ? null
                                         : () {
-                                            if (gClass.bookingMode ==
-                                                BookingMode.spot) {
-                                              _registerForClass(gClass);
-                                              return;
-                                            }
                                             if (liveFilled >= gClass.capacity) {
-                                              ScaffoldMessenger.of(context)
-                                                  .showSnackBar(
+                                              ScaffoldMessenger.of(
+                                                context,
+                                              ).showSnackBar(
                                                 const SnackBar(
                                                   content: Text(
                                                     'Class just filled up',
                                                   ),
                                                 ),
                                               );
+                                              return;
+                                            }
+                                            if (gClass.bookingMode ==
+                                                BookingMode.open) {
+                                              _registerForClass(gClass);
                                               return;
                                             }
                                             context.push(
@@ -562,10 +568,8 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         borderRadius: BorderRadius.circular(30),
                                       ),
                                       elevation: 4,
-                                      shadowColor:
-                                          colorScheme.primary.withValues(
-                                            alpha: 0.4,
-                                          ),
+                                      shadowColor: colorScheme.primary
+                                          .withValues(alpha: 0.4),
                                     ),
                                     child: _isLoading
                                         ? CircularProgressIndicator(
@@ -574,21 +578,30 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                         : Text(
                                             isRegistered
                                                 ? 'Registered'
+                                                : canClaimStandbySpot
+                                                ? switch (gClass.bookingMode) {
+                                                    BookingMode.open =>
+                                                      'Claim Open Spot',
+                                                    BookingMode.zone =>
+                                                      'Choose Your Zone',
+                                                    BookingMode.spot =>
+                                                      'Choose Your Spot',
+                                                  }
                                                 : isQueued
                                                 ? 'In Standby Queue'
                                                 : switch (gClass.bookingMode) {
-                                                  BookingMode.open =>
-                                                    normalizeGymClassType(
-                                                              gClass.type,
-                                                            ) ==
-                                                            'Dance'
-                                                        ? 'Join The Floor'
-                                                        : 'Join The Field',
-                                                  BookingMode.zone =>
-                                                    'Choose Your Zone',
-                                                  BookingMode.spot =>
-                                                    'Reserve Your Spot',
-                                                },
+                                                    BookingMode.open =>
+                                                      normalizeGymClassType(
+                                                                gClass.type,
+                                                              ) ==
+                                                              'Dance'
+                                                          ? 'Join The Floor'
+                                                          : 'Join The Field',
+                                                    BookingMode.zone =>
+                                                      'Choose Your Zone',
+                                                    BookingMode.spot =>
+                                                      'Choose Your Spot',
+                                                  },
                                             style: const TextStyle(
                                               fontSize: 18,
                                               fontWeight: FontWeight.bold,
@@ -623,56 +636,15 @@ class _ClassDetailScreenState extends ConsumerState<ClassDetailScreen> {
                                           color: colorScheme.primary,
                                         ),
                                         shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(28),
+                                          borderRadius: BorderRadius.circular(
+                                            28,
+                                          ),
                                         ),
                                       ),
                                     ),
                                   ),
                                   const SizedBox(height: 14),
                                 ],
-                                if (gClass.bookingMode == BookingMode.spot)
-                                  SizedBox(
-                                    width: double.infinity,
-                                    height: 54,
-                                    child: OutlinedButton.icon(
-                                      onPressed: (_isLoading ||
-                                              isRegistered ||
-                                              isFull ||
-                                              isQueued)
-                                          ? null
-                                          : () {
-                                              if (liveFilled >=
-                                                  gClass.capacity) {
-                                                ScaffoldMessenger.of(context)
-                                                    .showSnackBar(
-                                                  const SnackBar(
-                                                    content: Text(
-                                                      'Class just filled up',
-                                                    ),
-                                                  ),
-                                                );
-                                                return;
-                                              }
-                                              context.push(
-                                                MatSelectionScreen.routeName,
-                                                extra: gClass.id,
-                                              );
-                                            },
-                                      icon: const Icon(Icons.grid_view_rounded),
-                                      label: const Text('Choose Your Spot'),
-                                      style: OutlinedButton.styleFrom(
-                                        foregroundColor: colorScheme.primary,
-                                        side: BorderSide(
-                                          color: colorScheme.primary,
-                                        ),
-                                        shape: RoundedRectangleBorder(
-                                          borderRadius:
-                                              BorderRadius.circular(28),
-                                        ),
-                                      ),
-                                    ),
-                                  ),
                               ],
                             ),
                           ),
@@ -911,7 +883,10 @@ class _FullScreenGallery extends StatefulWidget {
   final List<String> imageUrls;
   final int initialIndex;
 
-  const _FullScreenGallery({required this.imageUrls, required this.initialIndex});
+  const _FullScreenGallery({
+    required this.imageUrls,
+    required this.initialIndex,
+  });
 
   @override
   State<_FullScreenGallery> createState() => _FullScreenGalleryState();

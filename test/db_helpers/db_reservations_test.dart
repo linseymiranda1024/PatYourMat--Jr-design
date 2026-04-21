@@ -116,6 +116,70 @@ void main() {
   });
 
   test(
+    'registerForClassWithGroupInvites creates host booking and pending invite',
+    () async {
+      final gymClass = buildClass(
+        id: 'class-group',
+        dateTime: DateTime(2026, 5, 20, 13),
+        capacity: 4,
+      );
+      await seedUserProfile('host-1', firstName: 'Pat', lastName: 'Host');
+      await seedUserProfile('friend-1', firstName: 'Jamie', lastName: 'Guest');
+      await seedClass(gymClass);
+
+      final result = await DBReservations.registerForClassWithGroupInvites(
+        hostUserId: 'host-1',
+        hostName: 'Pat Host',
+        gymClass: gymClass,
+        selectedMatNumbers: const ['Mat #1', 'Mat #2'],
+        inviteeUids: const ['friend-1'],
+      );
+
+      final hostRegistration = await firestore
+          .collection('user_profiles')
+          .doc('host-1')
+          .collection('registrations')
+          .doc('class-group')
+          .get();
+      final pendingInvite = await firestore
+          .collection('classes')
+          .doc('class-group')
+          .collection('pending_group_invites')
+          .doc('friend-1')
+          .get();
+      final notifications = await firestore
+          .collection('user_profiles')
+          .doc('friend-1')
+          .collection('notifications')
+          .where('class_id', isEqualTo: 'class-group')
+          .get();
+      final classDoc = await firestore
+          .collection('classes')
+          .doc('class-group')
+          .get();
+      final classData = classDoc.data()!;
+      final rosterEntry =
+          (classData['roster'] as Map<String, dynamic>)['host-1']
+              as Map<String, dynamic>;
+
+      expect(result.hostMatNumber, 'Mat #1');
+      expect(result.reservedMatNumbers, const ['Mat #1', 'Mat #2']);
+      expect(result.invitesSent, 1);
+      expect(hostRegistration.exists, isTrue);
+      expect(hostRegistration.data()?['matNumber'], 'Mat #1');
+      expect(pendingInvite.exists, isTrue);
+      expect(pendingInvite.data()?['reserved_mat_number'], 'Mat #2');
+      expect(pendingInvite.data()?['status'], 'pending');
+      expect(notifications.docs, hasLength(1));
+      expect(notifications.docs.single.data()['reserved_mat_number'], 'Mat #2');
+      expect(classData['filled'], 2);
+      expect(classData['registeredCount'], 2);
+      expect(classData['reservedMats'], const ['Mat #1', 'Mat #2']);
+      expect(rosterEntry['status'], ReservationStatus.confirmed);
+    },
+  );
+
+  test(
     'registerForClass is blocked while a no-show penalty is active',
     () async {
       final gymClass = buildClass(

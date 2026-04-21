@@ -45,11 +45,11 @@ void main() {
         .doc('user-1')
         .collection('notifications')
         .add({
-      'type': 'friend',
-      'title': 'New Friend',
-      'message': 'Someone followed you',
-      'created_at': Timestamp.now(),
-    });
+          'type': 'friend',
+          'title': 'New Friend',
+          'message': 'Someone followed you',
+          'created_at': Timestamp.now(),
+        });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -79,7 +79,7 @@ void main() {
 
     // Verify confirmation dialog
     expect(find.text('Clear notifications?'), findsOneWidget);
-    
+
     // Tap Clear All in dialog
     await tester.tap(find.text('Clear All').last);
     await tester.pumpAndSettle();
@@ -87,7 +87,7 @@ void main() {
     // Verify notification is gone
     expect(find.text('New Friend'), findsNothing);
     expect(find.text('You are all caught up.'), findsOneWidget);
-    
+
     // Verify Firestore is empty
     final snapshot = await firestore
         .collection('user_profiles')
@@ -98,17 +98,17 @@ void main() {
   });
 
   testWidgets('Swipe to delete notification works', (tester) async {
-     // Add a notification
-    final docRef = await firestore
+    // Add a notification
+    await firestore
         .collection('user_profiles')
         .doc('user-1')
         .collection('notifications')
         .add({
-      'type': 'friend',
-      'title': 'Delete Me',
-      'message': 'Swipe me away',
-      'created_at': Timestamp.now(),
-    });
+          'type': 'friend',
+          'title': 'Delete Me',
+          'message': 'Swipe me away',
+          'created_at': Timestamp.now(),
+        });
 
     await tester.pumpWidget(
       ProviderScope(
@@ -136,7 +136,7 @@ void main() {
 
     // Verify notification is gone from UI
     expect(find.text('Delete Me'), findsNothing);
-    
+
     // Verify Firestore is empty
     final snapshot = await firestore
         .collection('user_profiles')

@@ -698,7 +698,8 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
         final liveFilled = socialMatOccupancyAsync.hasValue
             ? socialMatOccupancy.reservedMatNumbers.length
             : gClass.filled;
-        final isFull = liveFilled >= gClass.capacity || gClass.standbyCount > 0;
+        final isAtCapacity = liveFilled >= gClass.capacity;
+        final hasStandbyQueue = gClass.standbyCount > 0;
         final roleOptions = _roleOptionsForClass(gClass);
         final zoneOptions = _zoneOptionsForClass(gClass);
         final headerDescription = _headerDescriptionFor(gClass);
@@ -730,13 +731,18 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
           });
         }
 
-        return StreamBuilder<bool>(
-          stream: DBReservations.isUserInStandby(
-            ref.read(reservationsProvider).userId ?? '',
-            gClass.id,
-          ),
+        return StreamBuilder<int?>(
+          stream: ref
+              .read(reservationsProvider)
+              .standbyQueuePositionStream(gClass.id),
           builder: (context, standbySnapshot) {
-            final isInStandby = standbySnapshot.data ?? false;
+            final queuePosition = standbySnapshot.data;
+            final isInStandby = queuePosition != null;
+            final canClaimStandbySpot =
+                isInStandby && queuePosition == 1 && !isAtCapacity;
+            final standbyBlocksSelection = isInStandby && !canClaimStandbySpot;
+            final isFull =
+                isAtCapacity || (hasStandbyQueue && !canClaimStandbySpot);
             final bookingSummary = _selectionSummary(
               gClass,
               socialMatOccupancy,
@@ -744,7 +750,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
             );
             final canSubmit =
                 !_isSubmitting &&
-                !isInStandby &&
+                !standbyBlocksSelection &&
                 !isFull &&
                 _hasCompleteSelection(gClass, socialMatOccupancy);
 
@@ -787,7 +793,7 @@ class _MatSelectionScreenState extends ConsumerState<MatSelectionScreen> {
                       socialMatOccupancy: socialMatOccupancy,
                       selectedMats: _selectedMats,
                       groupSize: _groupSize,
-                      isLocked: isFull || isInStandby,
+                      isLocked: isFull || standbyBlocksSelection,
                       onToggleMat: (matNumber) {
                         setState(() {
                           if (_selectedMats.contains(matNumber)) {
