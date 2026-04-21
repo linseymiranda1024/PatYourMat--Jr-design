@@ -14,9 +14,7 @@ service cloud.firestore {
     }
 
     function isStaff() {
-      return signedIn() && 
-             (get(/databases/$(database)/documents/user_profiles/$(request.auth.uid)).data.get('role', 'Member') == 'Staff' ||
-              get(/databases/$(database)/documents/user_profiles/$(request.auth.uid)).data.get('allow_class_creation', false) == true);
+      return signedIn() && currentUserProfile().data.role == 'Staff';
     }
 
     function pendingGroupInviteExpiryFieldsOnly() {

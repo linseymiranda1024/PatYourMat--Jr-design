@@ -11,10 +11,7 @@ service firebase.storage {
 
     function isStaff() {
       return isSignedIn() && 
-             (('role' in firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data &&
-               firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff') ||
-              ('allow_class_creation' in firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data &&
-               firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.allow_class_creation == true));
+             firestore.get(/databases/(default)/documents/user_profiles/$(request.auth.uid)).data.role == 'Staff';
     }
 
     match /users/{userId}/profile_picture/{fileName} {
@@ -23,7 +20,7 @@ service firebase.storage {
     }
 
     match /classes/images/{allPaths=**} {
-      allow read: if isSignedIn();
+      allow read: if true;
       allow write, delete: if isStaff();
     }
 
