@@ -785,21 +785,14 @@ class _ClassHeroHeader extends StatelessWidget {
           ),
         ),
         child: Center(
-          child: Column(
-            mainAxisSize: MainAxisSize.min,
-            children: [
-              Icon(visual.icon, size: 74, color: Colors.white),
-              const SizedBox(height: 16),
-              Text(
-                gymClass.type,
-                style: const TextStyle(
-                  color: Colors.white,
-                  fontSize: 18,
-                  fontWeight: FontWeight.w700,
-                  letterSpacing: 0.3,
-                ),
-              ),
-            ],
+          child: Text(
+            gymClass.type,
+            style: const TextStyle(
+              color: Colors.white,
+              fontSize: 18,
+              fontWeight: FontWeight.w700,
+              letterSpacing: 0.3,
+            ),
           ),
         ),
       );
@@ -825,11 +818,7 @@ class _ClassHeroHeader extends StatelessWidget {
                         decoration: BoxDecoration(
                           gradient: LinearGradient(colors: visual.colors),
                         ),
-                        child: Icon(
-                          visual.icon,
-                          color: Colors.white,
-                          size: 72,
-                        ),
+                        child: Icon(visual.icon, color: Colors.white, size: 72),
                       );
                     },
                   ),
