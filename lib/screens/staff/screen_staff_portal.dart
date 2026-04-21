@@ -788,22 +788,39 @@ class ScreenStaffPortal extends ConsumerWidget {
                       onPressed: () {
                         showDialog(
                           context: context,
-                          builder: (context) => AlertDialog(
+                          builder: (dialogContext) => AlertDialog(
                             title: const Text('Delete Class'),
                             content: const Text(
                               'Are you sure you want to delete this class?',
                             ),
                             actions: [
                               TextButton(
-                                onPressed: () => Navigator.pop(context),
+                                onPressed: () => Navigator.pop(dialogContext),
                                 child: const Text('Cancel'),
                               ),
                               TextButton(
-                                onPressed: () {
-                                  ref
-                                      .read(providerGymClass)
-                                      .deleteClass(gymClass.id);
-                                  Navigator.pop(context);
+                                onPressed: () async {
+                                  Navigator.pop(dialogContext);
+                                  try {
+                                    await ref
+                                        .read(providerGymClass)
+                                        .deleteClass(gymClass.id);
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      const SnackBar(
+                                        content: Text('Class deleted.'),
+                                      ),
+                                    );
+                                  } catch (error) {
+                                    if (!context.mounted) return;
+                                    ScaffoldMessenger.of(context).showSnackBar(
+                                      SnackBar(
+                                        content: Text(
+                                          'Failed to delete class: $error',
+                                        ),
+                                      ),
+                                    );
+                                  }
                                 },
                                 child: const Text('Delete'),
                               ),

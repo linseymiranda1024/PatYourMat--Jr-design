@@ -89,4 +89,15 @@ void main() {
       expect(dates[2].difference(dates[1]).inDays, 14);
     },
   );
+
+  test('deleteClass uses the server-side full delete function', () async {
+    String? deletedClassId;
+    DBGymClass.useDeleteClassFunction((classId) async {
+      deletedClassId = classId;
+    });
+
+    await DBGymClass.deleteClass(' class-1 ');
+
+    expect(deletedClassId, 'class-1');
+  });
 }

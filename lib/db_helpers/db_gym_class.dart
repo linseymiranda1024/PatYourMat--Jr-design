@@ -1,11 +1,15 @@
 import 'package:flutter/foundation.dart';
 import 'package:cloud_firestore/cloud_firestore.dart';
+import 'package:cloud_functions/cloud_functions.dart';
 import 'package:firebase_storage/firebase_storage.dart';
 import '../models/gym_class.dart';
+
+typedef DeleteClassFully = Future<void> Function(String classId);
 
 class DBGymClass {
   static FirebaseFirestore _db = FirebaseFirestore.instance;
   static FirebaseStorage _storage = FirebaseStorage.instance;
+  static DeleteClassFully? _deleteClassFullyOverride;
   static const String _collection = 'classes';
 
   @visibleForTesting
@@ -19,7 +23,13 @@ class DBGymClass {
   }
 
   @visibleForTesting
+  static void useDeleteClassFunction(DeleteClassFully deleteClassFully) {
+    _deleteClassFullyOverride = deleteClassFully;
+  }
+
+  @visibleForTesting
   static void resetFirestoreInstance() {
+    _deleteClassFullyOverride = null;
     try {
       _db = FirebaseFirestore.instance;
       _storage = FirebaseStorage.instance;
@@ -101,7 +111,20 @@ class DBGymClass {
   }
 
   static Future<void> deleteClass(String id) async {
-    await _db.collection(_collection).doc(id).delete();
+    final cleanId = id.trim();
+    if (cleanId.isEmpty) {
+      throw ArgumentError.value(id, 'id', 'Class id cannot be empty.');
+    }
+
+    final deleteClassFully = _deleteClassFullyOverride;
+    if (deleteClassFully != null) {
+      await deleteClassFully(cleanId);
+      return;
+    }
+
+    await FirebaseFunctions.instance.httpsCallable('deleteClassFully').call(
+      <String, dynamic>{'classId': cleanId},
+    );
   }
 
   static Future<String> uploadClassImage({
@@ -112,10 +135,7 @@ class DBGymClass {
     final ref = _storage.ref().child(
       'classes/images/$cleanImageId-${DateTime.now().microsecondsSinceEpoch}.jpg',
     );
-    await ref.putData(
-      imageBytes,
-      SettableMetadata(contentType: 'image/jpeg'),
-    );
+    await ref.putData(imageBytes, SettableMetadata(contentType: 'image/jpeg'));
     return ref.getDownloadURL();
   }
 

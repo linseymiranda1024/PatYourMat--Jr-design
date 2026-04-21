@@ -182,6 +182,76 @@ async function deleteDocumentRefsInBatches(documentRefs) {
   }
 }
 
+function addUniqueDocumentRef(refsByPath, ref) {
+  if (ref?.path) {
+    refsByPath.set(ref.path, ref);
+  }
+}
+
+async function collectDocumentDescendantRefs(docRef, refsByPath) {
+  const subcollections = await docRef.listCollections();
+  for (const subcollection of subcollections) {
+    const snapshot = await subcollection.get();
+    for (const doc of snapshot.docs) {
+      await collectDocumentDescendantRefs(doc.ref, refsByPath);
+      addUniqueDocumentRef(refsByPath, doc.ref);
+    }
+  }
+}
+
+async function collectClassRelatedDeleteRefs(classId) {
+  const refsByPath = new Map();
+  const classRef = db.collection("classes").doc(classId);
+
+  await collectDocumentDescendantRefs(classRef, refsByPath);
+
+  const userProfilesSnapshot = await db.collection("user_profiles").get();
+  await Promise.all(userProfilesSnapshot.docs.map(async (userDoc) => {
+    const registrationsRef = userDoc.ref.collection("registrations");
+    const notificationsRef = userDoc.ref.collection("notifications");
+
+    const [
+      registrationByIdDoc,
+      registrationByClassIdSnapshot,
+      notificationsBySnakeCaseSnapshot,
+      notificationsByCamelCaseSnapshot,
+    ] = await Promise.all([
+      registrationsRef.doc(classId).get(),
+      registrationsRef.where("classId", "==", classId).get(),
+      notificationsRef.where("class_id", "==", classId).get(),
+      notificationsRef.where("classId", "==", classId).get(),
+    ]);
+
+    if (registrationByIdDoc.exists) {
+      addUniqueDocumentRef(refsByPath, registrationByIdDoc.ref);
+    }
+    for (const doc of registrationByClassIdSnapshot.docs) {
+      addUniqueDocumentRef(refsByPath, doc.ref);
+    }
+    for (const doc of notificationsBySnakeCaseSnapshot.docs) {
+      addUniqueDocumentRef(refsByPath, doc.ref);
+    }
+    for (const doc of notificationsByCamelCaseSnapshot.docs) {
+      addUniqueDocumentRef(refsByPath, doc.ref);
+    }
+  }));
+
+  return {
+    classRef,
+    relatedRefs: [...refsByPath.values()],
+  };
+}
+
+async function assertStaffUser(uid) {
+  const profileDoc = await db.collection("user_profiles").doc(uid).get();
+  if (!profileDoc.exists || profileDoc.data()?.role !== "Staff") {
+    throw new HttpsError(
+        "permission-denied",
+        "Only staff members can delete classes.",
+    );
+  }
+}
+
 exports.registerForClass = onCall(async (request) => {
   const auth = request.auth;
   if (!auth) {
@@ -333,6 +403,54 @@ exports.registerForClass = onCall(async (request) => {
   }
 });
 
+exports.deleteClassFully = onCall(async (request) => {
+  const auth = request.auth;
+  if (!auth) {
+    throw new HttpsError(
+        "unauthenticated",
+        "The function must be called while authenticated.",
+    );
+  }
+
+  const classId = toTrimmedString(request.data?.classId);
+  if (!classId) {
+    throw new HttpsError(
+        "invalid-argument",
+        "The function must be called with a valid 'classId'.",
+    );
+  }
+
+  await assertStaffUser(auth.uid);
+
+  try {
+    const {classRef, relatedRefs} = await collectClassRelatedDeleteRefs(classId);
+    const classDoc = await classRef.get();
+
+    await classRef.delete();
+    await deleteDocumentRefsInBatches(relatedRefs);
+
+    console.log(
+        `Fully deleted class ${classId}; deleted ${relatedRefs.length} related docs.`,
+    );
+
+    return {
+      success: true,
+      classExisted: classDoc.exists,
+      deletedRelatedDocs: relatedRefs.length,
+    };
+  } catch (error) {
+    if (error instanceof HttpsError) {
+      throw error;
+    }
+
+    console.error("Class deletion error:", error);
+    throw new HttpsError(
+        "internal",
+        "An error occurred while deleting the class.",
+    );
+  }
+});
+
 exports.cleanupDeletedClassData = onDocumentDeleted(
     "classes/{classId}",
     async (event) => {
@@ -342,34 +460,12 @@ exports.cleanupDeletedClassData = onDocumentDeleted(
       }
 
       try {
-        const classRef = db.collection("classes").doc(classId);
-        const userProfilesSnapshot = await db.collection("user_profiles").get();
-        const userRegistrationRefs = userProfilesSnapshot.docs.map((userDoc) =>
-          userDoc.ref.collection("registrations").doc(classId),
-        );
-        const userRegistrationDocs = userRegistrationRefs.length > 0 ?
-          await db.getAll(...userRegistrationRefs) :
-          [];
-        const classRegistrationsSnapshot = await classRef
-            .collection("registrations")
-            .get();
-        const standbyQueueSnapshot = await classRef
-            .collection("standby_queue")
-            .get();
+        const {relatedRefs} = await collectClassRelatedDeleteRefs(classId);
+        await deleteDocumentRefsInBatches(relatedRefs);
 
-        const refsToDelete = [
-          ...userRegistrationDocs
-              .filter((doc) => doc.exists)
-              .map((doc) => doc.ref),
-          ...classRegistrationsSnapshot.docs.map((doc) => doc.ref),
-          ...standbyQueueSnapshot.docs.map((doc) => doc.ref),
-        ];
-
-        await deleteDocumentRefsInBatches(refsToDelete);
-
-        if (refsToDelete.length > 0) {
+        if (relatedRefs.length > 0) {
           console.log(
-              `Cleaned ${refsToDelete.length} orphaned docs for deleted class ${classId}.`,
+              `Cleaned ${relatedRefs.length} orphaned docs for deleted class ${classId}.`,
           );
         }
       } catch (error) {
