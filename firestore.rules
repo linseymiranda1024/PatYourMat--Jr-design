@@ -17,7 +17,14 @@ service cloud.firestore {
       return signedIn() && 
              exists(/databases/$(database)/documents/user_profiles/$(request.auth.uid)) &&
              (currentUserProfile().data.role == 'Staff' || 
-              (currentUserProfile().data.get('allow_class_creation', false) == true));
+              currentUserProfile().data.get('allow_class_creation', false) == true);
+    }
+
+    function pendingGroupInviteExpiryFieldsOnly() {
+      return request.resource.data.diff(resource.data).changedKeys().hasOnly([
+        'status',
+        'expired_at'
+      ]);
     }
 
     function classReservationFieldsOnly() {
@@ -113,6 +120,13 @@ service cloud.firestore {
         allow read: if signedIn();
         allow create, delete: if isOwner(userId);
         allow update: if false;
+      }
+
+      match /pending_group_invites/{inviteeUid} {
+        allow read: if signedIn();
+        allow create: if signedIn();
+        allow update: if isStaff() || (signedIn() && pendingGroupInviteExpiryFieldsOnly());
+        allow delete: if signedIn();
       }
     }
   }
